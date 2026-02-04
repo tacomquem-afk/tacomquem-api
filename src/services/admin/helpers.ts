@@ -36,16 +36,11 @@ export function maskName(name: string): string {
   return `${firstName} ${lastInitial}***`;
 }
 
-interface RequestWithHeaders {
-  headers?: Record<string, string | string[]>;
-  ip?: string;
-}
-
 /**
  * Extracts client IP address from request headers or direct IP
  * Checks x-forwarded-for, x-real-ip, then request.ip
  */
-export function getClientIp(request: RequestWithHeaders): string | undefined {
+export function getClientIp(request: any): string | undefined {
   const forwardedFor = request.headers?.['x-forwarded-for'];
   if (forwardedFor) {
     const ipStr = typeof forwardedFor === 'string' ? forwardedFor : forwardedFor[0];

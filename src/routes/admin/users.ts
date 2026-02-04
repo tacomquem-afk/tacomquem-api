@@ -13,7 +13,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       ],
     },
     async (request) => {
-      const params = listUsersSchema.parse(request.query);
+      const params = listUsersSchema.parse(request.query) as Parameters<typeof listUsers>[0];
       return await listUsers(params);
     }
   );

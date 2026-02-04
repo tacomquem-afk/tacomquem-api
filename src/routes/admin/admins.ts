@@ -75,7 +75,7 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
-      const params = auditLogQuerySchema.parse(request.query);
+      const params = auditLogQuerySchema.parse(request.query) as Parameters<typeof getAuditLog>[0];
       return await getAuditLog(params);
     }
   );
