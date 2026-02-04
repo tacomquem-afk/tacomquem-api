@@ -23,6 +23,25 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'loan_returned',
 ]);
 
+export const roleEnum = pgEnum('user_role', [
+  'USER',
+  'ANALYST',
+  'SUPPORT',
+  'MODERATOR',
+  'SUPER_ADMIN',
+]);
+
+export const adminActionEnum = pgEnum('admin_action', [
+  'user_blocked',
+  'user_unblocked',
+  'item_removed',
+  'loan_cancelled',
+  'admin_created',
+  'admin_role_changed',
+  'admin_removed',
+  'content_flagged',
+]);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   emailEncrypted: text('email_encrypted').notNull(),
