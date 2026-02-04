@@ -8,6 +8,7 @@ import Fastify from 'fastify';
 import { env } from './config/env.js';
 import { db } from './db/index.js';
 import jwtPlugin from './plugins/jwt.js';
+import rbacPlugin from './plugins/rbac.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import { dashboardRoutes } from './routes/dashboard/index.js';
@@ -82,6 +83,7 @@ export async function buildApp() {
   });
 
   await app.register(jwtPlugin);
+  await app.register(rbacPlugin);
 
   app.get(
     '/api/health',
