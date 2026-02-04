@@ -11,6 +11,8 @@ import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import itemsRoutes from './routes/items/index.js';
 import { uploadRoutes } from './routes/upload/index.js';
+import { loansRoutes } from './routes/loans/index.js';
+import { linksRoutes } from './routes/links/index.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -134,6 +136,8 @@ export async function buildApp() {
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
   await app.register(itemsRoutes, { prefix: '/api/items' });
   await app.register(uploadRoutes, { prefix: '/api/upload' });
+  await app.register(loansRoutes, { prefix: '/api/loans' });
+  await app.register(linksRoutes, { prefix: '/api/links' });
 
   return app;
 }
