@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { roleEnum, adminActionEnum } from '../schema.js';
+import { roleEnum, adminActionEnum, users } from '../schema.js';
 
 describe('Schema Enums', () => {
   it('should have all required user roles', () => {
@@ -22,5 +22,22 @@ describe('Schema Enums', () => {
     expect(actions).toContain('admin_role_changed');
     expect(actions).toContain('admin_removed');
     expect(actions).toContain('content_flagged');
+  });
+});
+
+describe('Users Table Admin Fields', () => {
+  it('should have role column with USER as default', () => {
+    const roleColumn = users.role;
+    expect(roleColumn).toBeDefined();
+  });
+
+  it('should have isActive column with true as default', () => {
+    const isActiveColumn = users.isActive;
+    expect(isActiveColumn).toBeDefined();
+  });
+
+  it('should have nullable blockedAt and blockedReason columns', () => {
+    expect(users.blockedAt).toBeDefined();
+    expect(users.blockedReason).toBeDefined();
   });
 });

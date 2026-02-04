@@ -50,6 +50,10 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }),
   avatarUrl: text('avatar_url'),
   emailVerified: boolean('email_verified').default(false).notNull(),
+  role: roleEnum('role').default('USER').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  blockedAt: timestamp('blocked_at'),
+  blockedReason: text('blocked_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
