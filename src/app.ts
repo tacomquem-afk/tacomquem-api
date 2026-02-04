@@ -4,9 +4,11 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
+
 import { env } from './config/env.js';
 import { db } from './db/index.js';
 import jwtPlugin from './plugins/jwt.js';
+import { dashboardRoutes } from './routes/dashboard/index.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import itemsRoutes from './routes/items/index.js';
@@ -138,6 +140,7 @@ export async function buildApp() {
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(loansRoutes, { prefix: '/api/loans' });
   await app.register(linksRoutes, { prefix: '/api/links' });
+  await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
 
   return app;
 }
