@@ -40,7 +40,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
         prompt: 'consent',
       });
 
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      const authUrl = `${env.GOOGLE_AUTH_URL}?${params}`;
       return reply.redirect(authUrl);
     }
   );
@@ -79,7 +79,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
       }
 
       try {
-        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        const tokenResponse = await fetch(env.GOOGLE_TOKEN_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
@@ -97,7 +97,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
 
         const tokens = (await tokenResponse.json()) as GoogleTokenResponse;
 
-        const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        const userResponse = await fetch(env.GOOGLE_USERINFO_URL, {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 

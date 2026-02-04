@@ -33,9 +33,9 @@ export async function buildApp() {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'TáComQuem API',
-        description: 'API para gestão de empréstimos pessoais entre amigos',
-        version: '1.0.0',
+        title: env.API_TITLE,
+        description: env.API_DESCRIPTION,
+        version: env.API_VERSION,
         contact: {
           name: 'TáComQuem',
         },
@@ -43,7 +43,7 @@ export async function buildApp() {
       servers: [
         {
           url: env.FRONTEND_URL,
-          description: 'Development server',
+          description: env.API_ENVIRONMENT_LABEL,
         },
       ],
       components: {
