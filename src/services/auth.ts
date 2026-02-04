@@ -45,6 +45,10 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
     passwordHash: passwordHashed,
   }).returning();
 
+  if (!user) {
+    throw new Error('Erro ao criar usuário');
+  }
+
   const token = nanoid(32);
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
 
@@ -66,7 +70,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
     id: user.id,
     name: input.name,
     email: input.email,
-    avatarUrl: user.avatarUrl,
+    avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
   };
 }
@@ -128,7 +132,7 @@ export async function login(email: string, password: string): Promise<UserRespon
     id: user.id,
     name: decrypt(user.nameEncrypted),
     email: decrypt(user.emailEncrypted),
-    avatarUrl: user.avatarUrl,
+    avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
   };
 }
@@ -209,13 +213,13 @@ export async function findOrCreateGoogleUser(
     with: { user: true },
   });
 
-  if (existingOauth && existingOauth.user) {
+  if (existingOauth?.user) {
     const user = existingOauth.user;
     return {
       id: user.id,
       name: decrypt(user.nameEncrypted),
       email: decrypt(user.emailEncrypted),
-      avatarUrl: user.avatarUrl,
+      avatarUrl: user.avatarUrl ?? null,
       emailVerified: user.emailVerified,
     };
   }
@@ -240,7 +244,7 @@ export async function findOrCreateGoogleUser(
       id: existingUser.id,
       name: decrypt(existingUser.nameEncrypted),
       email: decrypt(existingUser.emailEncrypted),
-      avatarUrl: avatarUrl || existingUser.avatarUrl,
+      avatarUrl: (avatarUrl || existingUser.avatarUrl) ?? null,
       emailVerified: true,
     };
   }
@@ -253,6 +257,10 @@ export async function findOrCreateGoogleUser(
     emailVerified: true,
   }).returning();
 
+  if (!user) {
+    throw new Error('Erro ao criar usuário');
+  }
+
   await db.insert(oauthAccounts).values({
     userId: user.id,
     provider: 'google',
@@ -263,7 +271,7 @@ export async function findOrCreateGoogleUser(
     id: user.id,
     name,
     email,
-    avatarUrl,
+    avatarUrl: avatarUrl ?? null,
     emailVerified: true,
   };
 }
@@ -281,7 +289,7 @@ export async function getUserById(userId: string): Promise<UserResponse | null> 
     id: user.id,
     name: decrypt(user.nameEncrypted),
     email: decrypt(user.emailEncrypted),
-    avatarUrl: user.avatarUrl,
+    avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
   };
 }
