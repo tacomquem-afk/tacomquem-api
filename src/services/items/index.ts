@@ -1,7 +1,7 @@
-import { and, eq } from "drizzle-orm";
-import { db } from "../../db/index.js";
-import { items } from "../../db/schema.js";
-import type { CreateItemInput, UpdateItemInput } from "../../schemas/items.js";
+import { and, eq } from 'drizzle-orm';
+import { db } from '../../db/index.js';
+import { items } from '../../db/schema.js';
+import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
 
 export interface ItemResponse {
   id: string;
@@ -33,10 +33,7 @@ function toItemResponse(item: typeof items.$inferSelect): ItemResponse {
   };
 }
 
-export async function createItem(
-  ownerId: string,
-  input: CreateItemInput,
-): Promise<ItemResponse> {
+export async function createItem(ownerId: string, input: CreateItemInput): Promise<ItemResponse> {
   const result = await db
     .insert(items)
     .values({
@@ -48,15 +45,13 @@ export async function createItem(
     .returning();
 
   if (!result[0]) {
-    throw new Error("Falha ao criar item");
+    throw new Error('Falha ao criar item');
   }
 
   return toItemResponse(result[0]);
 }
 
-export async function getItemsByOwner(
-  ownerId: string,
-): Promise<ItemResponse[]> {
+export async function getItemsByOwner(ownerId: string): Promise<ItemResponse[]> {
   const result = await db.query.items.findMany({
     where: and(eq(items.ownerId, ownerId), eq(items.isActive, true)),
     orderBy: (items, { desc }) => [desc(items.createdAt)],
@@ -65,10 +60,7 @@ export async function getItemsByOwner(
   return result.map(toItemResponse);
 }
 
-export async function getItemById(
-  itemId: string,
-  ownerId: string,
-): Promise<ItemResponse | null> {
+export async function getItemById(itemId: string, ownerId: string): Promise<ItemResponse | null> {
   const item = await db.query.items.findFirst({
     where: and(eq(items.id, itemId), eq(items.ownerId, ownerId)),
   });
@@ -83,7 +75,7 @@ export async function getItemById(
 export async function updateItem(
   itemId: string,
   ownerId: string,
-  input: UpdateItemInput,
+  input: UpdateItemInput
 ): Promise<ItemResponse | null> {
   const existing = await db.query.items.findFirst({
     where: and(eq(items.id, itemId), eq(items.ownerId, ownerId)),
@@ -98,28 +90,19 @@ export async function updateItem(
   };
 
   if (input.name !== undefined) updateData.name = input.name;
-  if (input.description !== undefined)
-    updateData.description = input.description;
-  if (input.images !== undefined)
-    updateData.images = JSON.stringify(input.images);
+  if (input.description !== undefined) updateData.description = input.description;
+  if (input.images !== undefined) updateData.images = JSON.stringify(input.images);
 
-  const result = await db
-    .update(items)
-    .set(updateData)
-    .where(eq(items.id, itemId))
-    .returning();
+  const result = await db.update(items).set(updateData).where(eq(items.id, itemId)).returning();
 
   if (!result[0]) {
-    throw new Error("Falha ao atualizar item");
+    throw new Error('Falha ao atualizar item');
   }
 
   return toItemResponse(result[0]);
 }
 
-export async function deleteItem(
-  itemId: string,
-  ownerId: string,
-): Promise<boolean> {
+export async function deleteItem(itemId: string, ownerId: string): Promise<boolean> {
   const existing = await db.query.items.findFirst({
     where: and(eq(items.id, itemId), eq(items.ownerId, ownerId)),
   });
@@ -137,9 +120,7 @@ export async function deleteItem(
   return true;
 }
 
-export async function getItemByIdPublic(
-  itemId: string,
-): Promise<ItemResponse | null> {
+export async function getItemByIdPublic(itemId: string): Promise<ItemResponse | null> {
   const item = await db.query.items.findFirst({
     where: and(eq(items.id, itemId), eq(items.isActive, true)),
   });

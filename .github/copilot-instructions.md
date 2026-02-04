@@ -132,6 +132,8 @@ const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
 
 ### Directory Structure
 
+**Pattern:** Each service lives in its own folder with colocated tests under `__tests__/`.
+
 ```
 src/
 ├── config/env.ts              # Environment validation (Zod)
@@ -150,11 +152,28 @@ src/
 ├── schemas/
 │   ├── auth.ts              # Auth validations
 │   └── items.ts             # Item validations
-├── services/                # Business logic (to create)
-│   ├── crypto/index.ts      # Encryption/decryption
-│   ├── email/index.ts       # Email sending
-│   └── items.ts             # Item business logic
-├── app.ts                    # Express setup + plugin registration
+├── services/
+│   ├── auth/
+│   │   ├── index.ts         # Auth business logic
+│   │   └── __tests__/
+│   │       └── auth.test.ts
+│   ├── crypto/
+│   │   ├── index.ts         # Encryption/decryption
+│   │   └── __tests__/
+│   │       └── crypto.test.ts
+│   ├── email/
+│   │   ├── index.ts         # Email sending
+│   │   └── __tests__/
+│   │       └── email.test.ts
+│   ├── items/
+│   │   ├── index.ts         # Item business logic
+│   │   └── __tests__/
+│   │       └── items.test.ts
+│   └── password/
+│       ├── index.ts         # Password hashing/verification
+│       └── __tests__/
+│           └── password.test.ts
+├── app.ts                    # Fastify setup + plugin registration
 └── index.ts                  # Entry point
 ```
 
@@ -335,6 +354,55 @@ export default async function routes(fastify: FastifyInstance) {
 
 // 3. Register in src/app.ts
 await app.register(newfeatureRoutes, { prefix: "/api/newfeature" });
+```
+
+### Adding a New Service
+
+**Always create a folder for each new service with colocated tests.**
+
+```typescript
+// 1. Create service structure
+src/services/newservice/
+├── index.ts                  # Service functions
+└── __tests__/
+    └── newservice.test.ts    # Unit tests
+
+// 2. Create src/services/newservice/index.ts
+export interface ServiceResult {
+  id: string;
+  // ... types
+}
+
+export async function doSomething(input: string): Promise<ServiceResult> {
+  // Business logic here
+  return result;
+}
+
+// 3. Create tests in src/services/newservice/__tests__/newservice.test.ts
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { db } from '../../../db/index.js';
+import { doSomething } from '../index.js';
+
+describe('newservice', () => {
+  beforeEach(() => {
+    // Mock setup
+  });
+
+  it('should do something', async () => {
+    spyOn(db.query.sometable, 'findFirst').mockResolvedValueOnce(mockData as any);
+    const result = await doSomething('input');
+    expect(result).toBeDefined();
+  });
+});
+
+// 4. Import in routes
+import { doSomething } from '../../services/newservice/index.js';
+
+// 5. Run tests to ensure they pass
+bun test src/services/newservice/__tests__/newservice.test.ts
+
+// 6. Run QA before committing
+bun run qa
 ```
 
 ### Running Migrations After Schema Changes

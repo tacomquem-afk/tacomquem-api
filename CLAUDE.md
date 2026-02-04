@@ -63,7 +63,9 @@ users
 3. User must login to confirm the loan
 4. JWT access tokens expire in 7 days, refresh tokens in 30 days
 
-### Project Structure (Planned)
+### Project Structure
+
+**Pattern:** Each service lives in its own folder with colocated tests.
 
 ```
 src/
@@ -77,14 +79,31 @@ src/
 │   ├── links/
 │   └── dashboard/
 ├── services/
-│   ├── email.ts
-│   ├── crypto.ts
-│   └── storage.ts
+│   ├── auth/
+│   │   ├── index.ts
+│   │   └── __tests__/
+│   │       └── auth.test.ts
+│   ├── crypto/
+│   │   ├── index.ts
+│   │   └── __tests__/
+│   │       └── crypto.test.ts
+│   ├── email/
+│   │   ├── index.ts
+│   │   └── __tests__/
+│   │       └── email.test.ts
+│   ├── items/
+│   │   ├── index.ts
+│   │   └── __tests__/
+│   │       └── items.test.ts
+│   └── password/
+│       ├── index.ts
+│       └── __tests__/
+│           └── password.test.ts
 ├── schemas/         # Zod validations
 └── index.ts
 ```
 
-## Development Commands (When Implementation Starts)
+## Development Commands
 
 ```bash
 # Using Bun runtime
@@ -92,13 +111,17 @@ bun run dev              # Development server with hot reload
 bun run build            # Build TypeScript
 bun run start            # Production server
 
-# Database migrations
-bun drizzle-kit generate:pg    # Generate migration
-bun drizzle-kit push:pg         # Apply migration
-
-# Testing
-bun test                 # Run tests
+# Quality & Testing
+bun run qa               # TypeScript check + Biome linting (REQUIRED before commit)
+bun run qa:fix           # Auto-fix lint/format issues, then typecheck
+bun test                 # Run all tests
+bun test [path]          # Run specific test file
 bun test:coverage        # Run tests with coverage
+
+# Database migrations
+bun run db:generate      # Generate migration after schema changes
+bun run db:migrate       # Apply migrations
+bun run db:studio        # Open Drizzle Studio GUI
 ```
 
 ## Key Documentation
@@ -195,3 +218,34 @@ export const verificationTokens = pgTable('verification_tokens', {
 // Using AES-256-GCM for LGPD compliance - each encryption uses a unique IV
 function encrypt(text: string): string { ... }
 ```
+
+## Creating New Services
+
+When creating a new service, always follow this pattern:
+
+1. **Create the service folder:**
+   ```
+   src/services/myservice/
+   ├── index.ts                           # Export only functions and types
+   └── __tests__/
+       └── myservice.test.ts              # Unit tests
+   ```
+
+2. **Implement the service** (`src/services/myservice/index.ts`):
+   - Export typed interfaces for domain objects
+   - Write pure or dependency-injected functions
+   - Avoid circular imports (import from db, schemas, other services)
+
+3. **Write comprehensive tests** (`src/services/myservice/__tests__/myservice.test.ts`):
+   - Mock external dependencies (db, email service, etc.)
+   - Use Bun's native `test` runner
+   - Test both happy paths and error cases
+
+4. **Run QA before committing:**
+   ```bash
+   bun test src/services/myservice/__tests__/myservice.test.ts
+   bun run qa   # TypeScript + Biome checks
+   bun run qa:fix   # Auto-fix issues if needed
+   ```
+
+Example of a well-structured service: [src/services/items/](src/services/items/) with [tests](src/services/items/__tests__/items.test.ts).
