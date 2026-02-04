@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { createLoanSchema, type CreateLoanInput } from '../../schemas/loans.js';
+import { type CreateLoanInput, createLoanSchema } from '../../schemas/loans.js';
 import {
-  createLoan,
-  getLoansByUser,
-  getLoanById,
-  markLoanAsReturned,
   cancelLoan,
+  createLoan,
+  getLoanById,
+  getLoansByUser,
+  markLoanAsReturned,
   sendReminder,
-} from '../../services/loans.js';
+} from '../../services/loans/index.js';
 
 export async function loansRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate);

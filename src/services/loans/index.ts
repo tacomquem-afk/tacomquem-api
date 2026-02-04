@@ -1,11 +1,15 @@
-import { eq, and, or, desc } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { db } from '../db/index.js';
-import { loans, loanTokens, items, users, notifications } from '../db/schema.js';
-import { decrypt } from './crypto.js';
-import { sendEmail, buildLoanConfirmationRequestEmail, buildLoanReminderEmail } from './email.js';
-import { env } from '../config/env.js';
-import type { CreateLoanInput } from '../schemas/loans.js';
+import { env } from '../../config/env.js';
+import { db } from '../../db/index.js';
+import { items, loans, loanTokens, notifications, users } from '../../db/schema.js';
+import type { CreateLoanInput } from '../../schemas/loans.js';
+import { decrypt } from '../crypto/index.js';
+import {
+  buildLoanConfirmationRequestEmail,
+  buildLoanReminderEmail,
+  sendEmail,
+} from '../email/index.js';
 
 const TOKEN_EXPIRY_DAYS = 7;
 
@@ -48,7 +52,10 @@ function parseImages(imagesJson: string): string[] {
   }
 }
 
-export async function createLoan(lenderId: string, input: CreateLoanInput): Promise<{ loan: LoanResponse; confirmUrl: string }> {
+export async function createLoan(
+  lenderId: string,
+  input: CreateLoanInput
+): Promise<{ loan: LoanResponse; confirmUrl: string }> {
   const item = await db.query.items.findFirst({
     where: and(eq(items.id, input.itemId), eq(items.ownerId, lenderId)),
   });
@@ -67,14 +74,22 @@ export async function createLoan(lenderId: string, input: CreateLoanInput): Prom
 
   const lenderName = decrypt(lender.nameEncrypted);
 
-  const [loan] = await db.insert(loans).values({
-    itemId: input.itemId,
-    lenderId,
-    borrowerEmail: input.borrowerEmail,
-    expectedReturnDate: input.expectedReturnDate ? new Date(input.expectedReturnDate) : null,
-    lenderNotes: input.lenderNotes,
-  }).returning();
+  const loanResult = await db
+    .insert(loans)
+    .values({
+      itemId: input.itemId,
+      lenderId,
+      borrowerEmail: input.borrowerEmail,
+      expectedReturnDate: input.expectedReturnDate ? new Date(input.expectedReturnDate) : null,
+      lenderNotes: input.lenderNotes,
+    })
+    .returning();
 
+  if (!loanResult[0]) {
+    throw new Error('Falha ao criar empréstimo');
+  }
+
+  const loan = loanResult[0];
   const token = nanoid(32);
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
@@ -121,7 +136,7 @@ export async function getLoansByUser(
   userId: string,
   filter?: 'lent' | 'borrowed' | 'pending' | 'confirmed' | 'returned'
 ): Promise<LoanResponse[]> {
-  let whereClause;
+  let whereClause = or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId));
 
   switch (filter) {
     case 'lent':
@@ -192,10 +207,7 @@ export async function getLoansByUser(
 
 export async function getLoanById(loanId: string, userId: string): Promise<LoanResponse | null> {
   const loan = await db.query.loans.findFirst({
-    where: and(
-      eq(loans.id, loanId),
-      or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId))
-    ),
+    where: and(eq(loans.id, loanId), or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId))),
     with: {
       item: true,
       lender: true,
@@ -235,7 +247,10 @@ export async function getLoanById(loanId: string, userId: string): Promise<LoanR
   };
 }
 
-export async function markLoanAsReturned(loanId: string, lenderId: string): Promise<LoanResponse | null> {
+export async function markLoanAsReturned(
+  loanId: string,
+  lenderId: string
+): Promise<LoanResponse | null> {
   const loan = await db.query.loans.findFirst({
     where: and(eq(loans.id, loanId), eq(loans.lenderId, lenderId)),
     with: { item: true, lender: true, borrower: true },
@@ -249,7 +264,8 @@ export async function markLoanAsReturned(loanId: string, lenderId: string): Prom
     throw new Error('Apenas empréstimos confirmados podem ser marcados como devolvidos');
   }
 
-  await db.update(loans)
+  await db
+    .update(loans)
     .set({ status: 'returned', returnedAt: new Date(), updatedAt: new Date() })
     .where(eq(loans.id, loanId));
 
@@ -280,7 +296,8 @@ export async function cancelLoan(loanId: string, lenderId: string): Promise<bool
     throw new Error('Apenas empréstimos pendentes podem ser cancelados');
   }
 
-  await db.update(loans)
+  await db
+    .update(loans)
     .set({ status: 'cancelled', updatedAt: new Date() })
     .where(eq(loans.id, loanId));
 
@@ -315,14 +332,16 @@ export async function sendReminder(loanId: string, lenderId: string): Promise<bo
     html: buildLoanReminderEmail(borrowerName, lenderName, loan.item.name, env.FRONTEND_URL),
   });
 
-  await db.insert(notifications).values({
-    userId: loan.borrowerId!,
-    loanId: loan.id,
-    type: 'loan_reminder',
-    title: 'Lembrete de devolução',
-    message: `${lenderName} está solicitando a devolução de "${loan.item.name}".`,
-    sentAt: new Date(),
-  });
+  if (loan.borrowerId) {
+    await db.insert(notifications).values({
+      userId: loan.borrowerId,
+      loanId: loan.id,
+      type: 'loan_reminder',
+      title: 'Lembrete de devolução',
+      message: `${lenderName} está solicitando a devolução de "${loan.item.name}".`,
+      sentAt: new Date(),
+    });
+  }
 
   return true;
 }
@@ -388,7 +407,8 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
     throw new Error('Empréstimo já foi processado');
   }
 
-  await db.update(loans)
+  await db
+    .update(loans)
     .set({
       borrowerId,
       status: 'confirmed',
@@ -397,9 +417,7 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
     })
     .where(eq(loans.id, loanToken.loanId));
 
-  await db.update(loanTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(loanTokens.id, loanToken.id));
+  await db.update(loanTokens).set({ usedAt: new Date() }).where(eq(loanTokens.id, loanToken.id));
 
   const borrower = await db.query.users.findFirst({
     where: eq(users.id, borrowerId),

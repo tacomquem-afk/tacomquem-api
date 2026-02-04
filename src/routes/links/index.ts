@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getPublicLoanInfo, confirmLoan } from '../../services/loans.js';
+import { confirmLoan, getPublicLoanInfo } from '../../services/loans/index.js';
 
 export async function linksRoutes(app: FastifyInstance) {
   app.get<{ Params: { token: string } }>('/:token', async (request, reply) => {

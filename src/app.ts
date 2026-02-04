@@ -10,9 +10,9 @@ import jwtPlugin from './plugins/jwt.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import itemsRoutes from './routes/items/index.js';
-import { uploadRoutes } from './routes/upload/index.js';
-import { loansRoutes } from './routes/loans/index.js';
 import { linksRoutes } from './routes/links/index.js';
+import { loansRoutes } from './routes/loans/index.js';
+import { uploadRoutes } from './routes/upload/index.js';
 
 export async function buildApp() {
   const app = Fastify({
