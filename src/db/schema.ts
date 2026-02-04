@@ -1,11 +1,9 @@
 import { pgTable, uuid, text, varchar, boolean, timestamp, pgEnum } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-// Enums
 export const loanStatusEnum = pgEnum('loan_status', ['pending', 'confirmed', 'returned', 'cancelled']);
 export const notificationTypeEnum = pgEnum('notification_type', ['loan_created', 'loan_confirmed', 'loan_reminder', 'loan_returned']);
 
-// Users
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   emailEncrypted: text('email_encrypted').notNull(),
@@ -18,7 +16,6 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// OAuth Accounts
 export const oauthAccounts = pgTable('oauth_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -31,19 +28,17 @@ export const oauthAccounts = pgTable('oauth_accounts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Items
 export const items = pgTable('items', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
-  images: text('images').notNull().default('[]'), // JSON array of URLs
+  images: text('images').notNull().default('[]'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Loans
 export const loans = pgTable('loans', {
   id: uuid('id').primaryKey().defaultRandom(),
   itemId: uuid('item_id').notNull().references(() => items.id),
@@ -60,7 +55,6 @@ export const loans = pgTable('loans', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Loan Tokens
 export const loanTokens = pgTable('loan_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   loanId: uuid('loan_id').notNull().references(() => loans.id, { onDelete: 'cascade' }),
@@ -70,7 +64,6 @@ export const loanTokens = pgTable('loan_tokens', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Notifications
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -83,18 +76,16 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Verification Tokens (email verification, password reset)
 export const verificationTokens = pgTable('verification_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: text('token').notNull().unique(),
-  type: varchar('type', { length: 50 }).notNull(), // 'email_verification' | 'password_reset'
+  type: varchar('type', { length: 50 }).notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   usedAt: timestamp('used_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-// Relations
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),

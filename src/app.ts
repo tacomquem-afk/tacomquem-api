@@ -12,7 +12,6 @@ export async function buildApp() {
     },
   });
 
-  // Plugins
   await app.register(cors, {
     origin: env.FRONTEND_URL,
     credentials: true,
@@ -23,7 +22,6 @@ export async function buildApp() {
     timeWindow: '1 minute',
   });
 
-  // Health checks
   app.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });

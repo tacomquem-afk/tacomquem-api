@@ -162,3 +162,36 @@ When setting up the project, reference `.env.example` for required variables:
 - `JWT_SECRET` / `JWT_REFRESH_SECRET` - Minimum 32 characters
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - OAuth credentials
 - `APP_URL` - Base URL for link generation
+
+## Coding Standards
+
+### Code Comments
+
+**DO NOT add unnecessary comments.** The code should be self-documenting.
+
+- **Avoid** obvious comments like `// Users`, `// Items`, `// Plugins`, `// Health checks`
+- **Avoid** inline comments that repeat what the code already says (e.g., `// 'email_verification' | 'password_reset'` next to a varchar field)
+- **Use** blank lines for visual grouping instead of comment headers
+- **Only** add comments when explaining WHY something is done (not WHAT), or for complex/non-obvious logic
+
+Examples:
+```typescript
+// ❌ BAD - Obvious comment
+// Users
+export const users = pgTable('users', { ... });
+
+// ❌ BAD - Redundant inline comment
+type: varchar('type', { length: 50 }).notNull(), // 'email_verification' | 'password_reset'
+
+// ✅ GOOD - Self-documenting
+export const users = pgTable('users', { ... });
+
+export const verificationTokens = pgTable('verification_tokens', {
+  type: varchar('type', { length: 50 }).notNull(),
+  ...
+});
+
+// ✅ ACCEPTABLE - Explains WHY (not obvious)
+// Using AES-256-GCM for LGPD compliance - each encryption uses a unique IV
+function encrypt(text: string): string { ... }
+```
