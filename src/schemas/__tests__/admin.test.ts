@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import {
-  listUsersSchema,
+  auditLogQuerySchema,
   blockUserSchema,
-  promoteAdminSchema,
   changeRoleSchema,
+  listUsersSchema,
+  promoteAdminSchema,
   removeContentSchema,
-  auditLogQuerySchema
 } from '../admin.js';
 
 describe('Admin Schemas', () => {
@@ -14,7 +14,7 @@ describe('Admin Schemas', () => {
       const result = listUsersSchema.parse({
         page: '1',
         limit: '50',
-        role: 'MODERATOR'
+        role: 'MODERATOR',
       });
 
       expect(result.page).toBe(1);
@@ -53,7 +53,9 @@ describe('Admin Schemas', () => {
   describe('removeContentSchema', () => {
     it('should validate remove reason', () => {
       expect(() => removeContentSchema.parse({ reason: 'short' })).toThrow();
-      expect(() => removeContentSchema.parse({ reason: 'Inappropriate content found' })).not.toThrow();
+      expect(() =>
+        removeContentSchema.parse({ reason: 'Inappropriate content found' })
+      ).not.toThrow();
     });
   });
 
@@ -65,17 +67,19 @@ describe('Admin Schemas', () => {
     it('should accept valid UUID and role', () => {
       const result = promoteAdminSchema.parse({
         userId: '123e4567-e89b-12d3-a456-426614174000',
-        role: 'MODERATOR'
+        role: 'MODERATOR',
       });
       expect(result.userId).toBe('123e4567-e89b-12d3-a456-426614174000');
       expect(result.role).toBe('MODERATOR');
     });
 
     it('should reject USER role', () => {
-      expect(() => promoteAdminSchema.parse({
-        userId: '123e4567-e89b-12d3-a456-426614174000',
-        role: 'USER'
-      })).toThrow();
+      expect(() =>
+        promoteAdminSchema.parse({
+          userId: '123e4567-e89b-12d3-a456-426614174000',
+          role: 'USER',
+        })
+      ).toThrow();
     });
   });
 

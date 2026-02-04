@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
-import userRoutes from '../users.js';
 import * as adminService from '../../../services/admin/index.js';
+import userRoutes from '../users.js';
 
 describe('Admin User Routes', () => {
   let app: FastifyInstance;
@@ -26,13 +26,13 @@ describe('Admin User Routes', () => {
   it('GET / should list users', async () => {
     spyOn(adminService, 'listUsers').mockResolvedValueOnce({
       users: [],
-      pagination: { page: 1, limit: 50, total: 0, totalPages: 0 }
+      pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/users',
-      headers: { authorization: `Bearer ${analystToken}` }
+      headers: { authorization: `Bearer ${analystToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -41,13 +41,13 @@ describe('Admin User Routes', () => {
   it('GET / should support pagination', async () => {
     spyOn(adminService, 'listUsers').mockResolvedValueOnce({
       users: [],
-      pagination: { page: 2, limit: 25, total: 100, totalPages: 4 }
+      pagination: { page: 2, limit: 25, total: 100, totalPages: 4 },
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/users?page=2&limit=25',
-      headers: { authorization: `Bearer ${analystToken}` }
+      headers: { authorization: `Bearer ${analystToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -69,13 +69,13 @@ describe('Admin User Routes', () => {
       borrowedLoans: [],
       items: [],
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/users/user-123',
-      headers: { authorization: `Bearer ${supportToken}` }
+      headers: { authorization: `Bearer ${supportToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -89,7 +89,7 @@ describe('Admin User Routes', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/users/nonexistent',
-      headers: { authorization: `Bearer ${supportToken}` }
+      headers: { authorization: `Bearer ${supportToken}` },
     });
 
     expect(response.statusCode).toBe(404);
@@ -100,7 +100,7 @@ describe('Admin User Routes', () => {
       method: 'POST',
       url: '/api/admin/users/user-123/block',
       headers: { authorization: `Bearer ${analystToken}` },
-      payload: { reason: 'Test reason for blocking' }
+      payload: { reason: 'Test reason for blocking' },
     });
 
     expect(response.statusCode).toBe(403);
@@ -113,7 +113,7 @@ describe('Admin User Routes', () => {
       method: 'POST',
       url: '/api/admin/users/user-123/block',
       headers: { authorization: `Bearer ${superAdminToken}` },
-      payload: { reason: 'Valid reason for blocking user' }
+      payload: { reason: 'Valid reason for blocking user' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -127,7 +127,7 @@ describe('Admin User Routes', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/admin/users/user-123/unblock',
-      headers: { authorization: `Bearer ${superAdminToken}` }
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
     expect(response.statusCode).toBe(200);

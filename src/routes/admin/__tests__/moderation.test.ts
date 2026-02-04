@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
-import moderationRoutes from '../moderation.js';
 import * as moderationService from '../../../services/admin/moderation.js';
+import moderationRoutes from '../moderation.js';
 
 describe('Admin Moderation Routes', () => {
   let app: FastifyInstance;
@@ -30,15 +30,15 @@ describe('Admin Moderation Routes', () => {
       owner: {
         id: 'user-123',
         email: 'jo***@example.com',
-        name: 'John D***'
+        name: 'John D***',
       },
-      loans: []
+      loans: [],
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/moderation/items/item-123',
-      headers: { authorization: `Bearer ${supportToken}` }
+      headers: { authorization: `Bearer ${supportToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -52,7 +52,7 @@ describe('Admin Moderation Routes', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/moderation/items/nonexistent',
-      headers: { authorization: `Bearer ${supportToken}` }
+      headers: { authorization: `Bearer ${supportToken}` },
     });
 
     expect(response.statusCode).toBe(404);
@@ -65,7 +65,7 @@ describe('Admin Moderation Routes', () => {
       method: 'DELETE',
       url: '/api/admin/moderation/items/item-123',
       headers: { authorization: `Bearer ${moderatorToken}` },
-      payload: { reason: 'Inappropriate content detected' }
+      payload: { reason: 'Inappropriate content detected' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -81,19 +81,19 @@ describe('Admin Moderation Routes', () => {
       lender: {
         id: 'user-1',
         email: 'jo***@example.com',
-        name: 'John D***'
+        name: 'John D***',
       },
       borrower: {
         id: 'user-2',
         email: 'ma***@example.com',
-        name: 'Maria S***'
-      }
+        name: 'Maria S***',
+      },
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/moderation/loans/loan-123',
-      headers: { authorization: `Bearer ${supportToken}` }
+      headers: { authorization: `Bearer ${supportToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -108,7 +108,7 @@ describe('Admin Moderation Routes', () => {
       method: 'POST',
       url: '/api/admin/moderation/loans/loan-123/cancel',
       headers: { authorization: `Bearer ${moderatorToken}` },
-      payload: { reason: 'Fraudulent loan detected' }
+      payload: { reason: 'Fraudulent loan detected' },
     });
 
     expect(response.statusCode).toBe(200);

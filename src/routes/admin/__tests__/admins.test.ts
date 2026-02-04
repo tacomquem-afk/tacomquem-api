@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
-import adminsRoutes from '../admins.js';
 import * as adminsService from '../../../services/admin/admins.js';
+import adminsRoutes from '../admins.js';
 
 describe('Admin Management Routes', () => {
   let app: FastifyInstance;
@@ -27,14 +27,14 @@ describe('Admin Management Routes', () => {
         name: 'Admin U***',
         role: 'SUPER_ADMIN',
         isActive: true,
-        createdAt: new Date()
-      }
+        createdAt: new Date(),
+      },
     ] as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/admins',
-      headers: { authorization: `Bearer ${superAdminToken}` }
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -51,8 +51,8 @@ describe('Admin Management Routes', () => {
       headers: { authorization: `Bearer ${superAdminToken}` },
       payload: {
         userId: '123e4567-e89b-12d3-a456-426614174000',
-        role: 'MODERATOR'
-      }
+        role: 'MODERATOR',
+      },
     });
 
     expect(response.statusCode).toBe(200);
@@ -67,7 +67,7 @@ describe('Admin Management Routes', () => {
       method: 'PATCH',
       url: '/api/admin/admins/admin-1/role',
       headers: { authorization: `Bearer ${superAdminToken}` },
-      payload: { role: 'ANALYST' }
+      payload: { role: 'ANALYST' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -81,7 +81,7 @@ describe('Admin Management Routes', () => {
     const response = await app.inject({
       method: 'DELETE',
       url: '/api/admin/admins/admin-1',
-      headers: { authorization: `Bearer ${superAdminToken}` }
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -99,22 +99,22 @@ describe('Admin Management Routes', () => {
             id: 'admin-1',
             email: 'ad***@example.com',
             name: 'Admin U***',
-            role: 'SUPER_ADMIN'
+            role: 'SUPER_ADMIN',
           },
           targetType: 'user',
           targetId: 'user-1',
           metadata: { reason: 'Spam' },
           ipAddress: '192.168.1.1',
-          createdAt: new Date()
-        }
+          createdAt: new Date(),
+        },
       ],
-      pagination: { page: 1, limit: 50 }
+      pagination: { page: 1, limit: 50 },
     } as any);
 
     const response = await app.inject({
       method: 'GET',
       url: '/api/admin/admins/audit-log',
-      headers: { authorization: `Bearer ${superAdminToken}` }
+      headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
     expect(response.statusCode).toBe(200);
