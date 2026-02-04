@@ -80,15 +80,16 @@ describe('dashboard service', () => {
         createdAt: now,
       };
 
-      spyOn(db, 'select').mockImplementation((query: any) => ({
-        from: () => ({
-          where: () => [{ count: 1 }],
-        }),
-      } as any));
+      spyOn(db, 'select').mockImplementation(
+        () =>
+          ({
+            from: () => ({
+              where: () => [{ count: 1 }],
+            }),
+          }) as any
+      );
 
-      spyOn(db.query.notifications, 'findMany').mockResolvedValue([
-        mockNotification,
-      ]);
+      spyOn(db.query.notifications, 'findMany').mockResolvedValue([mockNotification]);
 
       spyOn(db.query.loans, 'findMany')
         .mockResolvedValueOnce(
@@ -110,14 +111,23 @@ describe('dashboard service', () => {
       expect(data.stats.pendingCount).toBe(1);
 
       expect(data.recentActivity).toHaveLength(1);
-      expect(data.recentActivity[0].type).toBe('loan_created');
+      const activity = data.recentActivity[0];
+      if (activity) {
+        expect(activity.type).toBe('loan_created');
+      }
 
       expect(data.pendingLoans).toHaveLength(1);
-      expect(data.pendingLoans[0].itemName).toBe('Laptop');
+      const pendingLoan = data.pendingLoans[0];
+      if (pendingLoan) {
+        expect(pendingLoan.itemName).toBe('Laptop');
+      }
 
       expect(data.activeLoans).toHaveLength(1);
-      expect(data.activeLoans[0].otherParty).toBe('Jane Smith');
-      expect(data.activeLoans[0].role).toBe('lender');
+      const activeLoan = data.activeLoans[0];
+      if (activeLoan) {
+        expect(activeLoan.otherParty).toBe('Jane Smith');
+        expect(activeLoan.role).toBe('lender');
+      }
     });
   });
 
@@ -182,11 +192,14 @@ describe('dashboard service', () => {
       const friends = await getFriends(userId);
 
       expect(friends).toHaveLength(1);
-      expect(friends[0].id).toBe(friendId);
-      expect(friends[0].name).toBe('Friend Name');
-      expect(friends[0].lentCount).toBe(1);
-      expect(friends[0].borrowedCount).toBe(1);
-      expect(friends[0].avatarUrl).toBe('https://example.com/avatar.jpg');
+      const friend = friends[0];
+      if (friend) {
+        expect(friend.id).toBe(friendId);
+        expect(friend.name).toBe('Friend Name');
+        expect(friend.lentCount).toBe(1);
+        expect(friend.borrowedCount).toBe(1);
+        expect(friend.avatarUrl).toBe('https://example.com/avatar.jpg');
+      }
     });
 
     it('should return empty array when user has no friends', async () => {
@@ -289,8 +302,12 @@ describe('dashboard service', () => {
       const friends = await getFriends(userId);
 
       expect(friends).toHaveLength(2);
-      expect(friends[0].id).toBe('friend-2'); // 2 loans
-      expect(friends[1].id).toBe('friend-1'); // 1 loan
+      const resultFriend1 = friends[0];
+      const resultFriend2 = friends[1];
+      if (resultFriend1 && resultFriend2) {
+        expect(resultFriend1.id).toBe('friend-2'); // 2 loans
+        expect(resultFriend2.id).toBe('friend-1'); // 1 loan
+      }
     });
   });
 });

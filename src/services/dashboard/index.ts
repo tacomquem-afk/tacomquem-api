@@ -1,6 +1,6 @@
-import { eq, and, or, desc, count } from 'drizzle-orm';
+import { and, count, desc, eq, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { loans, items, users, notifications } from '../../db/schema.js';
+import { items, loans, notifications } from '../../db/schema.js';
 import { decrypt } from '../crypto/index.js';
 
 export interface DashboardStats {
@@ -47,22 +47,22 @@ function parseImages(imagesJson: string): string[] {
 }
 
 export async function getDashboardData(userId: string): Promise<DashboardData> {
-  const [itemsCount] = await db
+  const itemsCountResult = await db
     .select({ count: count() })
     .from(items)
     .where(and(eq(items.ownerId, userId), eq(items.isActive, true)));
 
-  const [activeLentCount] = await db
+  const activeLentCountResult = await db
     .select({ count: count() })
     .from(loans)
     .where(and(eq(loans.lenderId, userId), eq(loans.status, 'confirmed')));
 
-  const [activeBorrowedCount] = await db
+  const activeBorrowedCountResult = await db
     .select({ count: count() })
     .from(loans)
     .where(and(eq(loans.borrowerId, userId), eq(loans.status, 'confirmed')));
 
-  const [pendingCount] = await db
+  const pendingCountResult = await db
     .select({ count: count() })
     .from(loans)
     .where(and(eq(loans.lenderId, userId), eq(loans.status, 'pending')));
@@ -96,10 +96,10 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
 
   return {
     stats: {
-      itemsCount: itemsCount.count,
-      activeLentCount: activeLentCount.count,
-      activeBorrowedCount: activeBorrowedCount.count,
-      pendingCount: pendingCount.count,
+      itemsCount: itemsCountResult[0]?.count || 0,
+      activeLentCount: activeLentCountResult[0]?.count || 0,
+      activeBorrowedCount: activeBorrowedCountResult[0]?.count || 0,
+      pendingCount: pendingCountResult[0]?.count || 0,
     },
     recentActivity: recentNotifications.map((n) => ({
       id: n.id,
@@ -129,7 +129,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
         otherParty,
         role: isLender ? 'lender' : 'borrower',
         expectedReturnDate: l.expectedReturnDate,
-        confirmedAt: l.confirmedAt!,
+        confirmedAt: l.confirmedAt ?? new Date(),
       };
     }),
   };
@@ -189,6 +189,6 @@ export async function getFriends(userId: string): Promise<Friend[]> {
   }
 
   return Array.from(friendsMap.values()).sort(
-    (a, b) => (b.lentCount + b.borrowedCount) - (a.lentCount + a.borrowedCount)
+    (a, b) => b.lentCount + b.borrowedCount - (a.lentCount + a.borrowedCount)
   );
 }
