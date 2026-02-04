@@ -40,19 +40,22 @@ export function maskName(name: string): string {
  * Extracts client IP address from request headers or direct IP
  * Checks x-forwarded-for, x-real-ip, then request.ip
  */
-export function getClientIp(request: any): string | undefined {
+export function getClientIp(request: {
+  headers?: Record<string, unknown>;
+  ip?: string;
+}): string | undefined {
   const forwardedFor = request.headers?.['x-forwarded-for'];
   if (forwardedFor) {
-    const ipStr = typeof forwardedFor === 'string' ? forwardedFor : forwardedFor[0];
+    const ipStr = typeof forwardedFor === 'string' ? forwardedFor : (forwardedFor as unknown[])[0];
     if (ipStr) {
-      const parts = ipStr.split(',');
+      const parts = String(ipStr).split(',');
       return parts[0]?.trim();
     }
   }
 
   const realIp = request.headers?.['x-real-ip'];
   if (realIp) {
-    return typeof realIp === 'string' ? realIp : realIp[0];
+    return typeof realIp === 'string' ? realIp : ((realIp as unknown[])[0] as string);
   }
 
   return request.ip;

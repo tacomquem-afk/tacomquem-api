@@ -5,6 +5,16 @@ import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt } from '../crypto/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
+type AdminAction =
+  | 'user_blocked'
+  | 'user_unblocked'
+  | 'item_removed'
+  | 'loan_cancelled'
+  | 'admin_created'
+  | 'admin_role_changed'
+  | 'admin_removed'
+  | 'content_flagged';
+
 export interface ListUsersParams {
   page: number;
   limit: number;
@@ -172,16 +182,16 @@ export async function unblockUser(userId: string, adminId: string, ipAddress?: s
 
 export async function logAdminAction(params: {
   adminId: string;
-  action: string;
+  action: AdminAction;
   targetType?: string;
   targetId?: string;
-  metadata?: unknown;
+  metadata?: Record<string, unknown>;
   ipAddress?: string | undefined;
   userAgent?: string | undefined;
 }) {
   await db.insert(adminAuditLog).values({
     adminId: params.adminId,
-    action: params.action as any,
+    action: params.action,
     targetType: params.targetType || undefined,
     targetId: params.targetId || undefined,
     metadata: params.metadata ? JSON.stringify(params.metadata) : null,

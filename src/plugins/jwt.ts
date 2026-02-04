@@ -44,12 +44,13 @@ async function jwtPlugin(fastify: FastifyInstance) {
   fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const decoded = await request.jwtVerify<TokenPayload>();
-      (request as any).user = {
+      request.user = {
         userId: decoded.userId,
         role: decoded.role || 'USER',
       };
     } catch (_err) {
-      reply.status(401).send({ error: 'Unauthorized' });
+      reply.code(401);
+      throw new Error('Unauthorized');
     }
   });
 }

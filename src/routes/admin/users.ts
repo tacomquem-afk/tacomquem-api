@@ -46,7 +46,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     async (request) => {
       const { id } = request.params as { id: string };
       const { reason } = blockUserSchema.parse(request.body);
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await blockUser(id, adminId, reason, ipAddress);
@@ -62,7 +62,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     },
     async (request) => {
       const { id } = request.params as { id: string };
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await unblockUser(id, adminId, ipAddress);

@@ -32,16 +32,17 @@ describe('RBAC Plugin', () => {
     const mockRequest = { user: null } as any;
     const mockReply = {
       code: mock((_code: number) => mockReply),
-      send: mock((body: any) => body),
     } as any;
 
-    await handler(mockRequest, mockReply);
+    let error: Error | null = null;
+    try {
+      await handler(mockRequest, mockReply);
+    } catch (e) {
+      error = e as Error;
+    }
 
     expect(mockReply.code).toHaveBeenCalledWith(401);
-    expect(mockReply.send).toHaveBeenCalledWith({
-      error: 'Unauthorized',
-      message: 'Authentication required',
-    });
+    expect(error?.message).toBe('Authentication required');
   });
 
   it('should return 403 if user role is insufficient', async () => {
@@ -49,16 +50,17 @@ describe('RBAC Plugin', () => {
     const mockRequest = { user: { userId: 'test', role: 'USER' } } as any;
     const mockReply = {
       code: mock((_code: number) => mockReply),
-      send: mock((body: any) => body),
     } as any;
 
-    await handler(mockRequest, mockReply);
+    let error: Error | null = null;
+    try {
+      await handler(mockRequest, mockReply);
+    } catch (e) {
+      error = e as Error;
+    }
 
     expect(mockReply.code).toHaveBeenCalledWith(403);
-    expect(mockReply.send).toHaveBeenCalledWith({
-      error: 'Forbidden',
-      message: 'Insufficient permissions',
-    });
+    expect(error?.message).toBe('Insufficient permissions');
   });
 
   it('should allow access if user has exact role', async () => {

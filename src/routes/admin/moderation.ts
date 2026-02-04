@@ -37,7 +37,7 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
     async (request) => {
       const { id } = request.params as { id: string };
       const { reason } = removeContentSchema.parse(request.body);
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await removeItem(id, adminId, reason, ipAddress);
@@ -74,7 +74,7 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
     async (request) => {
       const { id } = request.params as { id: string };
       const { reason } = removeContentSchema.parse(request.body);
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await cancelLoan(id, adminId, reason, ipAddress);

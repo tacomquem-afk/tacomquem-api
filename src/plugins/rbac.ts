@@ -21,20 +21,16 @@ async function rbacPlugin(fastify: FastifyInstance) {
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = (request as any).user;
+      const user = request.user;
 
       if (!user) {
-        return reply.code(401).send({
-          error: 'Unauthorized',
-          message: 'Authentication required',
-        });
+        reply.code(401);
+        throw new Error('Authentication required');
       }
 
       if (!hasRole(user.role, roles)) {
-        return reply.code(403).send({
-          error: 'Forbidden',
-          message: 'Insufficient permissions',
-        });
+        reply.code(403);
+        throw new Error('Insufficient permissions');
       }
     };
   });

@@ -27,7 +27,7 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
     },
     async (request) => {
       const { userId, role } = promoteAdminSchema.parse(request.body);
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await promoteToAdmin(userId, role, adminId, ipAddress);
@@ -44,7 +44,7 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
     async (request) => {
       const { id } = request.params as { id: string };
       const { role } = changeRoleSchema.parse(request.body);
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await changeAdminRole(id, role, adminId, ipAddress);
@@ -60,7 +60,7 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
     },
     async (request) => {
       const { id } = request.params as { id: string };
-      const adminId = request.user!.userId;
+      const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
       await removeAdmin(id, adminId, ipAddress);

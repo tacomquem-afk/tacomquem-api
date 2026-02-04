@@ -60,9 +60,6 @@ export async function createSuperAdmin(
 }
 
 async function main() {
-  // eslint-disable-next-line no-console
-  console.log('=== TáComQuem - Criar SUPER_ADMIN ===\n');
-
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -75,20 +72,11 @@ async function main() {
     const email = await question('Email: ');
     const password = await question('Senha (mínimo 8 caracteres): ');
     const name = await question('Nome completo: ');
-
-    // eslint-disable-next-line no-console
-    console.log('\nCriando SUPER_ADMIN...');
     const result = await createSuperAdmin(email.trim(), password.trim(), name.trim());
 
     if (result.created) {
-      // eslint-disable-next-line no-console
-      console.log('\n✅ SUPER_ADMIN criado com sucesso!');
     } else {
-      // eslint-disable-next-line no-console
-      console.log('\n✅ Usuário promovido a SUPER_ADMIN!');
     }
-    // eslint-disable-next-line no-console
-    console.log(`ID: ${result.userId}\n`);
   } catch (error) {
     if (error instanceof z.ZodError) {
       // eslint-disable-next-line no-console

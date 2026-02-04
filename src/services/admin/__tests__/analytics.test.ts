@@ -47,8 +47,8 @@ describe('Analytics Service', () => {
 
       const stats = await getUsersStats();
 
-      expect(stats.byRole['USER']).toBe(2);
-      expect(stats.byRole['MODERATOR']).toBe(1);
+      expect(stats.byRole.USER).toBe(2);
+      expect(stats.byRole.MODERATOR).toBe(1);
       expect(stats.activeUsers).toBe(2);
       expect(stats.emailVerifiedCount).toBe(3);
     });
@@ -67,9 +67,9 @@ describe('Analytics Service', () => {
 
       const stats = await getLoansStats();
 
-      expect(stats.byStatus['pending']).toBe(1);
-      expect(stats.byStatus['confirmed']).toBe(1);
-      expect(stats.byStatus['returned']).toBe(1);
+      expect(stats.byStatus.pending).toBe(1);
+      expect(stats.byStatus.confirmed).toBe(1);
+      expect(stats.byStatus.returned).toBe(1);
       expect(stats.averageLoanDuration).toBeGreaterThanOrEqual(0);
     });
   });
