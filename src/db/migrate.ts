@@ -1,6 +1,6 @@
+import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
-import { SQL } from 'bun';
 
 async function main() {
   const databaseUrl = Bun.env.DATABASE_URL;
@@ -10,10 +10,7 @@ async function main() {
 
   const client = new SQL(databaseUrl);
   const db = drizzle({ client });
-
-  console.log('🔄 Running migrations...');
   await migrate(db, { migrationsFolder: './drizzle' });
-  console.log('✅ Migrations complete!');
 
   client.close();
   process.exit(0);

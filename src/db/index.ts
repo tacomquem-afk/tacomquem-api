@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/bun-sql';
 import { SQL } from 'bun';
+import { drizzle } from 'drizzle-orm/bun-sql';
 import { env } from '../config/env.js';
 import * as schema from './schema.js';
 

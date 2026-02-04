@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from 'bun:test';
-import { encrypt, decrypt, hash } from './crypto.js';
+import { beforeAll, describe, expect, it } from 'bun:test';
+import { decrypt, encrypt, hash } from '../index.js';
 
 beforeAll(() => {
   process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';

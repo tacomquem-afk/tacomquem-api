@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'bun:test';
-import { hashPassword, verifyPassword } from './password.js';
+import { describe, expect, it } from 'bun:test';
+import { hashPassword, verifyPassword } from '../index.js';
 
 describe('password service', () => {
   it('should hash and verify password correctly', async () => {

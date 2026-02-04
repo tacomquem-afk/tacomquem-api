@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { env } from '../../config/env.js';
-import { findOrCreateGoogleUser } from '../../services/auth.js';
+import { findOrCreateGoogleUser } from '../../services/auth/index.js';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -30,7 +30,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request, reply) => {
+    async (_request, reply) => {
       const params = new URLSearchParams({
         client_id: env.GOOGLE_CLIENT_ID,
         redirect_uri: env.GOOGLE_REDIRECT_URI,
@@ -95,7 +95,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
           throw new Error('Failed to exchange code for tokens');
         }
 
-        const tokens: GoogleTokenResponse = await tokenResponse.json();
+        const tokens = (await tokenResponse.json()) as GoogleTokenResponse;
 
         const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -105,7 +105,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
           throw new Error('Failed to get user info');
         }
 
-        const googleUser: GoogleUserInfo = await userResponse.json();
+        const googleUser = (await userResponse.json()) as GoogleUserInfo;
 
         const user = await findOrCreateGoogleUser(
           googleUser.id,
@@ -114,10 +114,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
           googleUser.picture
         );
 
-        const accessToken = app.jwt.sign(
-          { userId: user.id },
-          { expiresIn: env.JWT_EXPIRES_IN }
-        );
+        const accessToken = app.jwt.sign({ userId: user.id }, { expiresIn: env.JWT_EXPIRES_IN });
 
         const refreshToken = app.jwt.sign(
           { userId: user.id },

@@ -1,8 +1,18 @@
-import { pgTable, uuid, text, varchar, boolean, timestamp, pgEnum } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { boolean, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-export const loanStatusEnum = pgEnum('loan_status', ['pending', 'confirmed', 'returned', 'cancelled']);
-export const notificationTypeEnum = pgEnum('notification_type', ['loan_created', 'loan_confirmed', 'loan_reminder', 'loan_returned']);
+export const loanStatusEnum = pgEnum('loan_status', [
+  'pending',
+  'confirmed',
+  'returned',
+  'cancelled',
+]);
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'loan_created',
+  'loan_confirmed',
+  'loan_reminder',
+  'loan_returned',
+]);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -18,7 +28,9 @@ export const users = pgTable('users', {
 
 export const oauthAccounts = pgTable('oauth_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   provider: varchar('provider', { length: 50 }).notNull(),
   providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
   accessToken: text('access_token'),
@@ -30,7 +42,9 @@ export const oauthAccounts = pgTable('oauth_accounts', {
 
 export const items = pgTable('items', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ownerId: uuid('owner_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
   images: text('images').notNull().default('[]'),
@@ -41,8 +55,12 @@ export const items = pgTable('items', {
 
 export const loans = pgTable('loans', {
   id: uuid('id').primaryKey().defaultRandom(),
-  itemId: uuid('item_id').notNull().references(() => items.id),
-  lenderId: uuid('lender_id').notNull().references(() => users.id),
+  itemId: uuid('item_id')
+    .notNull()
+    .references(() => items.id),
+  lenderId: uuid('lender_id')
+    .notNull()
+    .references(() => users.id),
   borrowerId: uuid('borrower_id').references(() => users.id),
   borrowerEmail: varchar('borrower_email', { length: 255 }),
   status: loanStatusEnum('status').notNull().default('pending'),
@@ -57,7 +75,9 @@ export const loans = pgTable('loans', {
 
 export const loanTokens = pgTable('loan_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  loanId: uuid('loan_id').notNull().references(() => loans.id, { onDelete: 'cascade' }),
+  loanId: uuid('loan_id')
+    .notNull()
+    .references(() => loans.id, { onDelete: 'cascade' }),
   token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at').notNull(),
   usedAt: timestamp('used_at'),
@@ -66,7 +86,9 @@ export const loanTokens = pgTable('loan_tokens', {
 
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   loanId: uuid('loan_id').references(() => loans.id, { onDelete: 'cascade' }),
   type: notificationTypeEnum('type').notNull(),
   title: varchar('title', { length: 255 }).notNull(),
@@ -78,7 +100,9 @@ export const notifications = pgTable('notifications', {
 
 export const verificationTokens = pgTable('verification_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
   token: text('token').notNull().unique(),
   type: varchar('type', { length: 50 }).notNull(),
   expiresAt: timestamp('expires_at').notNull(),

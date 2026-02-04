@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -22,7 +22,14 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encryptedText: string): string {
-  const [ivHex, authTagHex, encrypted] = encryptedText.split(':');
+  const parts = encryptedText.split(':');
+  const ivHex = parts[0];
+  const authTagHex = parts[1];
+  const encrypted = parts[2];
+
+  if (!ivHex || !authTagHex || !encrypted) {
+    throw new Error('Invalid encrypted text format');
+  }
 
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');

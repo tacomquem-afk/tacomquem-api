@@ -11,9 +11,20 @@
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bun src/db/migrate.ts",
     "db:studio": "bunx drizzle-kit studio",
-    "format": "prettier --write \"src/**/*.ts\""
+
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --write src/",
+    "format": "biome format --write src/",
+    "format:check": "biome format src/",
+    "check": "biome check src/",
+    "check:fix": "biome check --write src/",
+
+    "qa": "bun run typecheck && bun run check",
+    "qa:fix": "bun run check:fix && bun run typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
     "@faker-js/faker": "^10.2.0",
     "@types/bun": "latest",
     "drizzle-kit": "^0.31.8",

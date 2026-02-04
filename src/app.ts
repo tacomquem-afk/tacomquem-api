@@ -1,14 +1,14 @@
-import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import { sql } from 'drizzle-orm';
+import Fastify from 'fastify';
 import { env } from './config/env.js';
 import { db } from './db/index.js';
-import { sql } from 'drizzle-orm';
 import jwtPlugin from './plugins/jwt.js';
-import authRoutes from './routes/auth/index.js';
 import googleAuthRoutes from './routes/auth/google.js';
+import authRoutes from './routes/auth/index.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -75,48 +75,56 @@ export async function buildApp() {
 
   await app.register(jwtPlugin);
 
-  app.get('/api/health', {
-    schema: {
-      description: 'Check API health status',
-      tags: ['Health'],
-      response: {
-        200: {
-          description: 'API is healthy',
-          type: 'object',
-          properties: {
-            status: { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
+  app.get(
+    '/api/health',
+    {
+      schema: {
+        description: 'Check API health status',
+        tags: ['Health'],
+        response: {
+          200: {
+            description: 'API is healthy',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              timestamp: { type: 'string', format: 'date-time' },
+            },
           },
         },
       },
     },
-  }, async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
-  });
-
-  app.get('/api/health/db', {
-    schema: {
-      description: 'Check database connection',
-      tags: ['Health'],
-      response: {
-        200: {
-          description: 'Database status',
-          type: 'object',
-          properties: {
-            status: { type: 'string', enum: ['ok', 'error'] },
-            database: { type: 'string', enum: ['connected', 'disconnected'] },
-          },
-        },
-      },
-    },
-  }, async () => {
-    try {
-      await db.execute(sql`SELECT 1`);
-      return { status: 'ok', database: 'connected' };
-    } catch (error) {
-      return { status: 'error', database: 'disconnected' };
+    async () => {
+      return { status: 'ok', timestamp: new Date().toISOString() };
     }
-  });
+  );
+
+  app.get(
+    '/api/health/db',
+    {
+      schema: {
+        description: 'Check database connection',
+        tags: ['Health'],
+        response: {
+          200: {
+            description: 'Database status',
+            type: 'object',
+            properties: {
+              status: { type: 'string', enum: ['ok', 'error'] },
+              database: { type: 'string', enum: ['connected', 'disconnected'] },
+            },
+          },
+        },
+      },
+    },
+    async () => {
+      try {
+        await db.execute(sql`SELECT 1`);
+        return { status: 'ok', database: 'connected' };
+      } catch (_error) {
+        return { status: 'error', database: 'disconnected' };
+      }
+    }
+  );
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });

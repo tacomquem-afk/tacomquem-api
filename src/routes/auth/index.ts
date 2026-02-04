@@ -1,25 +1,25 @@
 import type { FastifyInstance } from 'fastify';
+import { env } from '../../config/env.js';
 import {
-  registerSchema,
-  loginSchema,
-  verifyEmailSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  type RegisterInput,
-  type LoginInput,
-  type VerifyEmailInput,
   type ForgotPasswordInput,
+  forgotPasswordSchema,
+  type LoginInput,
+  loginSchema,
+  type RegisterInput,
   type ResetPasswordInput,
+  registerSchema,
+  resetPasswordSchema,
+  type VerifyEmailInput,
+  verifyEmailSchema,
 } from '../../schemas/auth.js';
 import {
   createUser,
+  getUserById,
   login,
-  verifyEmail,
   requestPasswordReset,
   resetPassword,
-  getUserById,
-} from '../../services/auth.js';
-import { env } from '../../config/env.js';
+  verifyEmail,
+} from '../../services/auth/index.js';
 
 async function authRoutes(app: FastifyInstance) {
   app.post<{
@@ -36,7 +36,11 @@ async function authRoutes(app: FastifyInstance) {
           properties: {
             name: { type: 'string', minLength: 2, maxLength: 100, description: 'User full name' },
             email: { type: 'string', format: 'email', description: 'User email address' },
-            password: { type: 'string', minLength: 8, description: 'User password (min 8 characters)' },
+            password: {
+              type: 'string',
+              minLength: 8,
+              description: 'User password (min 8 characters)',
+            },
           },
         },
         response: {
@@ -146,10 +150,7 @@ async function authRoutes(app: FastifyInstance) {
       try {
         const user = await login(result.data.email, result.data.password);
 
-        const accessToken = app.jwt.sign(
-          { userId: user.id },
-          { expiresIn: env.JWT_EXPIRES_IN }
-        );
+        const accessToken = app.jwt.sign({ userId: user.id }, { expiresIn: env.JWT_EXPIRES_IN });
 
         const refreshToken = app.jwt.sign(
           { userId: user.id },
@@ -260,7 +261,7 @@ async function authRoutes(app: FastifyInstance) {
         return reply.send({
           message: 'Se o email existir, você receberá instruções de recuperação.',
         });
-      } catch (error) {
+      } catch (_error) {
         return reply.send({
           message: 'Se o email existir, você receberá instruções de recuperação.',
         });
@@ -281,7 +282,11 @@ async function authRoutes(app: FastifyInstance) {
           required: ['token', 'password'],
           properties: {
             token: { type: 'string', description: 'Password reset token' },
-            password: { type: 'string', minLength: 8, description: 'New password (min 8 characters)' },
+            password: {
+              type: 'string',
+              minLength: 8,
+              description: 'New password (min 8 characters)',
+            },
           },
         },
         response: {
@@ -348,13 +353,10 @@ async function authRoutes(app: FastifyInstance) {
         await request.jwtVerify();
         const { userId } = request.user;
 
-        const accessToken = app.jwt.sign(
-          { userId },
-          { expiresIn: env.JWT_EXPIRES_IN }
-        );
+        const accessToken = app.jwt.sign({ userId }, { expiresIn: env.JWT_EXPIRES_IN });
 
         return reply.send({ accessToken });
-      } catch (error) {
+      } catch (_error) {
         return reply.status(401).send({ error: 'Token inválido' });
       }
     }

@@ -19,7 +19,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -79,7 +79,7 @@ export function buildLoanReminderEmail(
 }
 
 export function buildLoanConfirmationRequestEmail(
-  borrowerEmail: string,
+  _borrowerEmail: string,
   lenderName: string,
   itemName: string,
   confirmUrl: string

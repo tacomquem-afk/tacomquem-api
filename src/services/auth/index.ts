@@ -1,11 +1,11 @@
-import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
-import { db } from '../db/index.js';
-import { users, verificationTokens, oauthAccounts } from '../db/schema.js';
-import { encrypt, decrypt, hash } from './crypto.js';
-import { hashPassword, verifyPassword } from './password.js';
-import { sendEmail, buildVerificationEmail, buildPasswordResetEmail } from './email.js';
-import { env } from '../config/env.js';
+import { nanoid } from 'nanoid';
+import { env } from '../../config/env.js';
+import { db } from '../../db/index.js';
+import { oauthAccounts, users, verificationTokens } from '../../db/schema.js';
+import { decrypt, encrypt, hash } from '../crypto/index.js';
+import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
+import { hashPassword, verifyPassword } from '../password/index.js';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -38,12 +38,15 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
   const emailEncrypted = encrypt(input.email);
   const nameEncrypted = encrypt(input.name);
 
-  const [user] = await db.insert(users).values({
-    emailEncrypted,
-    nameEncrypted,
-    emailHash,
-    passwordHash: passwordHashed,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      emailEncrypted,
+      nameEncrypted,
+      emailHash,
+      passwordHash: passwordHashed,
+    })
+    .returning();
 
   if (!user) {
     throw new Error('Erro ao criar usuário');
@@ -97,11 +100,13 @@ export async function verifyEmail(token: string): Promise<boolean> {
     throw new Error('Tipo de token inválido');
   }
 
-  await db.update(users)
+  await db
+    .update(users)
     .set({ emailVerified: true, updatedAt: new Date() })
     .where(eq(users.id, verification.userId));
 
-  await db.update(verificationTokens)
+  await db
+    .update(verificationTokens)
     .set({ usedAt: new Date() })
     .where(eq(verificationTokens.id, verification.id));
 
@@ -191,11 +196,13 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   const passwordHashed = await hashPassword(newPassword);
 
-  await db.update(users)
+  await db
+    .update(users)
     .set({ passwordHash: passwordHashed, updatedAt: new Date() })
     .where(eq(users.id, verification.userId));
 
-  await db.update(verificationTokens)
+  await db
+    .update(verificationTokens)
     .set({ usedAt: new Date() })
     .where(eq(verificationTokens.id, verification.id));
 
@@ -236,8 +243,13 @@ export async function findOrCreateGoogleUser(
       providerAccountId: googleId,
     });
 
-    await db.update(users)
-      .set({ emailVerified: true, avatarUrl: avatarUrl || existingUser.avatarUrl, updatedAt: new Date() })
+    await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        avatarUrl: avatarUrl || existingUser.avatarUrl,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, existingUser.id));
 
     return {
@@ -249,13 +261,16 @@ export async function findOrCreateGoogleUser(
     };
   }
 
-  const [user] = await db.insert(users).values({
-    emailEncrypted: encrypt(email),
-    nameEncrypted: encrypt(name),
-    emailHash,
-    avatarUrl,
-    emailVerified: true,
-  }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({
+      emailEncrypted: encrypt(email),
+      nameEncrypted: encrypt(name),
+      emailHash,
+      avatarUrl,
+      emailVerified: true,
+    })
+    .returning();
 
   if (!user) {
     throw new Error('Erro ao criar usuário');
