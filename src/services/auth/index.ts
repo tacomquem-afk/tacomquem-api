@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
 import { oauthAccounts, users, verificationTokens } from '../../db/schema.js';
+import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
 import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
 import { hashPassword, verifyPassword } from '../password/index.js';
@@ -21,6 +22,7 @@ export interface UserResponse {
   email: string;
   avatarUrl: string | null;
   emailVerified: boolean;
+  role: UserRole;
 }
 
 export async function createUser(input: CreateUserInput): Promise<UserResponse> {
@@ -75,6 +77,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
     email: input.email,
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
+    role: user.role,
   };
 }
 
@@ -139,6 +142,7 @@ export async function login(email: string, password: string): Promise<UserRespon
     email: decrypt(user.emailEncrypted),
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
+    role: user.role,
   };
 }
 
@@ -228,6 +232,7 @@ export async function findOrCreateGoogleUser(
       email: decrypt(user.emailEncrypted),
       avatarUrl: user.avatarUrl ?? null,
       emailVerified: user.emailVerified,
+      role: user.role,
     };
   }
 
@@ -258,6 +263,7 @@ export async function findOrCreateGoogleUser(
       email: decrypt(existingUser.emailEncrypted),
       avatarUrl: (avatarUrl || existingUser.avatarUrl) ?? null,
       emailVerified: true,
+      role: existingUser.role,
     };
   }
 
@@ -288,6 +294,7 @@ export async function findOrCreateGoogleUser(
     email,
     avatarUrl: avatarUrl ?? null,
     emailVerified: true,
+    role: user.role,
   };
 }
 
@@ -306,5 +313,6 @@ export async function getUserById(userId: string): Promise<UserResponse | null> 
     email: decrypt(user.emailEncrypted),
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
+    role: user.role,
   };
 }

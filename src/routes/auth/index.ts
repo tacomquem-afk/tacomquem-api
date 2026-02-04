@@ -56,6 +56,10 @@ async function authRoutes(app: FastifyInstance) {
                   email: { type: 'string' },
                   avatarUrl: { type: 'string', nullable: true },
                   emailVerified: { type: 'boolean' },
+                  role: {
+                    type: 'string',
+                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
+                  },
                 },
               },
             },
@@ -124,6 +128,10 @@ async function authRoutes(app: FastifyInstance) {
                   email: { type: 'string' },
                   avatarUrl: { type: 'string', nullable: true },
                   emailVerified: { type: 'boolean' },
+                  role: {
+                    type: 'string',
+                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
+                  },
                 },
               },
               accessToken: { type: 'string', description: 'JWT access token (7 days)' },
@@ -149,9 +157,9 @@ async function authRoutes(app: FastifyInstance) {
       try {
         const user = await login(result.data.email, result.data.password);
 
-        const accessToken = (app as any).signAccessToken(user.id, 'USER');
+        const accessToken = app.signAccessToken(user.id, user.role);
 
-        const refreshToken = (app as any).signRefreshToken(user.id, 'USER');
+        const refreshToken = app.signRefreshToken(user.id, user.role);
 
         return reply.send({
           user,
@@ -349,7 +357,7 @@ async function authRoutes(app: FastifyInstance) {
         await request.jwtVerify();
         const { userId, role } = request.user;
 
-        const accessToken = (app as any).signAccessToken(userId, role);
+        const accessToken = app.signAccessToken(userId, role);
 
         return reply.send({ accessToken });
       } catch (_error) {
@@ -378,6 +386,10 @@ async function authRoutes(app: FastifyInstance) {
                   email: { type: 'string' },
                   avatarUrl: { type: 'string', nullable: true },
                   emailVerified: { type: 'boolean' },
+                  role: {
+                    type: 'string',
+                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
+                  },
                 },
               },
             },

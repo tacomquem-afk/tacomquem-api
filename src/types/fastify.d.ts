@@ -4,6 +4,9 @@ import type { UserRole } from '../plugins/rbac.js';
 declare module 'fastify' {
   interface FastifyInstance {
     requireRole(allowedRoles: UserRole | UserRole[]): (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    signAccessToken(userId: string, role?: UserRole): string;
+    signRefreshToken(userId: string, role?: UserRole): string;
+    authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void>;
   }
 
   interface FastifyRequest {

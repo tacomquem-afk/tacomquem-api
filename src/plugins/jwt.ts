@@ -9,14 +9,6 @@ interface TokenPayload {
   role: UserRole;
 }
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-    signAccessToken(userId: string, role?: UserRole): string;
-    signRefreshToken(userId: string, role?: UserRole): string;
-  }
-}
-
 declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: TokenPayload;

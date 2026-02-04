@@ -47,6 +47,7 @@ describe('auth service', () => {
         passwordHash: 'hashed_password123',
         avatarUrl: null,
         emailVerified: false,
+        role: 'USER' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -75,6 +76,7 @@ describe('auth service', () => {
         email: 'test@example.com',
         avatarUrl: null,
         emailVerified: false,
+        role: 'USER',
       });
     });
 
@@ -190,6 +192,7 @@ describe('auth service', () => {
         passwordHash: 'hashed_password123',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER' as const,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -202,6 +205,7 @@ describe('auth service', () => {
         email: 'test@example.com',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER',
       });
     });
 
@@ -218,6 +222,7 @@ describe('auth service', () => {
         id: 'user-123',
         emailHash: 'hash_test@example.com',
         passwordHash: 'hashed_correctpassword',
+        role: 'USER' as const,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -232,6 +237,7 @@ describe('auth service', () => {
         id: 'user-123',
         emailHash: 'hash_test@example.com',
         passwordHash: null,
+        role: 'USER' as const,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -248,6 +254,7 @@ describe('auth service', () => {
         id: 'user-123',
         emailHash: 'hash_test@example.com',
         nameEncrypted: 'encrypted_Test User',
+        role: 'USER' as const,
       };
 
       const findFirstSpy = spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(
@@ -369,6 +376,7 @@ describe('auth service', () => {
           nameEncrypted: 'encrypted_Test User',
           avatarUrl: 'https://avatar.url',
           emailVerified: true,
+          role: 'USER' as const,
         },
       };
 
@@ -387,6 +395,7 @@ describe('auth service', () => {
         email: 'test@example.com',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER',
       });
     });
 
@@ -398,6 +407,7 @@ describe('auth service', () => {
         emailHash: 'hash_test@example.com',
         avatarUrl: null,
         emailVerified: false,
+        role: 'USER' as const,
       };
 
       spyOn(db.query.oauthAccounts, 'findFirst').mockResolvedValueOnce(undefined);
@@ -430,6 +440,7 @@ describe('auth service', () => {
         emailHash: 'hash_new@example.com',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER' as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -454,6 +465,7 @@ describe('auth service', () => {
         email: 'new@example.com',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER',
       });
     });
   });
@@ -466,6 +478,7 @@ describe('auth service', () => {
         nameEncrypted: 'encrypted_Test User',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER' as const,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -478,6 +491,7 @@ describe('auth service', () => {
         email: 'test@example.com',
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
+        role: 'USER',
       });
     });
 

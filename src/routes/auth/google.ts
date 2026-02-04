@@ -114,9 +114,9 @@ async function googleAuthRoutes(app: FastifyInstance) {
           googleUser.picture
         );
 
-        const accessToken = (app as any).signAccessToken(user.id, 'USER');
+        const accessToken = app.signAccessToken(user.id, user.role);
 
-        const refreshToken = (app as any).signRefreshToken(user.id, 'USER');
+        const refreshToken = app.signRefreshToken(user.id, user.role);
 
         const params = new URLSearchParams({
           accessToken,
