@@ -111,7 +111,6 @@ export async function deleteItem(itemId: string, ownerId: string): Promise<boole
     return false;
   }
 
-  // Soft delete
   await db
     .update(items)
     .set({ isActive: false, updatedAt: new Date() })
