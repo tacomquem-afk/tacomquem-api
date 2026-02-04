@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { items } from '../../db/schema.js';
+import { items, uploads } from '../../db/schema.js';
 import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
 
 export interface ItemResponse {
@@ -46,6 +46,13 @@ export async function createItem(ownerId: string, input: CreateItemInput): Promi
 
   if (!result[0]) {
     throw new Error('Falha ao criar item');
+  }
+
+  if (input.images && input.images.length > 0) {
+    await db
+      .update(uploads)
+      .set({ confirmedAt: new Date() })
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
   }
 
   return toItemResponse(result[0]);
@@ -97,6 +104,13 @@ export async function updateItem(
 
   if (!result[0]) {
     throw new Error('Falha ao atualizar item');
+  }
+
+  if (input.images && input.images.length > 0) {
+    await db
+      .update(uploads)
+      .set({ confirmedAt: new Date() })
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
   }
 
   return toItemResponse(result[0]);
