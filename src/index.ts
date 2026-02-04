@@ -8,7 +8,7 @@ async function main() {
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
 
-    startCleanupJob();
+    startCleanupJob(app.log);
     app.log.info('Cleanup job started');
   } catch (err) {
     app.log.error(err);
