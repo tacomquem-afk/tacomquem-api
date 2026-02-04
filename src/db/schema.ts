@@ -156,6 +156,20 @@ export const uploads = pgTable('uploads', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const adminAuditLog = pgTable('admin_audit_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  adminId: uuid('admin_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  action: adminActionEnum('action').notNull(),
+  targetType: varchar('target_type', { length: 50 }),
+  targetId: uuid('target_id'),
+  metadata: text('metadata'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),
@@ -164,6 +178,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   notifications: many(notifications),
   verificationTokens: many(verificationTokens),
   uploads: many(uploads),
+  adminActions: many(adminAuditLog),
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
@@ -228,6 +243,13 @@ export const verificationTokensRelations = relations(verificationTokens, ({ one 
 export const uploadsRelations = relations(uploads, ({ one }) => ({
   user: one(users, {
     fields: [uploads.userId],
+    references: [users.id],
+  }),
+}));
+
+export const adminAuditLogRelations = relations(adminAuditLog, ({ one }) => ({
+  admin: one(users, {
+    fields: [adminAuditLog.adminId],
     references: [users.id],
   }),
 }));

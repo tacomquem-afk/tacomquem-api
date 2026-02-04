@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { roleEnum, adminActionEnum, users } from '../schema.js';
+import { roleEnum, adminActionEnum, users, adminAuditLog } from '../schema.js';
 
 describe('Schema Enums', () => {
   it('should have all required user roles', () => {
@@ -39,5 +39,19 @@ describe('Users Table Admin Fields', () => {
   it('should have nullable blockedAt and blockedReason columns', () => {
     expect(users.blockedAt).toBeDefined();
     expect(users.blockedReason).toBeDefined();
+  });
+});
+
+describe('Admin Audit Log Table', () => {
+  it('should have all required columns', () => {
+    expect(adminAuditLog.id).toBeDefined();
+    expect(adminAuditLog.adminId).toBeDefined();
+    expect(adminAuditLog.action).toBeDefined();
+    expect(adminAuditLog.targetType).toBeDefined();
+    expect(adminAuditLog.targetId).toBeDefined();
+    expect(adminAuditLog.metadata).toBeDefined();
+    expect(adminAuditLog.ipAddress).toBeDefined();
+    expect(adminAuditLog.userAgent).toBeDefined();
+    expect(adminAuditLog.createdAt).toBeDefined();
   });
 });
