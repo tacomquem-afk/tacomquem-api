@@ -130,6 +130,18 @@ bun run db:studio        # Open Drizzle Studio GUI
 - **[docs/plans/001-mvp/design.md](docs/plans/001-mvp/design.md)** - MVP scope decisions, user flows, simplified schema
 - **[docs/plans/README.md](docs/plans/README.md)** - Planning structure and conventions
 
+## Admin System
+
+RBAC with 5 roles: `USER` (default), `ANALYST`, `SUPPORT`, `MODERATOR`, `SUPER_ADMIN`
+
+**Create first admin:**
+```bash
+bun run admin:create
+```
+
+**Admin routes:** `/api/admin/*` (require authentication + role check)
+**Full docs:** See [docs/plans/003-admin-backoffice/design.md](docs/plans/003-admin-backoffice/design.md)
+
 ## API Endpoints Structure
 
 ```
@@ -162,6 +174,21 @@ GET    /api/friends                # Friends list
 
 GET    /api/health                 # Health check
 GET    /api/health/db              # Database health check
+
+# Admin endpoints (role-based)
+GET    /api/admin/analytics/dashboard        # Dashboard stats (ANALYST+)
+GET    /api/admin/users                      # List users (ANALYST+)
+GET    /api/admin/users/:id                  # User details (SUPPORT+)
+POST   /api/admin/users/:id/block            # Block user (SUPER_ADMIN)
+POST   /api/admin/users/:id/unblock          # Unblock user (SUPER_ADMIN)
+GET    /api/admin/moderation/items/:id       # Item details (SUPPORT+)
+DELETE /api/admin/moderation/items/:id       # Remove item (MODERATOR+)
+POST   /api/admin/moderation/loans/:id/cancel # Cancel loan (MODERATOR+)
+GET    /api/admin/admins                     # List admins (SUPER_ADMIN)
+POST   /api/admin/admins                     # Promote user (SUPER_ADMIN)
+PATCH  /api/admin/admins/:id/role            # Change role (SUPER_ADMIN)
+DELETE /api/admin/admins/:id                 # Demote admin (SUPER_ADMIN)
+GET    /api/admin/admins/audit-log           # Audit log (SUPER_ADMIN)
 ```
 
 ## Security Considerations
