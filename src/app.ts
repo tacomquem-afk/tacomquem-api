@@ -9,6 +9,7 @@ import { db } from './db/index.js';
 import jwtPlugin from './plugins/jwt.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
+import itemsRoutes from './routes/items/index.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -57,6 +58,7 @@ export async function buildApp() {
       tags: [
         { name: 'Authentication', description: 'Authentication endpoints' },
         { name: 'OAuth', description: 'OAuth authentication providers' },
+        { name: 'Items', description: 'Items management endpoints' },
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
@@ -128,6 +130,7 @@ export async function buildApp() {
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
+  await app.register(itemsRoutes, { prefix: '/api/items' });
 
   return app;
 }
