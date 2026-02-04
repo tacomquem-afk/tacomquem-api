@@ -30,11 +30,11 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url(),
 
   // Cloudflare R2
-  R2_ACCOUNT_ID: z.string(),
-  R2_ACCESS_KEY_ID: z.string(),
-  R2_SECRET_ACCESS_KEY: z.string(),
-  R2_BUCKET_NAME: z.string(),
-  R2_PUBLIC_URL: z.string().url(),
+  R2_ACCOUNT_ID: z.string().default('test-account-id'),
+  R2_ACCESS_KEY_ID: z.string().default('test-access-key'),
+  R2_SECRET_ACCESS_KEY: z.string().default('test-secret-key'),
+  R2_BUCKET_NAME: z.string().default('test-bucket'),
+  R2_PUBLIC_URL: z.string().url().default('https://test-images.example.com'),
 });
 
 const parsed = envSchema.safeParse(Bun.env);
