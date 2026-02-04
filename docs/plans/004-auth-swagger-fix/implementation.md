@@ -10,28 +10,28 @@
 
 ### Parte 1: Corrigir Bug de Role
 
-- [ ] **1.1** Atualizar `src/services/auth/index.ts`
-  - [ ] Importar tipo `UserRole` de `../../plugins/rbac.js`
-  - [ ] Adicionar campo `role: UserRole` em `UserResponse`
-  - [ ] Atualizar return de `createUser()` para incluir `role`
-  - [ ] Atualizar return de `login()` para incluir `role`
-  - [ ] Atualizar 3 returns de `findOrCreateGoogleUser()` para incluir `role`
-  - [ ] Atualizar return de `getUserById()` para incluir `role`
+- [x] **1.1** Atualizar `src/services/auth/index.ts`
+  - [x] Importar tipo `UserRole` de `../../plugins/rbac.js`
+  - [x] Adicionar campo `role: UserRole` em `UserResponse`
+  - [x] Atualizar return de `createUser()` para incluir `role`
+  - [x] Atualizar return de `login()` para incluir `role`
+  - [x] Atualizar 3 returns de `findOrCreateGoogleUser()` para incluir `role`
+  - [x] Atualizar return de `getUserById()` para incluir `role`
 
-- [ ] **1.2** Atualizar `src/routes/auth/index.ts`
-  - [ ] Trocar `'USER'` por `user.role` no `signAccessToken` (linha 152)
-  - [ ] Trocar `'USER'` por `user.role` no `signRefreshToken` (linha 154)
-  - [ ] Adicionar `role` ao schema de response do `/login`
-  - [ ] Adicionar `role` ao schema de response do `/me`
+- [x] **1.2** Atualizar `src/routes/auth/index.ts`
+  - [x] Trocar `'USER'` por `user.role` no `signAccessToken` (linha 152)
+  - [x] Trocar `'USER'` por `user.role` no `signRefreshToken` (linha 154)
+  - [x] Adicionar `role` ao schema de response do `/login`
+  - [x] Adicionar `role` ao schema de response do `/me`
 
-- [ ] **1.3** Atualizar `src/routes/auth/google.ts`
-  - [ ] Trocar `'USER'` por `user.role` no `signAccessToken` (linha 117)
-  - [ ] Trocar `'USER'` por `user.role` no `signRefreshToken` (linha 119)
+- [x] **1.3** Atualizar `src/routes/auth/google.ts`
+  - [x] Trocar `'USER'` por `user.role` no `signAccessToken` (linha 117)
+  - [x] Trocar `'USER'` por `user.role` no `signRefreshToken` (linha 119)
 
-- [ ] **1.4** Atualizar `src/services/auth/__tests__/auth.test.ts`
-  - [ ] Adicionar `role: 'USER'` em todos os mock users
-  - [ ] Adicionar `role: 'USER'` em todas as assertions de resultado
-  - [ ] Adicionar teste para verificar role de admin no login
+- [x] **1.4** Atualizar `src/services/auth/__tests__/auth.test.ts`
+  - [x] Adicionar `role: 'USER'` em todos os mock users
+  - [x] Adicionar `role: 'USER'` em todas as assertions de resultado
+  - [x] Adicionar teste para verificar role de admin no login
 
 ---
 
@@ -90,10 +90,10 @@
 
 ### Parte 3: Verificação
 
-- [ ] **3.1** Testes automatizados
-  - [ ] `bun test src/services/auth/__tests__/auth.test.ts`
-  - [ ] `bun test` (suite completa)
-  - [ ] `bun run qa` (TypeScript + Biome)
+- [x] **3.1** Testes automatizados
+  - [x] `bun test src/services/auth/__tests__/auth.test.ts`
+  - [x] `bun test` (suite completa)
+  - [x] `bun run qa` (TypeScript + Biome)
 
 - [ ] **3.2** Teste manual do bug de role
   - [ ] Criar admin com `bun run admin:create`
