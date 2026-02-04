@@ -14,10 +14,8 @@ import {
 } from '../../services/items/index.js';
 
 export default async function itemsRoutes(app: FastifyInstance) {
-  // All routes require authentication
   app.addHook('preHandler', app.authenticate);
 
-  // Create item
   app.post<{ Body: CreateItemInput }>(
     '/',
     {
@@ -70,7 +68,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
     }
   );
 
-  // List my items
   app.get(
     '/',
     {
@@ -108,7 +105,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
     }
   );
 
-  // Get item by id
   app.get<{ Params: { id: string } }>(
     '/:id',
     {
@@ -161,7 +157,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
     }
   );
 
-  // Update item
   app.patch<{ Params: { id: string }; Body: UpdateItemInput }>(
     '/:id',
     {
@@ -231,7 +226,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
     }
   );
 
-  // Delete item (soft delete)
   app.delete<{ Params: { id: string } }>(
     '/:id',
     {
