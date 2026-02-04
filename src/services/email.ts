@@ -12,10 +12,11 @@ async function getEnv(key: string): Promise<string> {
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
+    const apiUrl = await getEnv('RESEND_API_URL');
     const apiKey = await getEnv('RESEND_API_KEY');
     const from = await getEnv('EMAIL_FROM');
 
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
