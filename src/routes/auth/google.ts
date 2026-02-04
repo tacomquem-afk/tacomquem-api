@@ -114,12 +114,9 @@ async function googleAuthRoutes(app: FastifyInstance) {
           googleUser.picture
         );
 
-        const accessToken = app.jwt.sign({ userId: user.id }, { expiresIn: env.JWT_EXPIRES_IN });
+        const accessToken = (app as any).signAccessToken(user.id, 'USER');
 
-        const refreshToken = app.jwt.sign(
-          { userId: user.id },
-          { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
-        );
+        const refreshToken = (app as any).signRefreshToken(user.id, 'USER');
 
         const params = new URLSearchParams({
           accessToken,

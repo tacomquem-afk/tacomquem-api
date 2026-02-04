@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import { env } from '../../config/env.js';
 import {
   type ForgotPasswordInput,
   forgotPasswordSchema,
@@ -150,12 +149,9 @@ async function authRoutes(app: FastifyInstance) {
       try {
         const user = await login(result.data.email, result.data.password);
 
-        const accessToken = app.jwt.sign({ userId: user.id }, { expiresIn: env.JWT_EXPIRES_IN });
+        const accessToken = (app as any).signAccessToken(user.id, 'USER');
 
-        const refreshToken = app.jwt.sign(
-          { userId: user.id },
-          { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
-        );
+        const refreshToken = (app as any).signRefreshToken(user.id, 'USER');
 
         return reply.send({
           user,
@@ -351,9 +347,9 @@ async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         await request.jwtVerify();
-        const { userId } = request.user;
+        const { userId, role } = request.user;
 
-        const accessToken = app.jwt.sign({ userId }, { expiresIn: env.JWT_EXPIRES_IN });
+        const accessToken = (app as any).signAccessToken(userId, role);
 
         return reply.send({ accessToken });
       } catch (_error) {

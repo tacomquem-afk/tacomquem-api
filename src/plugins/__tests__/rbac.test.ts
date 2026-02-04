@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import Fastify from 'fastify';
 import rbacPlugin from '../rbac.js';
 
 describe('RBAC Plugin', () => {
@@ -12,7 +12,7 @@ describe('RBAC Plugin', () => {
     // Register mock JWT plugin with proper name
     await app.register(
       async (fastify: FastifyInstance) => {
-        fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+        fastify.decorate('authenticate', async (_request: FastifyRequest, _reply: FastifyReply) => {
           // Mock authenticate - does nothing in tests
         });
       },
@@ -31,7 +31,7 @@ describe('RBAC Plugin', () => {
     const handler = (app as any).requireRole('SUPER_ADMIN');
     const mockRequest = { user: null } as any;
     const mockReply = {
-      code: mock((code: number) => mockReply),
+      code: mock((_code: number) => mockReply),
       send: mock((body: any) => body),
     } as any;
 
@@ -48,7 +48,7 @@ describe('RBAC Plugin', () => {
     const handler = (app as any).requireRole('SUPER_ADMIN');
     const mockRequest = { user: { userId: 'test', role: 'USER' } } as any;
     const mockReply = {
-      code: mock((code: number) => mockReply),
+      code: mock((_code: number) => mockReply),
       send: mock((body: any) => body),
     } as any;
 

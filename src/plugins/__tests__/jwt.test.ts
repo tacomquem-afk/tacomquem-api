@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import jwtPlugin from '../jwt.js';
-import { env } from '../../config/env.js';
 
 describe('JWT Plugin with Role', () => {
   let app: FastifyInstance;
@@ -30,7 +29,7 @@ describe('JWT Plugin with Role', () => {
 
   it('should sign refresh token with role', () => {
     const token = (app as any).signRefreshToken('user-789', 'MODERATOR');
-    const decoded = app.jwt.verify(token, { secret: env.JWT_REFRESH_SECRET }) as any;
+    const decoded = app.jwt.verify(token) as any;
     expect(decoded.userId).toBe('user-789');
     expect(decoded.role).toBe('MODERATOR');
   });

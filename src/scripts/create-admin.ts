@@ -1,5 +1,6 @@
-import { z } from 'zod';
+import { createInterface } from 'node:readline';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { encrypt, hash } from '../services/crypto/index.js';
@@ -29,10 +30,7 @@ export async function createSuperAdmin(
   const existingUser = await findUserByEmailHash(emailHash);
 
   if (existingUser) {
-    await db
-      .update(users)
-      .set({ role: 'SUPER_ADMIN' })
-      .where(eq(users.id, existingUser.id));
+    await db.update(users).set({ role: 'SUPER_ADMIN' }).where(eq(users.id, existingUser.id));
 
     return { created: false, userId: existingUser.id };
   }
@@ -62,10 +60,10 @@ export async function createSuperAdmin(
 }
 
 async function main() {
+  // eslint-disable-next-line no-console
   console.log('=== TáComQuem - Criar SUPER_ADMIN ===\n');
 
-  const readline = await import('readline');
-  const rl = readline.createInterface({
+  const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
   });
@@ -78,20 +76,29 @@ async function main() {
     const password = await question('Senha (mínimo 8 caracteres): ');
     const name = await question('Nome completo: ');
 
+    // eslint-disable-next-line no-console
     console.log('\nCriando SUPER_ADMIN...');
     const result = await createSuperAdmin(email.trim(), password.trim(), name.trim());
 
     if (result.created) {
+      // eslint-disable-next-line no-console
       console.log('\n✅ SUPER_ADMIN criado com sucesso!');
     } else {
+      // eslint-disable-next-line no-console
       console.log('\n✅ Usuário promovido a SUPER_ADMIN!');
     }
+    // eslint-disable-next-line no-console
     console.log(`ID: ${result.userId}\n`);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      // eslint-disable-next-line no-console
       console.error('\n❌ Erro de validação:');
-      error.errors.forEach((e) => console.error(`  - ${e.message}`));
+      error.issues.forEach((e) => {
+        // eslint-disable-next-line no-console
+        console.error(`  - ${e.message}`);
+      });
     } else {
+      // eslint-disable-next-line no-console
       console.error('\n❌ Erro:', error);
     }
     process.exit(1);

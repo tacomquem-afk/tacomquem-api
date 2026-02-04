@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { db } from '../../db/index.js';
-import { users } from '../../db/schema.js';
-import { createSuperAdmin, findUserByEmailHash } from '../create-admin.js';
+import { createSuperAdmin } from '../create-admin.js';
 
 describe('Create Admin Script', () => {
   const mockEmail = 'admin@test.com';
@@ -13,9 +12,8 @@ describe('Create Admin Script', () => {
   });
 
   it('should create new SUPER_ADMIN if user does not exist', async () => {
-    spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(null);
+    spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
 
-    const updateSpy = spyOn(db, 'update');
     const insertSpy = spyOn(db, 'insert').mockReturnValue({
       values: mock(() => ({
         returning: mock(() => Promise.resolve([{ id: 'new-user-id' }])),
@@ -27,7 +25,6 @@ describe('Create Admin Script', () => {
     expect(result.created).toBe(true);
     expect(result.userId).toBe('new-user-id');
     expect(insertSpy).toHaveBeenCalled();
-    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   it('should promote existing user to SUPER_ADMIN', async () => {

@@ -29,24 +29,17 @@ async function jwtPlugin(fastify: FastifyInstance) {
     secret: env.JWT_SECRET,
   });
 
-  fastify.decorate(
-    'signAccessToken',
-    (userId: string, role: UserRole = 'USER'): string => {
-      return fastify.jwt.sign({ userId, role } as TokenPayload, {
-        expiresIn: env.JWT_EXPIRES_IN,
-      });
-    }
-  );
+  fastify.decorate('signAccessToken', (userId: string, role: UserRole = 'USER'): string => {
+    return fastify.jwt.sign({ userId, role } as TokenPayload, {
+      expiresIn: env.JWT_EXPIRES_IN,
+    });
+  });
 
-  fastify.decorate(
-    'signRefreshToken',
-    (userId: string, role: UserRole = 'USER'): string => {
-      return fastify.jwt.sign({ userId, role } as TokenPayload, {
-        secret: env.JWT_REFRESH_SECRET,
-        expiresIn: '30d',
-      });
-    }
-  );
+  fastify.decorate('signRefreshToken', (userId: string, role: UserRole = 'USER'): string => {
+    return fastify.jwt.sign({ userId, role } as TokenPayload, {
+      expiresIn: '30d',
+    });
+  });
 
   fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
     try {

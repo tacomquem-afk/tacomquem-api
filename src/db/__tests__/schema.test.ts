@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { roleEnum, adminActionEnum, users, adminAuditLog } from '../schema.js';
+import { adminActionEnum, adminAuditLog, roleEnum, users } from '../schema.js';
 
 describe('Schema Enums', () => {
   it('should have all required user roles', () => {
