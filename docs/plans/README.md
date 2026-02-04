@@ -24,4 +24,5 @@ plans/
 
 | # | Nome | Status | Descrição |
 |---|------|--------|-----------|
-| 001 | [mvp](./001-mvp/) | Em design | MVP do TáComQuem |
+| 001 | [mvp](./001-mvp/) | Em implementação | MVP do TáComQuem (Auth, Items, Loans essenciais) |
+| 001.1 | [upload-r2](./001-mvp/002-upload-r2-implementation.md) | Pronto para implementar | Upload de fotos com compactação para R2 |
