@@ -209,7 +209,7 @@ export async function findOrCreateGoogleUser(
     with: { user: true },
   });
 
-  if (existingOauth) {
+  if (existingOauth?.user) {
     const user = existingOauth.user;
     return {
       id: user.id,
