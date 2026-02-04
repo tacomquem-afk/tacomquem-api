@@ -10,6 +10,7 @@ import jwtPlugin from './plugins/jwt.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import itemsRoutes from './routes/items/index.js';
+import { uploadRoutes } from './routes/upload/index.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -59,6 +60,7 @@ export async function buildApp() {
         { name: 'Authentication', description: 'Authentication endpoints' },
         { name: 'OAuth', description: 'OAuth authentication providers' },
         { name: 'Items', description: 'Items management endpoints' },
+        { name: 'Upload', description: 'Image upload endpoints' },
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
@@ -131,6 +133,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
   await app.register(itemsRoutes, { prefix: '/api/items' });
+  await app.register(uploadRoutes, { prefix: '/api/upload' });
 
   return app;
 }
