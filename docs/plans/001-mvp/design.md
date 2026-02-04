@@ -380,6 +380,6 @@ Prioridade para implementar depois do MVP validado:
 
 ## 10. Referências
 
-- PRD original: [docs/prd.md](../prd.md)
+- PRD original: [docs/prd.md](../../prd.md)
 - Mockup do dashboard: Central de Empréstimos com cards
 - Mockup do cadastro: Registro Relâmpago
