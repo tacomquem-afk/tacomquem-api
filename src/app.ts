@@ -9,6 +9,10 @@ import { env } from './config/env.js';
 import { db } from './db/index.js';
 import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
+import analyticsRoutes from './routes/admin/analytics.js';
+import adminsRoutes from './routes/admin/admins.js';
+import moderationRoutes from './routes/admin/moderation.js';
+import usersRoutes from './routes/admin/users.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import { dashboardRoutes } from './routes/dashboard/index.js';
@@ -143,6 +147,11 @@ export async function buildApp() {
   await app.register(loansRoutes, { prefix: '/api/loans' });
   await app.register(linksRoutes, { prefix: '/api/links' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+
+  await app.register(analyticsRoutes, { prefix: '/api/admin/analytics' });
+  await app.register(usersRoutes, { prefix: '/api/admin/users' });
+  await app.register(moderationRoutes, { prefix: '/api/admin/moderation' });
+  await app.register(adminsRoutes, { prefix: '/api/admin/admins' });
 
   return app;
 }
