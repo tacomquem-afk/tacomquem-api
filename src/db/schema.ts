@@ -1,5 +1,14 @@
 import { relations } from 'drizzle-orm';
-import { boolean, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 export const loanStatusEnum = pgEnum('loan_status', [
   'pending',
@@ -110,6 +119,20 @@ export const verificationTokens = pgTable('verification_tokens', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const uploads = pgTable('uploads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  url: text('url').notNull().unique(),
+  key: text('key').notNull(),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  mimeType: varchar('mime_type', { length: 100 }).notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  confirmedAt: timestamp('confirmed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),
@@ -117,6 +140,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   borrowedLoans: many(loans, { relationName: 'borrower' }),
   notifications: many(notifications),
   verificationTokens: many(verificationTokens),
+  uploads: many(uploads),
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
@@ -174,6 +198,13 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 export const verificationTokensRelations = relations(verificationTokens, ({ one }) => ({
   user: one(users, {
     fields: [verificationTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const uploadsRelations = relations(uploads, ({ one }) => ({
+  user: one(users, {
+    fields: [uploads.userId],
     references: [users.id],
   }),
 }));
