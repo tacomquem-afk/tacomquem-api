@@ -12,6 +12,7 @@
     "db:migrate": "bun src/db/migrate.ts",
     "db:seed": "bun src/db/seed.ts",
     "db:studio": "bunx drizzle-kit studio",
+    "admin:create": "bun run src/scripts/create-admin.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
