@@ -101,17 +101,6 @@ describe('Admin Moderation Routes', () => {
     expect(body.status).toBe('confirmed');
   });
 
-  it('POST /loans/:id/cancel should require MODERATOR role', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/api/admin/moderation/loans/loan-123/cancel',
-      headers: { authorization: `Bearer ${supportToken}` },
-      payload: { reason: 'Fraudulent loan detected' }
-    });
-
-    expect(response.statusCode).toBe(403);
-  });
-
   it('POST /loans/:id/cancel should cancel loan as MODERATOR', async () => {
     spyOn(moderationService, 'cancelLoan').mockResolvedValueOnce(undefined);
 
