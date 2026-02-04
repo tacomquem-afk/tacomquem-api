@@ -30,5 +30,5 @@ coverage/
 drizzle/meta/
 
 # Bun
-bun.lockb
+bun.lock
 .history
