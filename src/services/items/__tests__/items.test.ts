@@ -11,8 +11,8 @@ import {
 } from '../index.js';
 
 const mockItemData = {
-  id: 'item-123',
-  ownerId: 'owner-123',
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  ownerId: '550e8400-e29b-41d4-a716-446655440001',
   name: 'Test Item',
   description: 'A test item',
   images: '["https://example.com/image1.jpg"]',
@@ -22,7 +22,7 @@ const mockItemData = {
 };
 
 const expectedItemResponse: ItemResponse = {
-  id: 'item-123',
+  id: '550e8400-e29b-41d4-a716-446655440000',
   name: 'Test Item',
   description: 'A test item',
   images: ['https://example.com/image1.jpg'],
@@ -45,7 +45,7 @@ describe('items service', () => {
       const valuesMock = mock(() => ({ returning: returningMock }));
       spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
 
-      const result = await createItem('owner-123', {
+      const result = await createItem('550e8400-e29b-41d4-a716-446655440001', {
         name: 'Test Item',
         description: 'A test item',
         images: ['https://example.com/image1.jpg'],
@@ -60,7 +60,7 @@ describe('items service', () => {
       spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
 
       await expect(
-        createItem('owner-123', {
+        createItem('550e8400-e29b-41d4-a716-446655440001', {
           name: 'Test Item',
           description: 'A test item',
           images: [],
@@ -74,7 +74,7 @@ describe('items service', () => {
       const valuesMock = mock(() => ({ returning: returningMock }));
       spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
 
-      const result = await createItem('owner-123', {
+      const result = await createItem('550e8400-e29b-41d4-a716-446655440001', {
         name: 'Test Item',
         images: [],
       });
@@ -88,7 +88,7 @@ describe('items service', () => {
       const items = [mockItemData, { ...mockItemData, id: 'item-124' }];
       spyOn(db.query.items, 'findMany').mockResolvedValueOnce(items as any);
 
-      const result = await getItemsByOwner('owner-123');
+      const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(expectedItemResponse);
@@ -97,7 +97,7 @@ describe('items service', () => {
     it('should return empty array if owner has no items', async () => {
       spyOn(db.query.items, 'findMany').mockResolvedValueOnce([]);
 
-      const result = await getItemsByOwner('owner-123');
+      const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
       expect(result).toHaveLength(0);
     });
@@ -106,7 +106,7 @@ describe('items service', () => {
       const activeItem = { ...mockItemData, isActive: true };
       spyOn(db.query.items, 'findMany').mockResolvedValueOnce([activeItem] as any);
 
-      const result = await getItemsByOwner('owner-123');
+      const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
       expect(result).toHaveLength(1);
       expect(result[0]?.isActive).toBe(true);
@@ -117,7 +117,10 @@ describe('items service', () => {
     it('should return item if exists and owned by user', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
 
-      const result = await getItemById('item-123', 'owner-123');
+      const result = await getItemById(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
 
       expect(result).toEqual(expectedItemResponse);
     });
@@ -125,7 +128,7 @@ describe('items service', () => {
     it('should return null if item does not exist', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
 
-      const result = await getItemById('nonexistent-item', 'owner-123');
+      const result = await getItemById('nonexistent-item', '550e8400-e29b-41d4-a716-446655440001');
 
       expect(result).toBeNull();
     });
@@ -133,7 +136,7 @@ describe('items service', () => {
     it('should return null if item is not owned by user', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
 
-      const result = await getItemById('item-123', 'different-owner');
+      const result = await getItemById('550e8400-e29b-41d4-a716-446655440000', 'different-owner');
 
       expect(result).toBeNull();
     });
@@ -154,9 +157,13 @@ describe('items service', () => {
       const setMock = mock(() => ({ where: whereMock }));
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
 
-      const result = await updateItem('item-123', 'owner-123', {
-        name: 'Updated Item',
-      });
+      const result = await updateItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001',
+        {
+          name: 'Updated Item',
+        }
+      );
 
       expect(result?.name).toBe('Updated Item');
       expect(findSpy).toHaveBeenCalled();
@@ -165,7 +172,7 @@ describe('items service', () => {
     it('should return null if item does not exist', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
 
-      const result = await updateItem('nonexistent-item', 'owner-123', {
+      const result = await updateItem('nonexistent-item', '550e8400-e29b-41d4-a716-446655440001', {
         name: 'Updated Item',
       });
 
@@ -181,7 +188,7 @@ describe('items service', () => {
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
 
       await expect(
-        updateItem('item-123', 'owner-123', {
+        updateItem('550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001', {
           name: 'Updated Item',
         })
       ).rejects.toThrow('Falha ao atualizar item');
@@ -201,9 +208,13 @@ describe('items service', () => {
       const setMock = mock(() => ({ where: whereMock }));
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
 
-      const result = await updateItem('item-123', 'owner-123', {
-        description: 'New description',
-      });
+      const result = await updateItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001',
+        {
+          description: 'New description',
+        }
+      );
 
       expect(result?.description).toBe('New description');
     });
@@ -218,7 +229,10 @@ describe('items service', () => {
       const setMock = mock(() => ({ where: whereMock }));
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
 
-      const result = await deleteItem('item-123', 'owner-123');
+      const result = await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
 
       expect(result).toBe(true);
     });
@@ -226,7 +240,7 @@ describe('items service', () => {
     it('should return false if item does not exist', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
 
-      const result = await deleteItem('nonexistent-item', 'owner-123');
+      const result = await deleteItem('nonexistent-item', '550e8400-e29b-41d4-a716-446655440001');
 
       expect(result).toBe(false);
     });
@@ -242,7 +256,10 @@ describe('items service', () => {
         set: setMock,
       } as any);
 
-      await deleteItem('item-123', 'owner-123');
+      await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
 
       expect(findFirstSpy).toHaveBeenCalled();
       expect(updateSpy).toHaveBeenCalled();
@@ -253,7 +270,7 @@ describe('items service', () => {
     it('should return active item', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
 
-      const result = await getItemByIdPublic('item-123');
+      const result = await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 
       expect(result).toEqual(expectedItemResponse);
     });
@@ -270,7 +287,7 @@ describe('items service', () => {
       const inactiveItem = { ...mockItemData, isActive: false };
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(inactiveItem as any);
 
-      const result = await getItemByIdPublic('item-123');
+      const result = await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 
       expect(result?.isActive).toBeFalsy();
     });
@@ -280,7 +297,7 @@ describe('items service', () => {
         mockItemData as any
       );
 
-      await getItemByIdPublic('item-123');
+      await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 
       expect(findFirstSpy).toHaveBeenCalled();
     });

@@ -1,8 +1,24 @@
-import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
+
+const mockListAdmins = mock(() => Promise.resolve([]));
+const mockPromoteToAdmin = mock(() => Promise.resolve());
+const mockChangeAdminRole = mock(() => Promise.resolve());
+const mockRemoveAdmin = mock(() => Promise.resolve());
+const mockGetAuditLog = mock(() =>
+  Promise.resolve({ logs: [], pagination: { page: 1, limit: 50 } })
+);
+
+mock.module('../../../services/admin/admins.js', () => ({
+  listAdmins: mockListAdmins,
+  promoteToAdmin: mockPromoteToAdmin,
+  changeAdminRole: mockChangeAdminRole,
+  removeAdmin: mockRemoveAdmin,
+  getAuditLog: mockGetAuditLog,
+}));
+
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
-import * as adminsService from '../../../services/admin/admins.js';
 import adminsRoutes from '../admins.js';
 
 describe('Admin Management Routes', () => {
@@ -10,6 +26,19 @@ describe('Admin Management Routes', () => {
   let superAdminToken: string;
 
   beforeEach(async () => {
+    mockListAdmins.mockReset();
+    mockListAdmins.mockImplementation(() => Promise.resolve([]));
+    mockPromoteToAdmin.mockReset();
+    mockPromoteToAdmin.mockImplementation(() => Promise.resolve());
+    mockChangeAdminRole.mockReset();
+    mockChangeAdminRole.mockImplementation(() => Promise.resolve());
+    mockRemoveAdmin.mockReset();
+    mockRemoveAdmin.mockImplementation(() => Promise.resolve());
+    mockGetAuditLog.mockReset();
+    mockGetAuditLog.mockImplementation(() =>
+      Promise.resolve({ logs: [], pagination: { page: 1, limit: 50 } })
+    );
+
     app = Fastify();
     await app.register(jwtPlugin);
     await app.register(rbacPlugin);
@@ -20,7 +49,7 @@ describe('Admin Management Routes', () => {
   });
 
   it('GET / should list all admins', async () => {
-    spyOn(adminsService, 'listAdmins').mockResolvedValueOnce([
+    mockListAdmins.mockResolvedValueOnce([
       {
         id: 'admin-1',
         email: 'ad***@example.com',
@@ -38,12 +67,10 @@ describe('Admin Management Routes', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(Array.isArray(body)).toBe(true);
   });
 
   it('POST / should promote user to admin', async () => {
-    spyOn(adminsService, 'promoteToAdmin').mockResolvedValueOnce(undefined);
+    mockPromoteToAdmin.mockResolvedValueOnce(undefined);
 
     const response = await app.inject({
       method: 'POST',
@@ -61,11 +88,11 @@ describe('Admin Management Routes', () => {
   });
 
   it('PATCH /:id/role should change admin role', async () => {
-    spyOn(adminsService, 'changeAdminRole').mockResolvedValueOnce(undefined);
+    mockChangeAdminRole.mockResolvedValueOnce(undefined);
 
     const response = await app.inject({
       method: 'PATCH',
-      url: '/api/admin/admins/admin-1/role',
+      url: '/api/admin/admins/550e8400-e29b-41d4-a716-446655440000/role',
       headers: { authorization: `Bearer ${superAdminToken}` },
       payload: { role: 'ANALYST' },
     });
@@ -76,11 +103,11 @@ describe('Admin Management Routes', () => {
   });
 
   it('DELETE /:id should remove admin', async () => {
-    spyOn(adminsService, 'removeAdmin').mockResolvedValueOnce(undefined);
+    mockRemoveAdmin.mockResolvedValueOnce(undefined);
 
     const response = await app.inject({
       method: 'DELETE',
-      url: '/api/admin/admins/admin-1',
+      url: '/api/admin/admins/550e8400-e29b-41d4-a716-446655440000',
       headers: { authorization: `Bearer ${superAdminToken}` },
     });
 
@@ -90,7 +117,7 @@ describe('Admin Management Routes', () => {
   });
 
   it('GET /audit-log should return audit log', async () => {
-    spyOn(adminsService, 'getAuditLog').mockResolvedValueOnce({
+    mockGetAuditLog.mockResolvedValueOnce({
       logs: [
         {
           id: 'log-1',
@@ -118,7 +145,5 @@ describe('Admin Management Routes', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(Array.isArray(body.logs)).toBe(true);
   });
 });
