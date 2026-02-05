@@ -1,11 +1,33 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+
+import { resetAllDbMocks } from '../../../__tests__/helpers/db-mock-reset.js';
 import { db } from '../../../db/index.js';
 import * as cryptoModule from '../../crypto/index.js';
 import { cancelLoan, getItemDetails, getLoanDetails, removeItem } from '../moderation.js';
 
+const mocks: Array<{ mockRestore: () => void }> = [];
+
 describe('Moderation Service', () => {
   beforeEach(() => {
-    // Reset mocks
+    // Reset all db mocks from other test files
+    resetAllDbMocks();
+
+    // Clean any leftover mocks from previous tests
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
+  });
+
+  afterEach(() => {
+    for (const mock of mocks) {
+      mock.mockRestore();
+    }
+    mocks.length = 0;
   });
 
   describe('getItemDetails', () => {
@@ -22,20 +44,24 @@ describe('Moderation Service', () => {
         loans: [],
       };
 
-      spyOn(cryptoModule, 'decrypt')
-        .mockReturnValueOnce('owner@example.com')
-        .mockReturnValueOnce('Owner Name');
+      mocks.push(
+        spyOn(cryptoModule, 'decrypt')
+          .mockReturnValueOnce('owner@example.com')
+          .mockReturnValueOnce('Owner Name')
+      );
 
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItem as any);
+      mocks.push(spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItem as any));
 
       const result = await getItemDetails('item-1');
 
       expect(result).toBeDefined();
+      expect(result?.owner.email).toBeDefined();
+      expect(typeof result?.owner.email).toBe('string');
       expect(result?.owner.email).toContain('***');
     });
 
     it('should return null if item not found', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(null as any);
+      mocks.push(spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(null as any));
 
       const result = await getItemDetails('nonexistent');
 
@@ -48,10 +74,12 @@ describe('Moderation Service', () => {
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: mock(() => ({ where: mock(() => Promise.resolve()) })),
       } as any);
+      mocks.push(updateSpy);
 
       const insertSpy = spyOn(db, 'insert').mockReturnValue({
         values: mock(() => Promise.resolve()),
       } as any);
+      mocks.push(insertSpy);
 
       await removeItem('item-1', 'admin-1', 'Inappropriate content', '192.168.1.1');
 
@@ -69,18 +97,24 @@ describe('Moderation Service', () => {
         borrower: { id: 'user-2', emailEncrypted: 'enc', nameEncrypted: 'enc' },
       };
 
-      spyOn(cryptoModule, 'decrypt')
-        .mockReturnValueOnce('lender@example.com')
-        .mockReturnValueOnce('Lender Name')
-        .mockReturnValueOnce('borrower@example.com')
-        .mockReturnValueOnce('Borrower Name');
+      mocks.push(
+        spyOn(cryptoModule, 'decrypt')
+          .mockReturnValueOnce('lender@example.com')
+          .mockReturnValueOnce('Lender Name')
+          .mockReturnValueOnce('borrower@example.com')
+          .mockReturnValueOnce('Borrower Name')
+      );
 
-      spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(mockLoan as any);
+      mocks.push(spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(mockLoan as any));
 
       const result = await getLoanDetails('loan-1');
 
       expect(result).toBeDefined();
+      expect(result?.lender.email).toBeDefined();
+      expect(typeof result?.lender.email).toBe('string');
       expect(result?.lender.email).toContain('***');
+      expect(result?.borrower?.email).toBeDefined();
+      expect(typeof result?.borrower?.email).toBe('string');
       expect(result?.borrower?.email).toContain('***');
     });
   });
@@ -90,10 +124,12 @@ describe('Moderation Service', () => {
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: mock(() => ({ where: mock(() => Promise.resolve()) })),
       } as any);
+      mocks.push(updateSpy);
 
       const insertSpy = spyOn(db, 'insert').mockReturnValue({
         values: mock(() => Promise.resolve()),
       } as any);
+      mocks.push(insertSpy);
 
       await cancelLoan('loan-1', 'admin-1', 'Fraudulent loan', '192.168.1.1');
 

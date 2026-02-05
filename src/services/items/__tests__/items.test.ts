@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { db } from '../../../db/index.js';
 import {
   createItem,
@@ -9,6 +9,8 @@ import {
   type ItemResponse,
   updateItem,
 } from '../index.js';
+
+const mocks: Array<{ mockRestore: () => void }> = [];
 
 const mockItemData = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -32,10 +34,28 @@ const expectedItemResponse: ItemResponse = {
 };
 
 beforeEach(() => {
+  // Clean any leftover mocks from previous tests
+  for (const mock of mocks) {
+    try {
+      mock.mockRestore();
+    } catch (_e) {
+      // Already restored
+    }
+  }
+  mocks.length = 0;
+
+  // Just clear, don't track these clearings
   spyOn(db, 'insert').mockClear();
   spyOn(db, 'update').mockClear();
   spyOn(db.query.items, 'findMany').mockClear();
   spyOn(db.query.items, 'findFirst').mockClear();
+});
+
+afterEach(() => {
+  for (const mock of mocks) {
+    mock.mockRestore();
+  }
+  mocks.length = 0;
 });
 
 describe('items service', () => {
@@ -43,7 +63,8 @@ describe('items service', () => {
     it('should create item successfully', async () => {
       const returningMock = mock(() => Promise.resolve([mockItemData]));
       const valuesMock = mock(() => ({ returning: returningMock }));
-      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      const insertSpy = spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      mocks.push(insertSpy);
 
       const result = await createItem('550e8400-e29b-41d4-a716-446655440001', {
         name: 'Test Item',
@@ -57,7 +78,8 @@ describe('items service', () => {
     it('should throw error if item creation fails', async () => {
       const returningMock = mock(() => Promise.resolve([]));
       const valuesMock = mock(() => ({ returning: returningMock }));
-      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      const insertSpy = spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      mocks.push(insertSpy);
 
       await expect(
         createItem('550e8400-e29b-41d4-a716-446655440001', {
@@ -72,7 +94,8 @@ describe('items service', () => {
       const itemWithoutDescription = { ...mockItemData, description: null };
       const returningMock = mock(() => Promise.resolve([itemWithoutDescription]));
       const valuesMock = mock(() => ({ returning: returningMock }));
-      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      const insertSpy = spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      mocks.push(insertSpy);
 
       const result = await createItem('550e8400-e29b-41d4-a716-446655440001', {
         name: 'Test Item',
@@ -86,7 +109,8 @@ describe('items service', () => {
   describe('getItemsByOwner', () => {
     it('should return all active items for owner', async () => {
       const items = [mockItemData, { ...mockItemData, id: 'item-124' }];
-      spyOn(db.query.items, 'findMany').mockResolvedValueOnce(items as any);
+      const findManySpy = spyOn(db.query.items, 'findMany').mockResolvedValueOnce(items as any);
+      mocks.push(findManySpy);
 
       const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
@@ -95,7 +119,8 @@ describe('items service', () => {
     });
 
     it('should return empty array if owner has no items', async () => {
-      spyOn(db.query.items, 'findMany').mockResolvedValueOnce([]);
+      const findManySpy = spyOn(db.query.items, 'findMany').mockResolvedValueOnce([]);
+      mocks.push(findManySpy);
 
       const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
@@ -104,7 +129,10 @@ describe('items service', () => {
 
     it('should only return active items', async () => {
       const activeItem = { ...mockItemData, isActive: true };
-      spyOn(db.query.items, 'findMany').mockResolvedValueOnce([activeItem] as any);
+      const findManySpy = spyOn(db.query.items, 'findMany').mockResolvedValueOnce([
+        activeItem,
+      ] as any);
+      mocks.push(findManySpy);
 
       const result = await getItemsByOwner('550e8400-e29b-41d4-a716-446655440001');
 
@@ -115,7 +143,10 @@ describe('items service', () => {
 
   describe('getItemById', () => {
     it('should return item if exists and owned by user', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItemData as any
+      );
+      mocks.push(findFirstSpy);
 
       const result = await getItemById(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -134,7 +165,8 @@ describe('items service', () => {
     });
 
     it('should return null if item is not owned by user', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      mocks.push(findFirstSpy);
 
       const result = await getItemById('550e8400-e29b-41d4-a716-446655440000', 'different-owner');
 
@@ -145,6 +177,7 @@ describe('items service', () => {
   describe('updateItem', () => {
     it('should update item successfully', async () => {
       const findSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      mocks.push(findSpy);
 
       const updatedItem = {
         ...mockItemData,
@@ -155,7 +188,8 @@ describe('items service', () => {
       const returningMock = mock(() => Promise.resolve([updatedItem]));
       const whereMock = mock(() => ({ returning: returningMock }));
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
 
       const result = await updateItem(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -170,7 +204,8 @@ describe('items service', () => {
     });
 
     it('should return null if item does not exist', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      mocks.push(findFirstSpy);
 
       const result = await updateItem('nonexistent-item', '550e8400-e29b-41d4-a716-446655440001', {
         name: 'Updated Item',
@@ -180,12 +215,16 @@ describe('items service', () => {
     });
 
     it('should throw error if update fails', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItemData as any
+      );
+      mocks.push(findFirstSpy);
 
       const returningMock = mock(() => Promise.resolve([]));
       const whereMock = mock(() => ({ returning: returningMock }));
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
 
       await expect(
         updateItem('550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001', {
@@ -195,7 +234,10 @@ describe('items service', () => {
     });
 
     it('should only update provided fields', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItemData as any
+      );
+      mocks.push(findFirstSpy);
 
       const updatedItem = {
         ...mockItemData,
@@ -206,7 +248,8 @@ describe('items service', () => {
       const returningMock = mock(() => Promise.resolve([updatedItem]));
       const whereMock = mock(() => ({ returning: returningMock }));
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
 
       const result = await updateItem(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -222,12 +265,16 @@ describe('items service', () => {
 
   describe('deleteItem', () => {
     it('should soft delete item successfully', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItemData as any
+      );
+      mocks.push(findFirstSpy);
 
       const returningMock = mock(() => Promise.resolve());
       const whereMock = mock(() => ({ returning: returningMock }));
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
 
       const result = await deleteItem(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -238,7 +285,8 @@ describe('items service', () => {
     });
 
     it('should return false if item does not exist', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      mocks.push(findFirstSpy);
 
       const result = await deleteItem('nonexistent-item', '550e8400-e29b-41d4-a716-446655440001');
 
@@ -249,12 +297,14 @@ describe('items service', () => {
       const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
         mockItemData as any
       );
+      mocks.push(findFirstSpy);
 
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: setMock,
       } as any);
+      mocks.push(updateSpy);
 
       await deleteItem(
         '550e8400-e29b-41d4-a716-446655440000',
@@ -268,7 +318,10 @@ describe('items service', () => {
 
   describe('getItemByIdPublic', () => {
     it('should return active item', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItemData as any
+      );
+      mocks.push(findFirstSpy);
 
       const result = await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 
@@ -276,7 +329,8 @@ describe('items service', () => {
     });
 
     it('should return null if item does not exist', async () => {
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
+      mocks.push(findFirstSpy);
 
       const result = await getItemByIdPublic('nonexistent-item');
 
@@ -285,7 +339,10 @@ describe('items service', () => {
 
     it('should return null if item is inactive', async () => {
       const inactiveItem = { ...mockItemData, isActive: false };
-      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(inactiveItem as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        inactiveItem as any
+      );
+      mocks.push(findFirstSpy);
 
       const result = await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 
@@ -296,6 +353,7 @@ describe('items service', () => {
       const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
         mockItemData as any
       );
+      mocks.push(findFirstSpy);
 
       await getItemByIdPublic('550e8400-e29b-41d4-a716-446655440000');
 

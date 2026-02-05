@@ -37,8 +37,8 @@ describe('RBAC Plugin', () => {
     let error: Error | null = null;
     try {
       await handler(mockRequest, mockReply);
-    } catch (e) {
-      error = e as Error;
+    } catch (_error) {
+      error = _error as Error;
     }
 
     expect(mockReply.code).toHaveBeenCalledWith(401);
@@ -55,8 +55,8 @@ describe('RBAC Plugin', () => {
     let error: Error | null = null;
     try {
       await handler(mockRequest, mockReply);
-    } catch (e) {
-      error = e as Error;
+    } catch (_error) {
+      error = _error as Error;
     }
 
     expect(mockReply.code).toHaveBeenCalledWith(403);

@@ -1,14 +1,38 @@
-import { beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
+import { resetAllDbMocks } from '../../../__tests__/helpers/db-mock-reset.js';
 import { db } from '../../../db/index.js';
 import * as cryptoService from '../../crypto/index.js';
 import { getDashboardData, getFriends } from '../index.js';
+
+const mocks: Array<{ mockRestore: () => void }> = [];
 
 beforeAll(() => {
   process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 });
 
 describe('dashboard service', () => {
+  beforeEach(() => {
+    // Reset all db mocks from other test files
+    resetAllDbMocks();
+
+    // Clean any leftover mocks from previous tests
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
+  });
+
+  afterEach(() => {
+    for (const mock of mocks) {
+      mock.mockRestore();
+    }
+    mocks.length = 0;
+  });
   describe('getDashboardData', () => {
     it('should return dashboard data with stats and loans', async () => {
       const userId = 'user-123';
@@ -80,28 +104,34 @@ describe('dashboard service', () => {
         createdAt: now,
       };
 
-      spyOn(db, 'select').mockImplementation(
-        () =>
-          ({
-            from: () => ({
-              where: () => [{ count: 1 }],
-            }),
-          }) as any
+      mocks.push(
+        spyOn(db, 'select').mockImplementation(
+          () =>
+            ({
+              from: () => ({
+                where: () => [{ count: 1 }],
+              }),
+            }) as any
+        )
       );
 
-      spyOn(db.query.notifications, 'findMany').mockResolvedValue([mockNotification]);
+      mocks.push(spyOn(db.query.notifications, 'findMany').mockResolvedValue([mockNotification]));
 
-      spyOn(db.query.loans, 'findMany')
-        .mockResolvedValueOnce(
-          [mockActiveLoan] // pendingLoans query
-        )
-        .mockResolvedValueOnce([mockActiveLoan]); // activeLoans query
+      mocks.push(
+        spyOn(db.query.loans, 'findMany')
+          .mockResolvedValueOnce(
+            [mockActiveLoan] // pendingLoans query
+          )
+          .mockResolvedValueOnce([mockActiveLoan])
+      ); // activeLoans query
 
-      spyOn(cryptoService, 'decrypt').mockImplementation((text) => {
-        if (text === 'encrypted-name') return 'John Doe';
-        if (text === 'encrypted-name2') return 'Jane Smith';
-        return text;
-      });
+      mocks.push(
+        spyOn(cryptoService, 'decrypt').mockImplementation((text) => {
+          if (text === 'encrypted-name') return 'John Doe';
+          if (text === 'encrypted-name2') return 'Jane Smith';
+          return text;
+        })
+      );
 
       const data = await getDashboardData(userId);
 
@@ -183,11 +213,13 @@ describe('dashboard service', () => {
         lender: mockFriend,
       };
 
-      spyOn(db.query.loans, 'findMany')
-        .mockResolvedValueOnce([mockLentLoan]) // lentLoans
-        .mockResolvedValueOnce([mockBorrowedLoan]); // borrowedLoans
+      mocks.push(
+        spyOn(db.query.loans, 'findMany')
+          .mockResolvedValueOnce([mockLentLoan]) // lentLoans
+          .mockResolvedValueOnce([mockBorrowedLoan])
+      ); // borrowedLoans
 
-      spyOn(cryptoService, 'decrypt').mockReturnValue('Friend Name');
+      mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Friend Name'));
 
       const friends = await getFriends(userId);
 
@@ -205,9 +237,11 @@ describe('dashboard service', () => {
     it('should return empty array when user has no friends', async () => {
       const userId = 'user-123';
 
-      spyOn(db.query.loans, 'findMany')
-        .mockResolvedValueOnce([]) // lentLoans
-        .mockResolvedValueOnce([]); // borrowedLoans
+      mocks.push(
+        spyOn(db.query.loans, 'findMany')
+          .mockResolvedValueOnce([]) // lentLoans
+          .mockResolvedValueOnce([])
+      ); // borrowedLoans
 
       const friends = await getFriends(userId);
 
@@ -293,11 +327,13 @@ describe('dashboard service', () => {
         borrower: friend2,
       };
 
-      spyOn(db.query.loans, 'findMany')
-        .mockResolvedValueOnce([mockLoan1, mockLoan2a, mockLoan2b]) // lentLoans
-        .mockResolvedValueOnce([]); // borrowedLoans
+      mocks.push(
+        spyOn(db.query.loans, 'findMany')
+          .mockResolvedValueOnce([mockLoan1, mockLoan2a, mockLoan2b]) // lentLoans
+          .mockResolvedValueOnce([])
+      ); // borrowedLoans
 
-      spyOn(cryptoService, 'decrypt').mockReturnValue('Friend');
+      mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Friend'));
 
       const friends = await getFriends(userId);
 

@@ -1,43 +1,26 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
-
-const mockListAdmins = mock(() => Promise.resolve([]));
-const mockPromoteToAdmin = mock(() => Promise.resolve());
-const mockChangeAdminRole = mock(() => Promise.resolve());
-const mockRemoveAdmin = mock(() => Promise.resolve());
-const mockGetAuditLog = mock(() =>
-  Promise.resolve({ logs: [], pagination: { page: 1, limit: 50 } })
-);
-
-mock.module('../../../services/admin/admins.js', () => ({
-  listAdmins: mockListAdmins,
-  promoteToAdmin: mockPromoteToAdmin,
-  changeAdminRole: mockChangeAdminRole,
-  removeAdmin: mockRemoveAdmin,
-  getAuditLog: mockGetAuditLog,
-}));
-
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
+import * as adminsModule from '../../../services/admin/admins.js';
 import adminsRoutes from '../admins.js';
+
+const mocks: Array<{ mockRestore: () => void }> = [];
 
 describe('Admin Management Routes', () => {
   let app: FastifyInstance;
   let superAdminToken: string;
 
   beforeEach(async () => {
-    mockListAdmins.mockReset();
-    mockListAdmins.mockImplementation(() => Promise.resolve([]));
-    mockPromoteToAdmin.mockReset();
-    mockPromoteToAdmin.mockImplementation(() => Promise.resolve());
-    mockChangeAdminRole.mockReset();
-    mockChangeAdminRole.mockImplementation(() => Promise.resolve());
-    mockRemoveAdmin.mockReset();
-    mockRemoveAdmin.mockImplementation(() => Promise.resolve());
-    mockGetAuditLog.mockReset();
-    mockGetAuditLog.mockImplementation(() =>
-      Promise.resolve({ logs: [], pagination: { page: 1, limit: 50 } })
-    );
+    // Restore any previous mocks
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
 
     app = Fastify();
     await app.register(jwtPlugin);
@@ -48,17 +31,30 @@ describe('Admin Management Routes', () => {
     superAdminToken = (app as any).signAccessToken('super-admin', 'SUPER_ADMIN');
   });
 
+  afterEach(() => {
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
+  });
+
   it('GET / should list all admins', async () => {
-    mockListAdmins.mockResolvedValueOnce([
-      {
-        id: 'admin-1',
-        email: 'ad***@example.com',
-        name: 'Admin U***',
-        role: 'SUPER_ADMIN',
-        isActive: true,
-        createdAt: new Date(),
-      },
-    ] as any);
+    mocks.push(
+      spyOn(adminsModule, 'listAdmins').mockResolvedValueOnce([
+        {
+          id: 'admin-1',
+          email: 'ad***@example.com',
+          name: 'Admin U***',
+          role: 'SUPER_ADMIN',
+          isActive: true,
+          createdAt: new Date(),
+        },
+      ] as any)
+    );
 
     const response = await app.inject({
       method: 'GET',
@@ -70,7 +66,7 @@ describe('Admin Management Routes', () => {
   });
 
   it('POST / should promote user to admin', async () => {
-    mockPromoteToAdmin.mockResolvedValueOnce(undefined);
+    mocks.push(spyOn(adminsModule, 'promoteToAdmin').mockResolvedValueOnce(undefined));
 
     const response = await app.inject({
       method: 'POST',
@@ -88,7 +84,7 @@ describe('Admin Management Routes', () => {
   });
 
   it('PATCH /:id/role should change admin role', async () => {
-    mockChangeAdminRole.mockResolvedValueOnce(undefined);
+    mocks.push(spyOn(adminsModule, 'changeAdminRole').mockResolvedValueOnce(undefined));
 
     const response = await app.inject({
       method: 'PATCH',
@@ -103,7 +99,7 @@ describe('Admin Management Routes', () => {
   });
 
   it('DELETE /:id should remove admin', async () => {
-    mockRemoveAdmin.mockResolvedValueOnce(undefined);
+    mocks.push(spyOn(adminsModule, 'removeAdmin').mockResolvedValueOnce(undefined));
 
     const response = await app.inject({
       method: 'DELETE',
@@ -117,26 +113,28 @@ describe('Admin Management Routes', () => {
   });
 
   it('GET /audit-log should return audit log', async () => {
-    mockGetAuditLog.mockResolvedValueOnce({
-      logs: [
-        {
-          id: 'log-1',
-          action: 'user_blocked',
-          admin: {
-            id: 'admin-1',
-            email: 'ad***@example.com',
-            name: 'Admin U***',
-            role: 'SUPER_ADMIN',
+    mocks.push(
+      spyOn(adminsModule, 'getAuditLog').mockResolvedValueOnce({
+        logs: [
+          {
+            id: 'log-1',
+            action: 'user_blocked',
+            admin: {
+              id: 'admin-1',
+              email: 'ad***@example.com',
+              name: 'Admin U***',
+              role: 'SUPER_ADMIN',
+            },
+            targetType: 'user',
+            targetId: 'user-1',
+            metadata: { reason: 'Spam' },
+            ipAddress: '192.168.1.1',
+            createdAt: new Date(),
           },
-          targetType: 'user',
-          targetId: 'user-1',
-          metadata: { reason: 'Spam' },
-          ipAddress: '192.168.1.1',
-          createdAt: new Date(),
-        },
-      ],
-      pagination: { page: 1, limit: 50 },
-    } as any);
+        ],
+        pagination: { page: 1, limit: 50 },
+      } as any)
+    );
 
     const response = await app.inject({
       method: 'GET',

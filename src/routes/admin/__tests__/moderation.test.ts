@@ -1,21 +1,11 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
-
-const mockGetItemDetails = mock(() => Promise.resolve(null));
-const mockRemoveItem = mock(() => Promise.resolve());
-const mockGetLoanDetails = mock(() => Promise.resolve(null));
-const mockCancelLoan = mock(() => Promise.resolve());
-
-mock.module('../../../services/admin/moderation.js', () => ({
-  getItemDetails: mockGetItemDetails,
-  removeItem: mockRemoveItem,
-  getLoanDetails: mockGetLoanDetails,
-  cancelLoan: mockCancelLoan,
-}));
-
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
+import * as moderationModule from '../../../services/admin/moderation.js';
 import moderationRoutes from '../moderation.js';
+
+const mocks: Array<{ mockRestore: () => void }> = [];
 
 describe('Admin Moderation Routes', () => {
   let app: FastifyInstance;
@@ -23,14 +13,15 @@ describe('Admin Moderation Routes', () => {
   let supportToken: string;
 
   beforeEach(async () => {
-    mockGetItemDetails.mockReset();
-    mockGetItemDetails.mockImplementation(() => Promise.resolve(null));
-    mockRemoveItem.mockReset();
-    mockRemoveItem.mockImplementation(() => Promise.resolve());
-    mockGetLoanDetails.mockReset();
-    mockGetLoanDetails.mockImplementation(() => Promise.resolve(null));
-    mockCancelLoan.mockReset();
-    mockCancelLoan.mockImplementation(() => Promise.resolve());
+    // Restore any previous mocks
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
 
     app = Fastify();
     await app.register(jwtPlugin);
@@ -42,19 +33,32 @@ describe('Admin Moderation Routes', () => {
     supportToken = (app as any).signAccessToken('support', 'SUPPORT');
   });
 
+  afterEach(() => {
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
+  });
+
   it('GET /items/:id should return item details', async () => {
-    mockGetItemDetails.mockResolvedValueOnce({
-      id: '550e8400-e29b-41d4-a716-446655440000',
-      name: 'Test Item',
-      description: 'Test Description',
-      isActive: true,
-      owner: {
-        id: 'user-123',
-        email: 'jo***@example.com',
-        name: 'John D***',
-      },
-      loans: [],
-    } as any);
+    mocks.push(
+      spyOn(moderationModule, 'getItemDetails').mockResolvedValueOnce({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Test Item',
+        description: 'Test Description',
+        isActive: true,
+        owner: {
+          id: 'user-123',
+          email: 'jo***@example.com',
+          name: 'John D***',
+        },
+        loans: [],
+      } as any)
+    );
 
     const response = await app.inject({
       method: 'GET',
@@ -62,12 +66,11 @@ describe('Admin Moderation Routes', () => {
       headers: { authorization: `Bearer ${supportToken}` },
     });
 
-    // Smoke test: verify route is accessible
     expect(response.statusCode).toBe(200);
   });
 
   it('GET /items/:id should return 404 if item not found', async () => {
-    mockGetItemDetails.mockResolvedValueOnce(null);
+    mocks.push(spyOn(moderationModule, 'getItemDetails').mockResolvedValueOnce(null));
 
     const response = await app.inject({
       method: 'GET',
@@ -79,7 +82,7 @@ describe('Admin Moderation Routes', () => {
   });
 
   it('DELETE /items/:id should remove item as MODERATOR', async () => {
-    mockRemoveItem.mockResolvedValueOnce(undefined);
+    mocks.push(spyOn(moderationModule, 'removeItem').mockResolvedValueOnce(undefined));
 
     const response = await app.inject({
       method: 'DELETE',
@@ -94,21 +97,23 @@ describe('Admin Moderation Routes', () => {
   });
 
   it('GET /loans/:id should return loan details', async () => {
-    mockGetLoanDetails.mockResolvedValueOnce({
-      id: '550e8400-e29b-41d4-a716-446655440000',
-      status: 'confirmed',
-      item: { name: 'Test Item' },
-      lender: {
-        id: 'user-1',
-        email: 'jo***@example.com',
-        name: 'John D***',
-      },
-      borrower: {
-        id: 'user-2',
-        email: 'ma***@example.com',
-        name: 'Maria S***',
-      },
-    } as any);
+    mocks.push(
+      spyOn(moderationModule, 'getLoanDetails').mockResolvedValueOnce({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        status: 'confirmed',
+        item: { name: 'Test Item' },
+        lender: {
+          id: 'user-1',
+          email: 'jo***@example.com',
+          name: 'John D***',
+        },
+        borrower: {
+          id: 'user-2',
+          email: 'ma***@example.com',
+          name: 'Maria S***',
+        },
+      } as any)
+    );
 
     const response = await app.inject({
       method: 'GET',
@@ -116,12 +121,11 @@ describe('Admin Moderation Routes', () => {
       headers: { authorization: `Bearer ${supportToken}` },
     });
 
-    // Smoke test: verify route is accessible
     expect(response.statusCode).toBe(200);
   });
 
   it('POST /loans/:id/cancel should cancel loan as MODERATOR', async () => {
-    mockCancelLoan.mockResolvedValueOnce(undefined);
+    mocks.push(spyOn(moderationModule, 'cancelLoan').mockResolvedValueOnce(undefined));
 
     const response = await app.inject({
       method: 'POST',

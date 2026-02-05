@@ -1,12 +1,34 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+
+import { resetAllDbMocks } from '../../../__tests__/helpers/db-mock-reset.js';
 import { db } from '../../../db/index.js';
 import { adminAuditLog } from '../../../db/schema.js';
 import * as cryptoModule from '../../crypto/index.js';
 import { blockUser, getUserDetails, listUsers, logAdminAction, unblockUser } from '../index.js';
 
+const mocks: Array<{ mockRestore: () => void }> = [];
+
 describe('Admin User Management Service', () => {
   beforeEach(() => {
-    // Reset mocks
+    // Reset all db mocks from other test files
+    resetAllDbMocks();
+
+    // Clean any leftover mocks from previous tests
+    for (const mock of mocks) {
+      try {
+        mock.mockRestore();
+      } catch (_e) {
+        // Already restored
+      }
+    }
+    mocks.length = 0;
+  });
+
+  afterEach(() => {
+    for (const mock of mocks) {
+      mock.mockRestore();
+    }
+    mocks.length = 0;
   });
 
   describe('listUsers', () => {
@@ -27,16 +49,20 @@ describe('Admin User Management Service', () => {
         },
       ];
 
-      spyOn(cryptoModule, 'decrypt')
-        .mockReturnValueOnce('john@example.com')
-        .mockReturnValueOnce('John Doe');
+      mocks.push(
+        spyOn(cryptoModule, 'decrypt')
+          .mockReturnValueOnce('john@example.com')
+          .mockReturnValueOnce('John Doe')
+      );
 
-      spyOn(db.query.users, 'findMany').mockResolvedValueOnce(mockUsers as any);
-      spyOn(db, 'select').mockReturnValue({
-        from: mock(() => ({
-          where: mock(() => Promise.resolve([{ count: 1 }])),
-        })),
-      } as any);
+      mocks.push(spyOn(db.query.users, 'findMany').mockResolvedValueOnce(mockUsers as any));
+      mocks.push(
+        spyOn(db, 'select').mockReturnValue({
+          from: mock(() => ({
+            where: mock(() => Promise.resolve([{ count: 1 }])),
+          })),
+        } as any)
+      );
 
       const result = await listUsers({ page: 1, limit: 50 });
 
@@ -47,12 +73,14 @@ describe('Admin User Management Service', () => {
     });
 
     it('should filter by role', async () => {
-      spyOn(db.query.users, 'findMany').mockResolvedValueOnce([]);
-      spyOn(db, 'select').mockReturnValue({
-        from: mock(() => ({
-          where: mock(() => Promise.resolve([{ count: 0 }])),
-        })),
-      } as any);
+      mocks.push(spyOn(db.query.users, 'findMany').mockResolvedValueOnce([]));
+      mocks.push(
+        spyOn(db, 'select').mockReturnValue({
+          from: mock(() => ({
+            where: mock(() => Promise.resolve([{ count: 0 }])),
+          })),
+        } as any)
+      );
 
       const result = await listUsers({ page: 1, limit: 50, role: 'MODERATOR' as any });
 
@@ -77,11 +105,13 @@ describe('Admin User Management Service', () => {
         updatedAt: new Date(),
       };
 
-      spyOn(cryptoModule, 'decrypt')
-        .mockReturnValueOnce('john@example.com')
-        .mockReturnValueOnce('John Doe');
+      mocks.push(
+        spyOn(cryptoModule, 'decrypt')
+          .mockReturnValueOnce('john@example.com')
+          .mockReturnValueOnce('John Doe')
+      );
 
-      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
+      mocks.push(spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any));
 
       const result = await getUserDetails('user-1');
 
@@ -91,7 +121,7 @@ describe('Admin User Management Service', () => {
     });
 
     it('should return null if user not found', async () => {
-      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(null as any);
+      mocks.push(spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(null as any));
 
       const result = await getUserDetails('nonexistent');
 
@@ -104,10 +134,12 @@ describe('Admin User Management Service', () => {
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: mock(() => ({ where: mock(() => Promise.resolve()) })),
       } as any);
+      mocks.push(updateSpy);
 
       const insertSpy = spyOn(db, 'insert').mockReturnValue({
         values: mock(() => Promise.resolve()),
       } as any);
+      mocks.push(insertSpy);
 
       await blockUser('user-1', 'admin-1', 'Spam behavior', '192.168.1.1');
 
@@ -121,10 +153,12 @@ describe('Admin User Management Service', () => {
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: mock(() => ({ where: mock(() => Promise.resolve()) })),
       } as any);
+      mocks.push(updateSpy);
 
       const insertSpy = spyOn(db, 'insert').mockReturnValue({
         values: mock(() => Promise.resolve()),
       } as any);
+      mocks.push(insertSpy);
 
       await unblockUser('user-1', 'admin-1', '192.168.1.1');
 
@@ -138,6 +172,7 @@ describe('Admin User Management Service', () => {
       const insertSpy = spyOn(db, 'insert').mockReturnValue({
         values: mock(() => Promise.resolve()),
       } as any);
+      mocks.push(insertSpy);
 
       await logAdminAction({
         adminId: 'admin-1',
