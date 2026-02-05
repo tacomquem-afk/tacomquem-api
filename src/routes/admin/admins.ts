@@ -13,6 +13,28 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/',
     {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'List all admin users (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        response: {
+          200: {
+            description: 'Admin users list',
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                email: { type: 'string', format: 'email' },
+                role: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+              },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async () => {
@@ -23,6 +45,35 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/',
     {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'Promote a user to admin (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['userId', 'role'],
+          properties: {
+            userId: { type: 'string', format: 'uuid', description: 'User ID to promote' },
+            role: {
+              type: 'string',
+              enum: ['ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
+              description: 'Admin role',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'User promoted successfully',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
@@ -39,6 +90,41 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
   fastify.patch(
     '/:id/role',
     {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'Change an admin role (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'Admin user ID' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['role'],
+          properties: {
+            role: {
+              type: 'string',
+              enum: ['ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
+              description: 'New admin role',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'Admin role changed successfully',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
@@ -56,6 +142,30 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
   fastify.delete(
     '/:id',
     {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'Remove an admin (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'Admin user ID' },
+          },
+        },
+        response: {
+          200: {
+            description: 'Admin removed successfully',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
@@ -72,6 +182,33 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/audit-log',
     {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'Get audit log (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'number', default: 1, description: 'Page number' },
+            limit: { type: 'number', default: 50, description: 'Results per page (max 100)' },
+            action: { type: 'string', description: 'Filter by action type' },
+            adminId: { type: 'string', format: 'uuid', description: 'Filter by admin ID' },
+          },
+        },
+        response: {
+          200: {
+            description: 'Audit log entries',
+            type: 'object',
+            properties: {
+              logs: { type: 'array' },
+              total: { type: 'number' },
+              page: { type: 'number' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {

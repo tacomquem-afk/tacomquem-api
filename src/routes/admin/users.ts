@@ -7,6 +7,36 @@ export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/',
     {
+      schema: {
+        tags: ['Admin - Users'],
+        description: 'List all users (requires ANALYST role or higher)',
+        security: [{ BearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            page: { type: 'number', default: 1, description: 'Page number' },
+            limit: { type: 'number', default: 50, description: 'Results per page (max 100)' },
+            search: { type: 'string', description: 'Search by name or email' },
+            role: { type: 'string', description: 'Filter by role' },
+            isActive: { type: 'boolean', description: 'Filter by active status' },
+            sortBy: { type: 'string', enum: ['createdAt', 'lastActivity'], default: 'createdAt' },
+            sortOrder: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
+          },
+        },
+        response: {
+          200: {
+            description: 'Users list',
+            type: 'object',
+            properties: {
+              users: { type: 'array' },
+              total: { type: 'number' },
+              page: { type: 'number' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [
         fastify.authenticate,
         fastify.requireRole(['ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN']),
@@ -21,6 +51,27 @@ export default async function userRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/:id',
     {
+      schema: {
+        tags: ['Admin - Users'],
+        description: 'Get user details (requires SUPPORT role or higher)',
+        security: [{ BearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'User ID' },
+          },
+        },
+        response: {
+          200: {
+            description: 'User details',
+            type: 'object',
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+          404: { description: 'User not found' },
+        },
+      },
       preHandler: [
         fastify.authenticate,
         fastify.requireRole(['SUPPORT', 'MODERATOR', 'SUPER_ADMIN']),
@@ -41,6 +92,41 @@ export default async function userRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/:id/block',
     {
+      schema: {
+        tags: ['Admin - Users'],
+        description: 'Block a user (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'User ID' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['reason'],
+          properties: {
+            reason: {
+              type: 'string',
+              minLength: 10,
+              description: 'Block reason (minimum 10 characters)',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'User blocked successfully',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
@@ -58,6 +144,30 @@ export default async function userRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/:id/unblock',
     {
+      schema: {
+        tags: ['Admin - Users'],
+        description: 'Unblock a user (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid', description: 'User ID' },
+          },
+        },
+        response: {
+          200: {
+            description: 'User unblocked successfully',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+          401: { description: 'Unauthorized' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
