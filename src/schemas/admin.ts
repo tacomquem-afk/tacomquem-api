@@ -15,15 +15,15 @@ export const listUsersSchema = z.object({
 });
 
 export const blockUserSchema = z.object({
-  reason: z.string().min(10, 'Motivo deve ter no mínimo 10 caracteres'),
+  reason: z.string().min(10, 'Reason must be at least 10 characters'),
 });
 
 export const removeContentSchema = z.object({
-  reason: z.string().min(10, 'Motivo deve ter no mínimo 10 caracteres'),
+  reason: z.string().min(10, 'Reason must be at least 10 characters'),
 });
 
 export const promoteAdminSchema = z.object({
-  userId: z.string().uuid('ID de usuário inválido'),
+  userId: z.string().uuid('Invalid user ID'),
   role: adminRoleSchema,
 });
 

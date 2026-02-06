@@ -4,6 +4,11 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { sql } from 'drizzle-orm';
 import Fastify from 'fastify';
+import {
+  hasZodFastifySchemaValidationErrors,
+  jsonSchemaTransform,
+  validatorCompiler,
+} from 'fastify-type-provider-zod';
 
 import { env } from './config/env.js';
 import { db } from './db/index.js';
@@ -29,6 +34,8 @@ export async function buildApp() {
     },
   });
 
+  app.setValidatorCompiler(validatorCompiler);
+
   await app.register(cors, {
     origin: env.FRONTEND_URL,
     credentials: true,
@@ -37,6 +44,14 @@ export async function buildApp() {
   await app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
+    errorResponseBuilder: (request, _context) => ({
+      type: 'about:blank',
+      title: 'Too Many Requests',
+      status: 429,
+      detail: 'Rate limit exceeded',
+      errorCode: 'RATE_LIMIT_EXCEEDED',
+      instance: request.url,
+    }),
   });
 
   await app.register(swagger, {
@@ -81,6 +96,7 @@ export async function buildApp() {
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
+    transform: jsonSchemaTransform,
   });
 
   await app.register(swaggerUi, {
@@ -98,6 +114,29 @@ export async function buildApp() {
   await app.register(rbacPlugin);
 
   app.setErrorHandler((error, request, reply) => {
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      const fields = error.validation.map((v) => ({
+        field:
+          (v.params as { issue?: { path?: (string | number)[] } }).issue?.path?.join('.') || '',
+        message: v.message || '',
+      }));
+
+      request.log.warn({ errorCode: 'VALIDATION_INVALID_REQUEST' }, 'Request validation failed');
+      return reply
+        .status(422)
+        .header('Content-Type', 'application/problem+json')
+        .serializer((payload: unknown) => JSON.stringify(payload))
+        .send({
+          type: 'about:blank',
+          title: 'Validation Error',
+          status: 422,
+          detail: 'Request validation failed',
+          errorCode: 'VALIDATION_INVALID_REQUEST',
+          instance: request.url,
+          errors: fields,
+        });
+    }
+
     if (error instanceof AppError) {
       const statusCode = errorStatusMap.get(error.constructor) || 500;
       const problemDetails = formatProblemDetails(error, request);
@@ -124,6 +163,21 @@ export async function buildApp() {
         status: 500,
         detail: 'An unexpected error occurred',
         errorCode: 'INTERNAL_SERVER_ERROR',
+        instance: request.url,
+      });
+  });
+
+  app.setNotFoundHandler((request, reply) => {
+    return reply
+      .status(404)
+      .header('Content-Type', 'application/problem+json')
+      .serializer((payload: unknown) => JSON.stringify(payload))
+      .send({
+        type: 'about:blank',
+        title: 'Not Found',
+        status: 404,
+        detail: `Route ${request.method}:${request.url} not found`,
+        errorCode: 'NOT_FOUND',
         instance: request.url,
       });
   });

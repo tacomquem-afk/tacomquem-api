@@ -1,27 +1,27 @@
 import { z } from 'zod';
 
 export const registerSchema = z.object({
-  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
-  email: z.string().email('Email inválido'),
-  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Senha é obrigatória'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export const verifyEmailSchema = z.object({
-  token: z.string().min(1, 'Token é obrigatório'),
+  token: z.string().min(1, 'Token is required'),
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Email inválido'),
+  email: z.string().email('Invalid email address'),
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Token é obrigatório'),
-  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+  token: z.string().min(1, 'Token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

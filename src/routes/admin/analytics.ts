@@ -20,8 +20,6 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
               averageLoanValue: { type: 'number' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [
@@ -30,8 +28,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
       ],
     },
     async () => {
-      const stats = await getDashboardStats();
-      return stats;
+      return await getDashboardStats();
     }
   );
 
@@ -53,8 +50,6 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
               blockedUsers: { type: 'number' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [
@@ -63,8 +58,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
       ],
     },
     async () => {
-      const stats = await getUsersStats();
-      return stats;
+      return await getUsersStats();
     }
   );
 
@@ -87,8 +81,6 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
               averageLoanDuration: { type: 'number' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [
@@ -97,8 +89,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
       ],
     },
     async () => {
-      const stats = await getLoansStats();
-      return stats;
+      return await getLoansStats();
     }
   );
 }

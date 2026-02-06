@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-
 import { getDashboardData, getFriends } from '../../services/dashboard/index.js';
 
 export async function dashboardRoutes(app: FastifyInstance) {

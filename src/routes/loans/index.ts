@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { type CreateLoanInput, createLoanSchema } from '../../schemas/loans.js';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
+import { createLoanSchema } from '../../schemas/loans.js';
 import {
   cancelLoan,
   createLoan,
@@ -9,34 +12,24 @@ import {
   sendReminder,
 } from '../../services/loans/index.js';
 
+const idParamSchema = z.object({ id: z.string().uuid() });
+
+const loanFilterSchema = z.object({
+  filter: z.enum(['lent', 'borrowed', 'pending', 'confirmed', 'returned']).optional(),
+});
+
 export async function loansRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
   app.addHook('preHandler', app.authenticate);
 
-  app.post<{ Body: CreateLoanInput }>(
+  typed.post(
     '/',
     {
       schema: {
         tags: ['Loans'],
         description: 'Create a new loan and generate a confirmation link',
         security: [{ BearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['itemId', 'borrowerEmail'],
-          properties: {
-            itemId: { type: 'string', format: 'uuid', description: 'Item ID' },
-            borrowerEmail: {
-              type: 'string',
-              format: 'email',
-              description: 'Borrower email address',
-            },
-            expectedReturnDate: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Expected return date (optional)',
-            },
-            lenderNotes: { type: 'string', description: 'Lender notes (optional)' },
-          },
-        },
+        body: createLoanSchema,
         response: {
           201: {
             description: 'Loan created successfully',
@@ -56,38 +49,23 @@ export async function loansRoutes(app: FastifyInstance) {
               confirmUrl: { type: 'string', description: 'Public confirmation link' },
             },
           },
-          400: { description: 'Invalid input or error creating loan' },
         },
       },
     },
     async (request, reply) => {
-      const result = createLoanSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      const { loan, confirmUrl } = await createLoan(request.user.userId, result.data);
+      const { loan, confirmUrl } = await createLoan(request.user.userId, request.body);
       return reply.status(201).send({ loan, confirmUrl });
     }
   );
 
-  app.get<{ Querystring: { filter?: 'lent' | 'borrowed' | 'pending' | 'confirmed' | 'returned' } }>(
+  typed.get(
     '/',
     {
       schema: {
         tags: ['Loans'],
         description: 'List all loans for the authenticated user',
         security: [{ BearerAuth: [] }],
-        querystring: {
-          type: 'object',
-          properties: {
-            filter: {
-              type: 'string',
-              enum: ['lent', 'borrowed', 'pending', 'confirmed', 'returned'],
-              description: 'Filter loans by status',
-            },
-          },
-        },
+        querystring: loanFilterSchema,
         response: {
           200: {
             description: 'List of loans',
@@ -116,20 +94,14 @@ export async function loansRoutes(app: FastifyInstance) {
     }
   );
 
-  app.get<{ Params: { id: string } }>(
+  typed.get(
     '/:id',
     {
       schema: {
         tags: ['Loans'],
         description: 'Get loan details',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'Loan ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             description: 'Loan details',
@@ -138,7 +110,6 @@ export async function loansRoutes(app: FastifyInstance) {
               loan: { type: 'object' },
             },
           },
-          404: { description: 'Loan not found' },
         },
       },
     },
@@ -146,27 +117,21 @@ export async function loansRoutes(app: FastifyInstance) {
       const loan = await getLoanById(request.params.id, request.user.userId);
 
       if (!loan) {
-        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
+        throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
       return reply.send({ loan });
     }
   );
 
-  app.patch<{ Params: { id: string } }>(
+  typed.patch(
     '/:id/return',
     {
       schema: {
         tags: ['Loans'],
         description: 'Mark a loan as returned',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'Loan ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             description: 'Loan marked as returned',
@@ -175,7 +140,6 @@ export async function loansRoutes(app: FastifyInstance) {
               loan: { type: 'object' },
             },
           },
-          404: { description: 'Loan not found' },
         },
       },
     },
@@ -183,30 +147,23 @@ export async function loansRoutes(app: FastifyInstance) {
       const loan = await markLoanAsReturned(request.params.id, request.user.userId);
 
       if (!loan) {
-        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
+        throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
       return reply.send({ loan });
     }
   );
 
-  app.patch<{ Params: { id: string } }>(
+  typed.patch(
     '/:id/cancel',
     {
       schema: {
         tags: ['Loans'],
         description: 'Cancel a loan',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'Loan ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           204: { description: 'Loan cancelled successfully' },
-          404: { description: 'Loan not found' },
         },
       },
     },
@@ -214,27 +171,21 @@ export async function loansRoutes(app: FastifyInstance) {
       const cancelled = await cancelLoan(request.params.id, request.user.userId);
 
       if (!cancelled) {
-        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
+        throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
       return reply.status(204).send();
     }
   );
 
-  app.post<{ Params: { id: string } }>(
+  typed.post(
     '/:id/remind',
     {
       schema: {
         tags: ['Loans'],
         description: 'Send a reminder for a loan',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'Loan ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             description: 'Reminder sent successfully',
@@ -243,7 +194,6 @@ export async function loansRoutes(app: FastifyInstance) {
               message: { type: 'string' },
             },
           },
-          404: { description: 'Loan not found' },
         },
       },
     },
@@ -251,10 +201,10 @@ export async function loansRoutes(app: FastifyInstance) {
       const sent = await sendReminder(request.params.id, request.user.userId);
 
       if (!sent) {
-        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
+        throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
-      return reply.send({ message: 'Lembrete enviado com sucesso!' });
+      return reply.send({ message: 'Reminder sent successfully!' });
     }
   );
 }

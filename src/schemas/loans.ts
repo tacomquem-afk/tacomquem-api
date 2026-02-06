@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const createLoanSchema = z.object({
-  itemId: z.string().uuid('Item inválido'),
-  borrowerEmail: z.string().email('Email inválido'),
+  itemId: z.string().uuid('Invalid item ID'),
+  borrowerEmail: z.string().email('Invalid email address'),
   expectedReturnDate: z.string().datetime().optional(),
   lenderNotes: z.string().optional(),
 });

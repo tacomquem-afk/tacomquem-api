@@ -1,28 +1,24 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { blockUserSchema, listUsersSchema } from '../../schemas/admin.js';
 import { getClientIp } from '../../services/admin/helpers.js';
 import { blockUser, getUserDetails, listUsers, unblockUser } from '../../services/admin/index.js';
 
+const idParamSchema = z.object({ id: z.string().uuid() });
+
 export default async function userRoutes(fastify: FastifyInstance) {
-  fastify.get(
+  const typed = fastify.withTypeProvider<ZodTypeProvider>();
+
+  typed.get(
     '/',
     {
       schema: {
         tags: ['Admin - Users'],
         description: 'List all users (requires ANALYST role or higher)',
         security: [{ BearerAuth: [] }],
-        querystring: {
-          type: 'object',
-          properties: {
-            page: { type: 'number', default: 1, description: 'Page number' },
-            limit: { type: 'number', default: 50, description: 'Results per page (max 100)' },
-            search: { type: 'string', description: 'Search by name or email' },
-            role: { type: 'string', description: 'Filter by role' },
-            isActive: { type: 'boolean', description: 'Filter by active status' },
-            sortBy: { type: 'string', enum: ['createdAt', 'lastActivity'], default: 'createdAt' },
-            sortOrder: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
-          },
-        },
+        querystring: listUsersSchema,
         response: {
           200: {
             description: 'Users list',
@@ -33,8 +29,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
               page: { type: 'number' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [
@@ -43,33 +37,23 @@ export default async function userRoutes(fastify: FastifyInstance) {
       ],
     },
     async (request) => {
-      const params = listUsersSchema.parse(request.query) as Parameters<typeof listUsers>[0];
-      return await listUsers(params);
+      return await listUsers(request.query as Parameters<typeof listUsers>[0]);
     }
   );
 
-  fastify.get(
+  typed.get(
     '/:id',
     {
       schema: {
         tags: ['Admin - Users'],
         description: 'Get user details (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'User ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             description: 'User details',
             type: 'object',
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
-          404: { description: 'User not found' },
         },
       },
       preHandler: [
@@ -77,43 +61,26 @@ export default async function userRoutes(fastify: FastifyInstance) {
         fastify.requireRole(['SUPPORT', 'MODERATOR', 'SUPER_ADMIN']),
       ],
     },
-    async (request, reply) => {
-      const { id } = request.params as { id: string };
-      const user = await getUserDetails(id);
+    async (request) => {
+      const user = await getUserDetails(request.params.id);
 
       if (!user) {
-        return reply.code(404).send({ error: 'User not found' });
+        throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User not found');
       }
 
       return user;
     }
   );
 
-  fastify.post(
+  typed.post(
     '/:id/block',
     {
       schema: {
         tags: ['Admin - Users'],
         description: 'Block a user (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'User ID' },
-          },
-        },
-        body: {
-          type: 'object',
-          required: ['reason'],
-          properties: {
-            reason: {
-              type: 'string',
-              minLength: 10,
-              description: 'Block reason (minimum 10 characters)',
-            },
-          },
-        },
+        params: idParamSchema,
+        body: blockUserSchema,
         response: {
           200: {
             description: 'User blocked successfully',
@@ -123,38 +90,28 @@ export default async function userRoutes(fastify: FastifyInstance) {
               message: { type: 'string' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
-      const { id } = request.params as { id: string };
-      const { reason } = blockUserSchema.parse(request.body);
       const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
-      await blockUser(id, adminId, reason, ipAddress);
+      await blockUser(request.params.id, adminId, request.body.reason, ipAddress);
 
       return { success: true, message: 'User blocked successfully' };
     }
   );
 
-  fastify.post(
+  typed.post(
     '/:id/unblock',
     {
       schema: {
         tags: ['Admin - Users'],
         description: 'Unblock a user (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid', description: 'User ID' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             description: 'User unblocked successfully',
@@ -164,18 +121,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
               message: { type: 'string' },
             },
           },
-          401: { description: 'Unauthorized' },
-          403: { description: 'Insufficient permissions' },
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
     async (request) => {
-      const { id } = request.params as { id: string };
       const adminId = request.user?.userId;
       const ipAddress = getClientIp(request);
 
-      await unblockUser(id, adminId, ipAddress);
+      await unblockUser(request.params.id, adminId, ipAddress);
 
       return { success: true, message: 'User unblocked successfully' };
     }

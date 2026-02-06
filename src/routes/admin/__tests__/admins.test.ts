@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { validatorCompiler } from 'fastify-type-provider-zod';
+import { AppError, errorStatusMap } from '../../../errors/index.js';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
 import * as adminsModule from '../../../services/admin/admins.js';
@@ -23,8 +25,18 @@ describe('Admin Management Routes', () => {
     mocks.length = 0;
 
     app = Fastify();
+    app.setValidatorCompiler(validatorCompiler);
     await app.register(jwtPlugin);
     await app.register(rbacPlugin);
+
+    app.setErrorHandler((error, _request, reply) => {
+      if (error instanceof AppError) {
+        const statusCode = errorStatusMap.get(error.constructor) || 500;
+        return reply.status(statusCode).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    });
+
     await app.register(adminsRoutes, { prefix: '/api/admin/admins' });
     await app.ready();
 

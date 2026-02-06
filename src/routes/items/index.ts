@@ -1,10 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import {
-  type CreateItemInput,
-  createItemSchema,
-  type UpdateItemInput,
-  updateItemSchema,
-} from '../../schemas/items.js';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
+import { createItemSchema, updateItemSchema } from '../../schemas/items.js';
 import {
   createItem,
   deleteItem,
@@ -13,29 +11,20 @@ import {
   updateItem,
 } from '../../services/items/index.js';
 
+const idParamSchema = z.object({ id: z.string().uuid() });
+
 export default async function itemsRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
   app.addHook('preHandler', app.authenticate);
 
-  app.post<{ Body: CreateItemInput }>(
+  typed.post(
     '/',
     {
       schema: {
         description: 'Create a new item',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['name'],
-          properties: {
-            name: { type: 'string', description: 'Item name' },
-            description: { type: 'string', description: 'Item description' },
-            images: {
-              type: 'array',
-              items: { type: 'string', format: 'uri' },
-              description: 'Array of image URLs',
-            },
-          },
-        },
+        body: createItemSchema,
         response: {
           201: {
             type: 'object',
@@ -58,12 +47,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = createItemSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      const item = await createItem(request.user.userId, result.data);
+      const item = await createItem(request.user.userId, request.body);
       return reply.status(201).send({ item });
     }
   );
@@ -105,20 +89,14 @@ export default async function itemsRoutes(app: FastifyInstance) {
     }
   );
 
-  app.get<{ Params: { id: string } }>(
+  typed.get(
     '/:id',
     {
       schema: {
         description: 'Get a specific item by ID',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-          },
-        },
+        params: idParamSchema,
         response: {
           200: {
             type: 'object',
@@ -135,12 +113,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
                   updatedAt: { type: 'string', format: 'date-time' },
                 },
               },
-            },
-          },
-          404: {
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
             },
           },
         },
@@ -150,39 +122,22 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const item = await getItemById(request.params.id, request.user.userId);
 
       if (!item) {
-        return reply.status(404).send({ error: 'Item não encontrado' });
+        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'Item not found');
       }
 
       return reply.send({ item });
     }
   );
 
-  app.patch<{ Params: { id: string }; Body: UpdateItemInput }>(
+  typed.patch(
     '/:id',
     {
       schema: {
         description: 'Update an item',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-          },
-        },
-        body: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Item name' },
-            description: { type: 'string', description: 'Item description' },
-            images: {
-              type: 'array',
-              items: { type: 'string', format: 'uri' },
-              description: 'Array of image URLs',
-            },
-          },
-        },
+        params: idParamSchema,
+        body: updateItemSchema,
         response: {
           200: {
             type: 'object',
@@ -201,55 +156,30 @@ export default async function itemsRoutes(app: FastifyInstance) {
               },
             },
           },
-          404: {
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
     },
     async (request, reply) => {
-      const result = updateItemSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      const item = await updateItem(request.params.id, request.user.userId, result.data);
+      const item = await updateItem(request.params.id, request.user.userId, request.body);
 
       if (!item) {
-        return reply.status(404).send({ error: 'Item não encontrado' });
+        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'Item not found');
       }
 
       return reply.send({ item });
     }
   );
 
-  app.delete<{ Params: { id: string } }>(
+  typed.delete(
     '/:id',
     {
       schema: {
         description: 'Delete an item (soft delete)',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-          },
-        },
+        params: idParamSchema,
         response: {
-          204: {
-            type: 'null',
-          },
-          404: {
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
+          204: { type: 'null' },
         },
       },
     },
@@ -257,7 +187,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
       const deleted = await deleteItem(request.params.id, request.user.userId);
 
       if (!deleted) {
-        return reply.status(404).send({ error: 'Item não encontrado' });
+        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'Item not found');
       }
 
       return reply.status(204).send();

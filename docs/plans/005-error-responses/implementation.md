@@ -94,30 +94,30 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 3: Zod Schemas (Portuguese → English)
+## Phase 3: Zod Schemas (Portuguese → English) ✅
 
-### 3.1 Update `src/schemas/auth.ts`
-- [ ] `registerSchema`: change Portuguese messages to English
+### 3.1 Update `src/schemas/auth.ts` ✅
+- [x] `registerSchema`: change Portuguese messages to English
   - `'Nome deve ter pelo menos 2 caracteres'` → `'Name must be at least 2 characters'`
   - `'Email inválido'` → `'Invalid email address'`
   - `'Senha deve ter pelo menos 8 caracteres'` → `'Password must be at least 8 characters'`
-- [ ] `loginSchema`: change Portuguese messages to English
-- [ ] `verifyEmailSchema`, `forgotPasswordSchema`, `resetPasswordSchema`: change messages
-- [ ] Ensure all schemas export types for route use
+- [x] `loginSchema`: change Portuguese messages to English
+- [x] `verifyEmailSchema`, `forgotPasswordSchema`, `resetPasswordSchema`: change messages
+- [x] Ensure all schemas export types for route use
 
-### 3.2 Update `src/schemas/items.ts`
-- [ ] `createItemSchema`: change Portuguese messages to English
+### 3.2 Update `src/schemas/items.ts` ✅
+- [x] `createItemSchema`: change Portuguese messages to English
   - `'Nome é obrigatório'` → `'Name is required'`
-- [ ] `updateItemSchema`: change messages
+- [x] `updateItemSchema`: change messages
 
-### 3.3 Update `src/schemas/loans.ts`
-- [ ] `createLoanSchema`: change Portuguese messages to English
+### 3.3 Update `src/schemas/loans.ts` ✅
+- [x] `createLoanSchema`: change Portuguese messages to English
   - `'Item inválido'` → `'Invalid item ID'`
   - `'Email inválido'` → `'Invalid email address'`
 
-### 3.4 Update `src/schemas/admin.ts`
-- [ ] All admin schemas: change Portuguese messages to English
-- [ ] Run: `bun run qa`
+### 3.4 Update `src/schemas/admin.ts` ✅
+- [x] All admin schemas: change Portuguese messages to English
+- [x] Run: `bun run qa`
 
 ---
 
@@ -195,80 +195,81 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 6: Route Refactoring
+## Phase 6: Route Refactoring ✅
 
-### 6.1 Refactor `src/routes/auth/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()` to route registration
-- [ ] Remove all 5 manual `safeParse()` calls
-- [ ] Replace manual JSON Schema `body`/`querystring` definitions with Zod schema references:
+### 6.1 Refactor `src/routes/auth/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()` to route registration
+- [x] Remove all 5 manual `safeParse()` calls
+- [x] Replace manual JSON Schema `body`/`querystring` definitions with Zod schema references:
   ```typescript
   schema: { body: registerSchema, response: { 201: responseSchema } }
   ```
-- [ ] Remove all `try-catch` blocks around service calls (errors flow to global handler)
-- [ ] Remove all `reply.status(4xx).send({ error: ... })` patterns
-- [ ] Keep response schema definitions using Zod schemas
-- [ ] Verify `request.body` is typed from Zod schema (no manual type assertions)
+- [x] Remove all `try-catch` blocks around service calls (errors flow to global handler)
+- [x] Remove all `reply.status(4xx).send({ error: ... })` patterns
+- [x] Keep response schema definitions using Zod schemas
+- [x] Verify `request.body` is typed from Zod schema (no manual type assertions)
 
-### 6.2 Refactor `src/routes/auth/google.ts`
-- [ ] Keep redirect-based error handling (OAuth flow requires redirects, not JSON errors)
-- [ ] Replace any `throw new Error()` with domain error classes where applicable
-- [ ] Keep `reply.redirect()` patterns
+### 6.2 Refactor `src/routes/auth/google.ts` ✅
+- [x] Keep redirect-based error handling (OAuth flow requires redirects, not JSON errors)
+- [x] Replace any `throw new Error()` with domain error classes where applicable
+- [x] Keep `reply.redirect()` patterns
 
-### 6.3 Refactor `src/routes/items/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Remove 2 manual `safeParse()` calls
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Remove `try-catch` blocks
-- [ ] Remove `reply.status(404).send({ error: 'Item não encontrado' })` (service throws NotFoundError)
+### 6.3 Refactor `src/routes/items/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Remove 2 manual `safeParse()` calls
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Remove `try-catch` blocks
+- [x] Remove `reply.status(404).send({ error: 'Item não encontrado' })` (service throws NotFoundError)
 
-### 6.4 Refactor `src/routes/loans/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Remove 1 manual `safeParse()` call
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Remove `try-catch` blocks
-- [ ] Remove manual `reply.status(404).send({ error: 'Empréstimo não encontrado' })`
+### 6.4 Refactor `src/routes/loans/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Remove 1 manual `safeParse()` call
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Remove `try-catch` blocks
+- [x] Remove manual `reply.status(404).send({ error: 'Empréstimo não encontrado' })`
 
-### 6.5 Refactor `src/routes/links/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Remove manual `reply.status(404).send({ error: 'Link inválido ou expirado' })`
-- [ ] Remove `try-catch` blocks
+### 6.5 Refactor `src/routes/links/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Remove manual `reply.status(404).send({ error: 'Link inválido ou expirado' })`
+- [x] Remove `try-catch` blocks
 
-### 6.6 Refactor `src/routes/upload/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Replace `reply.status(400).send({ error: 'Máximo 5 arquivos por upload' })` with `throw new BadRequestError(ErrorCodes.STORAGE_MAX_FILES, ...)`
-- [ ] Replace `reply.status(400).send({ error: 'Nenhum arquivo foi enviado' })` with `throw new BadRequestError(ErrorCodes.STORAGE_NO_FILE, ...)`
-- [ ] Keep multipart file handling logic
-- [ ] Remove `try-catch` blocks around service calls
+### 6.6 Refactor `src/routes/upload/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Replace `reply.status(400).send({ error: 'Máximo 5 arquivos por upload' })` with `throw new BadRequestError(ErrorCodes.STORAGE_MAX_FILES, ...)`
+- [x] Replace `reply.status(400).send({ error: 'Nenhum arquivo foi enviado' })` with `throw new BadRequestError(ErrorCodes.STORAGE_NO_FILE, ...)`
+- [x] Keep multipart file handling logic
+- [x] Remove `try-catch` blocks around service calls
 
-### 6.7 Refactor `src/routes/dashboard/index.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Replace manual JSON Schema with Zod schemas
+### 6.7 Refactor `src/routes/dashboard/index.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Replace manual JSON Schema with Zod schemas
 
-### 6.8 Refactor `src/routes/admin/users.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Remove `.parse()` calls
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Remove `reply.code(404).send({ error: 'User not found' })` (service throws NotFoundError)
+### 6.8 Refactor `src/routes/admin/users.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Remove `.parse()` calls
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Remove `reply.code(404).send({ error: 'User not found' })` (service throws NotFoundError)
 
-### 6.9 Refactor `src/routes/admin/admins.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Remove `.parse()` calls
-- [ ] Replace manual JSON Schema with Zod schemas
+### 6.9 Refactor `src/routes/admin/admins.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Remove `.parse()` calls
+- [x] Replace manual JSON Schema with Zod schemas
 
-### 6.10 Refactor `src/routes/admin/moderation.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Remove `.parse()` calls
-- [ ] Replace manual JSON Schema with Zod schemas
-- [ ] Remove `reply.code(404).send({ error: ... })` patterns
+### 6.10 Refactor `src/routes/admin/moderation.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Remove `.parse()` calls
+- [x] Replace manual JSON Schema with Zod schemas
+- [x] Remove `reply.code(404).send({ error: ... })` patterns
 
-### 6.11 Refactor `src/routes/admin/analytics.ts`
-- [ ] Add `.withTypeProvider<ZodTypeProvider>()`
-- [ ] Replace manual JSON Schema with Zod schemas
+### 6.11 Refactor `src/routes/admin/analytics.ts` ✅
+- [x] Add `.withTypeProvider<ZodTypeProvider>()`
+- [x] Replace manual JSON Schema with Zod schemas
 
-### 6.12 QA check after routes
-- [ ] Run: `bun run qa`
+### 6.12 QA check after routes ✅
+- [x] Run: `bun run qa`
+- [x] Run: `bun test`
 
 ---
 

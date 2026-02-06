@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { validatorCompiler } from 'fastify-type-provider-zod';
 import { AppError, errorStatusMap } from '../../../errors/index.js';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
@@ -26,6 +27,7 @@ describe('Admin User Routes', () => {
     mocks.length = 0;
 
     app = Fastify();
+    app.setValidatorCompiler(validatorCompiler);
     await app.register(jwtPlugin);
     await app.register(rbacPlugin);
 

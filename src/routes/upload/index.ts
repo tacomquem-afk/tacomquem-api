@@ -1,5 +1,6 @@
 import multipart, { type MultipartFile } from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
+import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import { processAndUploadImage, type UploadResult } from '../../services/storage/index.js';
 
 export async function uploadRoutes(app: FastifyInstance) {
@@ -14,7 +15,7 @@ export async function uploadRoutes(app: FastifyInstance) {
     '/images',
     {
       schema: {
-        description: 'Upload de múltiplas fotos (compacta para WebP)',
+        description: 'Upload multiple images (compressed to WebP)',
         tags: ['Upload'],
         security: [{ BearerAuth: [] }],
         consumes: ['multipart/form-data'],
@@ -34,12 +35,6 @@ export async function uploadRoutes(app: FastifyInstance) {
               },
             },
           },
-          400: {
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
       preHandler: [app.authenticate],
@@ -53,19 +48,15 @@ export async function uploadRoutes(app: FastifyInstance) {
         if (part.type === 'file') {
           fileCount++;
           if (fileCount > 5) {
-            return reply.status(400).send({ error: 'Máximo 5 arquivos por upload' });
+            throw new BadRequestError(ErrorCodes.STORAGE_MAX_FILES, 'Maximum 5 files per upload');
           }
 
-          uploadPromises.push(
-            processAndUploadImage(part as MultipartFile, request.user.userId).catch((error) => {
-              throw error;
-            })
-          );
+          uploadPromises.push(processAndUploadImage(part as MultipartFile, request.user.userId));
         }
       }
 
       if (uploadPromises.length === 0) {
-        return reply.status(400).send({ error: 'Nenhum arquivo foi enviado' });
+        throw new BadRequestError(ErrorCodes.STORAGE_NO_FILE, 'No files were uploaded');
       }
 
       const results = await Promise.all(uploadPromises);

@@ -1,14 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import {
-  type ForgotPasswordInput,
   forgotPasswordSchema,
-  type LoginInput,
   loginSchema,
-  type RegisterInput,
-  type ResetPasswordInput,
   registerSchema,
   resetPasswordSchema,
-  type VerifyEmailInput,
   verifyEmailSchema,
 } from '../../schemas/auth.js';
 import {
@@ -21,27 +18,15 @@ import {
 } from '../../services/auth/index.js';
 
 async function authRoutes(app: FastifyInstance) {
-  app.post<{
-    Body: RegisterInput;
-  }>(
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.post(
     '/register',
     {
       schema: {
         description: 'Register a new user with email and password',
         tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['name', 'email', 'password'],
-          properties: {
-            name: { type: 'string', minLength: 2, maxLength: 100, description: 'User full name' },
-            email: { type: 'string', format: 'email', description: 'User email address' },
-            password: {
-              type: 'string',
-              minLength: 8,
-              description: 'User password (min 8 characters)',
-            },
-          },
-        },
+        body: registerSchema,
         response: {
           201: {
             description: 'User registered successfully',
@@ -64,13 +49,6 @@ async function authRoutes(app: FastifyInstance) {
               },
             },
           },
-          400: {
-            description: 'Invalid input or email already registered',
-            type: 'object',
-            properties: {
-              error: { oneOf: [{ type: 'string' }, { type: 'object' }] },
-            },
-          },
         },
       },
       config: {
@@ -81,35 +59,21 @@ async function authRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = registerSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      const user = await createUser(result.data);
+      const user = await createUser(request.body);
       return reply.status(201).send({
-        message: 'Cadastro realizado! Verifique seu email.',
+        message: 'Registration successful! Please verify your email.',
         user,
       });
     }
   );
 
-  app.post<{
-    Body: LoginInput;
-  }>(
+  typed.post(
     '/login',
     {
       schema: {
         description: 'Authenticate with email and password',
         tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['email', 'password'],
-          properties: {
-            email: { type: 'string', format: 'email', description: 'User email address' },
-            password: { type: 'string', description: 'User password' },
-          },
-        },
+        body: loginSchema,
         response: {
           200: {
             description: 'Authentication successful',
@@ -133,51 +97,25 @@ async function authRoutes(app: FastifyInstance) {
               refreshToken: { type: 'string', description: 'JWT refresh token (30 days)' },
             },
           },
-          401: {
-            description: 'Invalid credentials',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
     },
     async (request, reply) => {
-      const result = loginSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      const user = await login(result.data.email, result.data.password);
-
+      const user = await login(request.body.email, request.body.password);
       const accessToken = app.signAccessToken(user.id, user.role);
-
       const refreshToken = app.signRefreshToken(user.id, user.role);
 
-      return reply.send({
-        user,
-        accessToken,
-        refreshToken,
-      });
+      return reply.send({ user, accessToken, refreshToken });
     }
   );
 
-  app.post<{
-    Body: VerifyEmailInput;
-  }>(
+  typed.post(
     '/verify-email',
     {
       schema: {
         description: 'Verify email address with token sent via email',
         tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['token'],
-          properties: {
-            token: { type: 'string', description: 'Email verification token' },
-          },
-        },
+        body: verifyEmailSchema,
         response: {
           200: {
             description: 'Email verified successfully',
@@ -186,42 +124,22 @@ async function authRoutes(app: FastifyInstance) {
               message: { type: 'string' },
             },
           },
-          400: {
-            description: 'Invalid or expired token',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
     },
     async (request, reply) => {
-      const result = verifyEmailSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      await verifyEmail(result.data.token);
-      return reply.send({ message: 'Email verificado com sucesso!' });
+      await verifyEmail(request.body.token);
+      return reply.send({ message: 'Email verified successfully!' });
     }
   );
 
-  app.post<{
-    Body: ForgotPasswordInput;
-  }>(
+  typed.post(
     '/forgot-password',
     {
       schema: {
         description: 'Request password reset email',
         tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['email'],
-          properties: {
-            email: { type: 'string', format: 'email', description: 'User email address' },
-          },
-        },
+        body: forgotPasswordSchema,
         response: {
           200: {
             description: 'Password reset email sent (always returns success for security)',
@@ -240,44 +158,25 @@ async function authRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = forgotPasswordSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
+      try {
+        await requestPasswordReset(request.body.email);
+      } catch (_error) {
+        // Intentionally swallow errors to prevent email enumeration
       }
 
-      try {
-        await requestPasswordReset(result.data.email);
-        return reply.send({
-          message: 'Se o email existir, você receberá instruções de recuperação.',
-        });
-      } catch (_error) {
-        return reply.send({
-          message: 'Se o email existir, você receberá instruções de recuperação.',
-        });
-      }
+      return reply.send({
+        message: 'If this email is registered, you will receive recovery instructions.',
+      });
     }
   );
 
-  app.post<{
-    Body: ResetPasswordInput;
-  }>(
+  typed.post(
     '/reset-password',
     {
       schema: {
         description: 'Reset password with token from email',
         tags: ['Authentication'],
-        body: {
-          type: 'object',
-          required: ['token', 'password'],
-          properties: {
-            token: { type: 'string', description: 'Password reset token' },
-            password: {
-              type: 'string',
-              minLength: 8,
-              description: 'New password (min 8 characters)',
-            },
-          },
-        },
+        body: resetPasswordSchema,
         response: {
           200: {
             description: 'Password reset successful',
@@ -286,24 +185,12 @@ async function authRoutes(app: FastifyInstance) {
               message: { type: 'string' },
             },
           },
-          400: {
-            description: 'Invalid or expired token',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
     },
     async (request, reply) => {
-      const result = resetPasswordSchema.safeParse(request.body);
-      if (!result.success) {
-        return reply.status(400).send({ error: result.error.flatten() });
-      }
-
-      await resetPassword(result.data.token, result.data.password);
-      return reply.send({ message: 'Senha alterada com sucesso!' });
+      await resetPassword(request.body.token, request.body.password);
+      return reply.send({ message: 'Password changed successfully!' });
     }
   );
 
@@ -322,27 +209,14 @@ async function authRoutes(app: FastifyInstance) {
               accessToken: { type: 'string', description: 'New JWT access token (7 days)' },
             },
           },
-          401: {
-            description: 'Invalid or expired refresh token',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
+      preHandler: [app.authenticate],
     },
     async (request, reply) => {
-      try {
-        await request.jwtVerify();
-        const { userId, role } = request.user;
-
-        const accessToken = app.signAccessToken(userId, role);
-
-        return reply.send({ accessToken });
-      } catch (_error) {
-        return reply.status(401).send({ error: 'Token inválido' });
-      }
+      const { userId, role } = request.user;
+      const accessToken = app.signAccessToken(userId, role);
+      return reply.send({ accessToken });
     }
   );
 
@@ -374,20 +248,6 @@ async function authRoutes(app: FastifyInstance) {
               },
             },
           },
-          401: {
-            description: 'Unauthorized',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
-          404: {
-            description: 'User not found',
-            type: 'object',
-            properties: {
-              error: { type: 'string' },
-            },
-          },
         },
       },
       preHandler: [app.authenticate],
@@ -397,7 +257,7 @@ async function authRoutes(app: FastifyInstance) {
       const user = await getUserById(userId);
 
       if (!user) {
-        return reply.status(404).send({ error: 'Usuário não encontrado' });
+        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'User not found');
       }
 
       return reply.send({ user });
