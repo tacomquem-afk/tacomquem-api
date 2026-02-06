@@ -4,50 +4,50 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 1: Infrastructure
+## Phase 1: Infrastructure ✅
 
-### 1.1 Install dependencies
-- [ ] `bun add fastify-type-provider-zod` (v5.x for Zod v4 compatibility)
-- [ ] Verify installation: `bun run qa` passes with new dependency
+### 1.1 Install dependencies ✅
+- [x] `bun add fastify-type-provider-zod` (v5.x for Zod v4 compatibility)
+- [x] Verify installation: `bun run qa` passes with new dependency
 
-### 1.2 Create `src/errors/index.ts`
-- [ ] Define `FieldError` interface: `{ field: string; message: string }`
-- [ ] Create `AppError` base class extending `Error` with `code: string` property
-- [ ] Create subclasses:
-  - [ ] `NotFoundError` (→ 404)
-  - [ ] `BadRequestError` (→ 400)
-  - [ ] `ConflictError` (→ 409)
-  - [ ] `UnauthorizedError` (→ 401)
-  - [ ] `ForbiddenError` (→ 403)
-  - [ ] `ValidationError` (→ 422, has `fields: FieldError[]`)
-  - [ ] `GoneError` (→ 410)
-  - [ ] `PayloadTooLargeError` (→ 413)
-- [ ] Create `ErrorCodes` const object with `as const`:
-  - [ ] `AUTH_EMAIL_TAKEN`, `AUTH_INVALID_CREDENTIALS`, `AUTH_TOKEN_EXPIRED`, `AUTH_TOKEN_INVALID`, `AUTH_TOKEN_USED`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_SOCIAL_ACCOUNT`, `AUTH_UNAUTHORIZED`, `AUTH_CREATE_FAILED`, `AUTH_TOKEN_TYPE_INVALID`
-  - [ ] `ITEMS_NOT_FOUND`, `ITEMS_CREATE_FAILED`, `ITEMS_UPDATE_FAILED`
-  - [ ] `LOANS_NOT_FOUND`, `LOANS_ITEM_NOT_FOUND`, `LOANS_USER_NOT_FOUND`, `LOANS_CREATE_FAILED`, `LOANS_INVALID_STATE`, `LOANS_TOKEN_INVALID`, `LOANS_TOKEN_EXPIRED`, `LOANS_TOKEN_USED`, `LOANS_ALREADY_PROCESSED`, `LOANS_NO_RECEIVER`, `LOANS_FETCH_FAILED`
-  - [ ] `LINKS_INVALID_TOKEN`, `LINKS_TOKEN_EXPIRED`
-  - [ ] `ADMIN_INSUFFICIENT_PERMISSIONS`, `ADMIN_TARGET_NOT_FOUND`, `ADMIN_CANNOT_DEMOTE_SELF`, `ADMIN_INVALID_ROLE`, `ADMIN_USE_REMOVE`
-  - [ ] `STORAGE_FILE_TOO_LARGE`, `STORAGE_UNSUPPORTED_FORMAT`, `STORAGE_PROCESSING_FAILED`, `STORAGE_UPLOAD_FAILED`, `STORAGE_RECORD_FAILED`, `STORAGE_NO_FILE`, `STORAGE_MAX_FILES`
-  - [ ] `VALIDATION_INVALID_REQUEST`
-  - [ ] `RATE_LIMIT_EXCEEDED`
-- [ ] Export `ErrorCode` type: `typeof ErrorCodes[keyof typeof ErrorCodes]`
-- [ ] Create `formatProblemDetails(error: AppError, request: FastifyRequest)` helper returning RFC 9457 object
-- [ ] Create `errorStatusMap`: maps error class → HTTP status code
+### 1.2 Create `src/errors/index.ts` ✅
+- [x] Define `FieldError` interface: `{ field: string; message: string }`
+- [x] Create `AppError` base class extending `Error` with `code: string` property
+- [x] Create subclasses:
+  - [x] `NotFoundError` (→ 404)
+  - [x] `BadRequestError` (→ 400)
+  - [x] `ConflictError` (→ 409)
+  - [x] `UnauthorizedError` (→ 401)
+  - [x] `ForbiddenError` (→ 403)
+  - [x] `ValidationError` (→ 422, has `fields: FieldError[]`)
+  - [x] `GoneError` (→ 410)
+  - [x] `PayloadTooLargeError` (→ 413)
+- [x] Create `ErrorCodes` const object with `as const`:
+  - [x] `AUTH_EMAIL_TAKEN`, `AUTH_INVALID_CREDENTIALS`, `AUTH_TOKEN_EXPIRED`, `AUTH_TOKEN_INVALID`, `AUTH_TOKEN_USED`, `AUTH_EMAIL_NOT_VERIFIED`, `AUTH_SOCIAL_ACCOUNT`, `AUTH_UNAUTHORIZED`, `AUTH_CREATE_FAILED`, `AUTH_TOKEN_TYPE_INVALID`
+  - [x] `ITEMS_NOT_FOUND`, `ITEMS_CREATE_FAILED`, `ITEMS_UPDATE_FAILED`
+  - [x] `LOANS_NOT_FOUND`, `LOANS_ITEM_NOT_FOUND`, `LOANS_USER_NOT_FOUND`, `LOANS_CREATE_FAILED`, `LOANS_INVALID_STATE`, `LOANS_TOKEN_INVALID`, `LOANS_TOKEN_EXPIRED`, `LOANS_TOKEN_USED`, `LOANS_ALREADY_PROCESSED`, `LOANS_NO_RECEIVER`, `LOANS_FETCH_FAILED`
+  - [x] `LINKS_INVALID_TOKEN`, `LINKS_TOKEN_EXPIRED`
+  - [x] `ADMIN_INSUFFICIENT_PERMISSIONS`, `ADMIN_TARGET_NOT_FOUND`, `ADMIN_CANNOT_DEMOTE_SELF`, `ADMIN_INVALID_ROLE`, `ADMIN_USE_REMOVE`
+  - [x] `STORAGE_FILE_TOO_LARGE`, `STORAGE_UNSUPPORTED_FORMAT`, `STORAGE_PROCESSING_FAILED`, `STORAGE_UPLOAD_FAILED`, `STORAGE_RECORD_FAILED`, `STORAGE_NO_FILE`, `STORAGE_MAX_FILES`
+  - [x] `VALIDATION_INVALID_REQUEST`
+  - [x] `RATE_LIMIT_EXCEEDED`
+- [x] Export `ErrorCode` type: `typeof ErrorCodes[keyof typeof ErrorCodes]`
+- [x] Create `formatProblemDetails(error: AppError, request: FastifyRequest)` helper returning RFC 9457 object
+- [x] Create `errorStatusMap`: maps error class → HTTP status code
 
-### 1.3 Create `src/errors/__tests__/errors.test.ts`
-- [ ] Test `AppError` base class: constructor sets `code`, `message`, extends `Error`
-- [ ] Test each subclass: `instanceof AppError` is true, `instanceof` specific class is true
-- [ ] Test `ValidationError` has `fields` array
-- [ ] Test `formatProblemDetails()`:
-  - [ ] Returns `type: 'about:blank'`
-  - [ ] Returns correct `title` (HTTP status text)
-  - [ ] Returns `status` (number)
-  - [ ] Returns `detail` from error message
-  - [ ] Returns `errorCode` from error code
-  - [ ] Returns `instance` from request URL
-  - [ ] `ValidationError` includes `errors` array
-- [ ] Run: `bun test src/errors/__tests__/errors.test.ts`
+### 1.3 Create `src/errors/__tests__/errors.test.ts` ✅
+- [x] Test `AppError` base class: constructor sets `code`, `message`, extends `Error`
+- [x] Test each subclass: `instanceof AppError` is true, `instanceof` specific class is true
+- [x] Test `ValidationError` has `fields` array
+- [x] Test `formatProblemDetails()`:
+  - [x] Returns `type: 'about:blank'`
+  - [x] Returns correct `title` (HTTP status text)
+  - [x] Returns `status` (number)
+  - [x] Returns `detail` from error message
+  - [x] Returns `errorCode` from error code
+  - [x] Returns `instance` from request URL
+  - [x] `ValidationError` includes `errors` array
+- [x] Run: `bun test src/errors/__tests__/errors.test.ts`
 
 ---
 
