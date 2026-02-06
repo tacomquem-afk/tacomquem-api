@@ -86,16 +86,11 @@ async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: result.error.flatten() });
       }
 
-      try {
-        const user = await createUser(result.data);
-        return reply.status(201).send({
-          message: 'Cadastro realizado! Verifique seu email.',
-          user,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao cadastrar';
-        return reply.status(400).send({ error: message });
-      }
+      const user = await createUser(result.data);
+      return reply.status(201).send({
+        message: 'Cadastro realizado! Verifique seu email.',
+        user,
+      });
     }
   );
 
@@ -154,22 +149,17 @@ async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: result.error.flatten() });
       }
 
-      try {
-        const user = await login(result.data.email, result.data.password);
+      const user = await login(result.data.email, result.data.password);
 
-        const accessToken = app.signAccessToken(user.id, user.role);
+      const accessToken = app.signAccessToken(user.id, user.role);
 
-        const refreshToken = app.signRefreshToken(user.id, user.role);
+      const refreshToken = app.signRefreshToken(user.id, user.role);
 
-        return reply.send({
-          user,
-          accessToken,
-          refreshToken,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao fazer login';
-        return reply.status(401).send({ error: message });
-      }
+      return reply.send({
+        user,
+        accessToken,
+        refreshToken,
+      });
     }
   );
 
@@ -212,13 +202,8 @@ async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: result.error.flatten() });
       }
 
-      try {
-        await verifyEmail(result.data.token);
-        return reply.send({ message: 'Email verificado com sucesso!' });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao verificar email';
-        return reply.status(400).send({ error: message });
-      }
+      await verifyEmail(result.data.token);
+      return reply.send({ message: 'Email verificado com sucesso!' });
     }
   );
 
@@ -317,13 +302,8 @@ async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: result.error.flatten() });
       }
 
-      try {
-        await resetPassword(result.data.token, result.data.password);
-        return reply.send({ message: 'Senha alterada com sucesso!' });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao alterar senha';
-        return reply.status(400).send({ error: message });
-      }
+      await resetPassword(result.data.token, result.data.password);
+      return reply.send({ message: 'Senha alterada com sucesso!' });
     }
   );
 

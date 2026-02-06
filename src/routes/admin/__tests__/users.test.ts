@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { AppError, errorStatusMap } from '../../../errors/index.js';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
 import * as adminModule from '../../../services/admin/index.js';
@@ -27,6 +28,15 @@ describe('Admin User Routes', () => {
     app = Fastify();
     await app.register(jwtPlugin);
     await app.register(rbacPlugin);
+
+    app.setErrorHandler((error, _request, reply) => {
+      if (error instanceof AppError) {
+        const statusCode = errorStatusMap.get(error.constructor) || 500;
+        return reply.status(statusCode).send({ error: error.message });
+      }
+      return reply.status(500).send({ error: 'Internal Server Error' });
+    });
+
     await app.register(userRoutes, { prefix: '/api/admin/users' });
     await app.ready();
 

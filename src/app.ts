@@ -7,6 +7,7 @@ import Fastify from 'fastify';
 
 import { env } from './config/env.js';
 import { db } from './db/index.js';
+import { AppError, errorStatusMap, formatProblemDetails } from './errors/index.js';
 import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
 import adminsRoutes from './routes/admin/admins.js';
@@ -95,6 +96,37 @@ export async function buildApp() {
 
   await app.register(jwtPlugin);
   await app.register(rbacPlugin);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof AppError) {
+      const statusCode = errorStatusMap.get(error.constructor) || 500;
+      const problemDetails = formatProblemDetails(error, request);
+      if (statusCode >= 500) {
+        request.log.error({ err: error }, error.message);
+      } else {
+        request.log.warn({ errorCode: error.code }, error.message);
+      }
+      return reply
+        .status(statusCode)
+        .header('Content-Type', 'application/problem+json')
+        .serializer((payload: unknown) => JSON.stringify(payload))
+        .send(problemDetails);
+    }
+
+    request.log.error({ err: error }, 'Internal server error');
+    return reply
+      .status(500)
+      .header('Content-Type', 'application/problem+json')
+      .serializer((payload: unknown) => JSON.stringify(payload))
+      .send({
+        type: 'about:blank',
+        title: 'Internal Server Error',
+        status: 500,
+        detail: 'An unexpected error occurred',
+        errorCode: 'INTERNAL_SERVER_ERROR',
+        instance: request.url,
+      });
+  });
 
   app.get(
     '/api/health',

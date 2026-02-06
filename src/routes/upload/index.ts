@@ -68,19 +68,14 @@ export async function uploadRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: 'Nenhum arquivo foi enviado' });
       }
 
-      try {
-        const results = await Promise.all(uploadPromises);
+      const results = await Promise.all(uploadPromises);
 
-        return reply.send({
-          images: results.map((r) => ({
-            url: r.url,
-            sizeBytes: r.sizeBytes,
-          })),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao processar upload';
-        return reply.status(400).send({ error: message });
-      }
+      return reply.send({
+        images: results.map((r) => ({
+          url: r.url,
+          sizeBytes: r.sizeBytes,
+        })),
+      });
     }
   );
 }

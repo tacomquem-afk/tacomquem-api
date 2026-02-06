@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
 import { items, loans, loanTokens, notifications, users } from '../../db/schema.js';
+import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../errors/index.js';
 import type { CreateLoanInput } from '../../schemas/loans.js';
 import { decrypt } from '../crypto/index.js';
 import {
@@ -61,7 +62,7 @@ export async function createLoan(
   });
 
   if (!item) {
-    throw new Error('Item não encontrado');
+    throw new NotFoundError(ErrorCodes.LOANS_ITEM_NOT_FOUND, 'Item not found');
   }
 
   const lender = await db.query.users.findFirst({
@@ -69,7 +70,7 @@ export async function createLoan(
   });
 
   if (!lender) {
-    throw new Error('Usuário não encontrado');
+    throw new NotFoundError(ErrorCodes.LOANS_USER_NOT_FOUND, 'User not found');
   }
 
   const lenderName = decrypt(lender.nameEncrypted);
@@ -86,7 +87,7 @@ export async function createLoan(
     .returning();
 
   if (!loanResult[0]) {
-    throw new Error('Falha ao criar empréstimo');
+    throw new BadRequestError(ErrorCodes.LOANS_CREATE_FAILED, 'Failed to create loan');
   }
 
   const loan = loanResult[0];
@@ -261,7 +262,10 @@ export async function markLoanAsReturned(
   }
 
   if (loan.status !== 'confirmed') {
-    throw new Error('Apenas empréstimos confirmados podem ser marcados como devolvidos');
+    throw new BadRequestError(
+      ErrorCodes.LOANS_INVALID_STATE,
+      'Only confirmed loans can be marked as returned'
+    );
   }
 
   await db
@@ -293,7 +297,10 @@ export async function cancelLoan(loanId: string, lenderId: string): Promise<bool
   }
 
   if (loan.status !== 'pending') {
-    throw new Error('Apenas empréstimos pendentes podem ser cancelados');
+    throw new BadRequestError(
+      ErrorCodes.LOANS_INVALID_STATE,
+      'Only pending loans can be cancelled'
+    );
   }
 
   await db
@@ -315,11 +322,14 @@ export async function sendReminder(loanId: string, lenderId: string): Promise<bo
   }
 
   if (loan.status !== 'confirmed') {
-    throw new Error('Apenas empréstimos confirmados podem receber lembretes');
+    throw new BadRequestError(
+      ErrorCodes.LOANS_INVALID_STATE,
+      'Only confirmed loans can receive reminders'
+    );
   }
 
   if (!loan.borrower) {
-    throw new Error('Empréstimo não tem um receptor confirmado');
+    throw new BadRequestError(ErrorCodes.LOANS_NO_RECEIVER, 'Loan has no confirmed receiver');
   }
 
   const lenderName = decrypt(loan.lender.nameEncrypted);
@@ -392,19 +402,22 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
   });
 
   if (!loanToken) {
-    throw new Error('Token inválido');
+    throw new BadRequestError(ErrorCodes.LOANS_TOKEN_INVALID, 'Invalid loan token');
   }
 
   if (loanToken.expiresAt < new Date()) {
-    throw new Error('Token expirado');
+    throw new GoneError(ErrorCodes.LOANS_TOKEN_EXPIRED, 'Loan token has expired');
   }
 
   if (loanToken.usedAt) {
-    throw new Error('Token já utilizado');
+    throw new BadRequestError(ErrorCodes.LOANS_TOKEN_USED, 'Loan token already used');
   }
 
   if (loanToken.loan.status !== 'pending') {
-    throw new Error('Empréstimo já foi processado');
+    throw new BadRequestError(
+      ErrorCodes.LOANS_ALREADY_PROCESSED,
+      'Loan has already been processed'
+    );
   }
 
   await db
@@ -448,7 +461,7 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
 
   const loan = await getLoanById(loanToken.loanId, borrowerId);
   if (!loan) {
-    throw new Error('Erro ao buscar empréstimo');
+    throw new BadRequestError(ErrorCodes.LOANS_FETCH_FAILED, 'Failed to fetch loan');
   }
 
   return loan;

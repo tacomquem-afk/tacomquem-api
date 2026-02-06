@@ -140,58 +140,58 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 5: Service Layer Refactoring
+## Phase 5: Service Layer Refactoring ✅
 
-### 5.1 Refactor `src/services/auth/index.ts` (~12 throw sites)
-- [ ] Import error classes + codes from `../../errors/index.js`
-- [ ] `'Email já cadastrado'` → `throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered')`
-- [ ] `'Erro ao criar usuário'` → `throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user')`
-- [ ] `'Token inválido'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token')`
-- [ ] `'Token já utilizado'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_USED, 'Token already used')`
-- [ ] `'Token expirado'` → `throw new GoneError(ErrorCodes.AUTH_TOKEN_EXPIRED, 'Token has expired')`
-- [ ] `'Tipo de token inválido'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_TYPE_INVALID, 'Invalid token type')`
-- [ ] `'Email ou senha inválidos'` → `throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password')`
-- [ ] `'Use o login social para esta conta'` → `throw new BadRequestError(ErrorCodes.AUTH_SOCIAL_ACCOUNT, 'Use social login for this account')`
+### 5.1 Refactor `src/services/auth/index.ts` (~12 throw sites) ✅
+- [x] Import error classes + codes from `../../errors/index.js`
+- [x] `'Email já cadastrado'` → `throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered')`
+- [x] `'Erro ao criar usuário'` → `throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user')`
+- [x] `'Token inválido'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token')`
+- [x] `'Token já utilizado'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_USED, 'Token already used')`
+- [x] `'Token expirado'` → `throw new GoneError(ErrorCodes.AUTH_TOKEN_EXPIRED, 'Token has expired')`
+- [x] `'Tipo de token inválido'` → `throw new BadRequestError(ErrorCodes.AUTH_TOKEN_TYPE_INVALID, 'Invalid token type')`
+- [x] `'Email ou senha inválidos'` → `throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password')`
+- [x] `'Use o login social para esta conta'` → `throw new BadRequestError(ErrorCodes.AUTH_SOCIAL_ACCOUNT, 'Use social login for this account')`
 
-### 5.2 Refactor `src/services/items/index.ts` (~2 throw sites)
-- [ ] Import error classes + codes from `../../errors/index.js`
-- [ ] `'Falha ao criar item'` → `throw new BadRequestError(ErrorCodes.ITEMS_CREATE_FAILED, 'Failed to create item')`
-- [ ] `'Falha ao atualizar item'` → `throw new BadRequestError(ErrorCodes.ITEMS_UPDATE_FAILED, 'Failed to update item')`
+### 5.2 Refactor `src/services/items/index.ts` (~2 throw sites) ✅
+- [x] Import error classes + codes from `../../errors/index.js`
+- [x] `'Falha ao criar item'` → `throw new BadRequestError(ErrorCodes.ITEMS_CREATE_FAILED, 'Failed to create item')`
+- [x] `'Falha ao atualizar item'` → `throw new BadRequestError(ErrorCodes.ITEMS_UPDATE_FAILED, 'Failed to update item')`
 
-### 5.3 Refactor `src/services/loans/index.ts` (~12 throw sites)
-- [ ] Import error classes + codes from `../../errors/index.js`
-- [ ] `'Item não encontrado'` → `throw new NotFoundError(ErrorCodes.LOANS_ITEM_NOT_FOUND, 'Item not found')`
-- [ ] `'Usuário não encontrado'` → `throw new NotFoundError(ErrorCodes.LOANS_USER_NOT_FOUND, 'User not found')`
-- [ ] `'Falha ao criar empréstimo'` → `throw new BadRequestError(ErrorCodes.LOANS_CREATE_FAILED, 'Failed to create loan')`
-- [ ] `'Apenas empréstimos confirmados podem ser marcados como devolvidos'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only confirmed loans can be marked as returned')`
-- [ ] `'Apenas empréstimos pendentes podem ser cancelados'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only pending loans can be cancelled')`
-- [ ] `'Apenas empréstimos confirmados podem receber lembretes'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only confirmed loans can receive reminders')`
-- [ ] `'Empréstimo não tem um receptor confirmado'` → `throw new BadRequestError(ErrorCodes.LOANS_NO_RECEIVER, 'Loan has no confirmed receiver')`
-- [ ] `'Token inválido'` → `throw new BadRequestError(ErrorCodes.LOANS_TOKEN_INVALID, 'Invalid loan token')`
-- [ ] `'Token expirado'` → `throw new GoneError(ErrorCodes.LOANS_TOKEN_EXPIRED, 'Loan token has expired')`
-- [ ] `'Token já utilizado'` → `throw new BadRequestError(ErrorCodes.LOANS_TOKEN_USED, 'Loan token already used')`
-- [ ] `'Empréstimo já foi processado'` → `throw new BadRequestError(ErrorCodes.LOANS_ALREADY_PROCESSED, 'Loan has already been processed')`
-- [ ] `'Erro ao buscar empréstimo'` → `throw new BadRequestError(ErrorCodes.LOANS_FETCH_FAILED, 'Failed to fetch loan')`
+### 5.3 Refactor `src/services/loans/index.ts` (~12 throw sites) ✅
+- [x] Import error classes + codes from `../../errors/index.js`
+- [x] `'Item não encontrado'` → `throw new NotFoundError(ErrorCodes.LOANS_ITEM_NOT_FOUND, 'Item not found')`
+- [x] `'Usuário não encontrado'` → `throw new NotFoundError(ErrorCodes.LOANS_USER_NOT_FOUND, 'User not found')`
+- [x] `'Falha ao criar empréstimo'` → `throw new BadRequestError(ErrorCodes.LOANS_CREATE_FAILED, 'Failed to create loan')`
+- [x] `'Apenas empréstimos confirmados podem ser marcados como devolvidos'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only confirmed loans can be marked as returned')`
+- [x] `'Apenas empréstimos pendentes podem ser cancelados'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only pending loans can be cancelled')`
+- [x] `'Apenas empréstimos confirmados podem receber lembretes'` → `throw new BadRequestError(ErrorCodes.LOANS_INVALID_STATE, 'Only confirmed loans can receive reminders')`
+- [x] `'Empréstimo não tem um receptor confirmado'` → `throw new BadRequestError(ErrorCodes.LOANS_NO_RECEIVER, 'Loan has no confirmed receiver')`
+- [x] `'Token inválido'` → `throw new BadRequestError(ErrorCodes.LOANS_TOKEN_INVALID, 'Invalid loan token')`
+- [x] `'Token expirado'` → `throw new GoneError(ErrorCodes.LOANS_TOKEN_EXPIRED, 'Loan token has expired')`
+- [x] `'Token já utilizado'` → `throw new BadRequestError(ErrorCodes.LOANS_TOKEN_USED, 'Loan token already used')`
+- [x] `'Empréstimo já foi processado'` → `throw new BadRequestError(ErrorCodes.LOANS_ALREADY_PROCESSED, 'Loan has already been processed')`
+- [x] `'Erro ao buscar empréstimo'` → `throw new BadRequestError(ErrorCodes.LOANS_FETCH_FAILED, 'Failed to fetch loan')`
 
-### 5.4 Refactor `src/services/storage/index.ts` (~6 throw sites)
-- [ ] Import error classes + codes from `../../errors/index.js`
-- [ ] File too large → `throw new PayloadTooLargeError(ErrorCodes.STORAGE_FILE_TOO_LARGE, 'File exceeds maximum size of NMB')`
-- [ ] Invalid format → `throw new BadRequestError(ErrorCodes.STORAGE_UNSUPPORTED_FORMAT, 'Unsupported file format. Use JPEG, PNG or WebP')`
-- [ ] Processing error → `throw new BadRequestError(ErrorCodes.STORAGE_PROCESSING_FAILED, 'Failed to process image')`
-- [ ] Upload error → `throw new BadRequestError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file')`
-- [ ] Record insert → `throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to save upload record')`
-- [ ] Register error → `throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload')`
+### 5.4 Refactor `src/services/storage/index.ts` (~6 throw sites) ✅
+- [x] Import error classes + codes from `../../errors/index.js`
+- [x] File too large → `throw new PayloadTooLargeError(ErrorCodes.STORAGE_FILE_TOO_LARGE, 'File exceeds maximum size of NMB')`
+- [x] Invalid format → `throw new BadRequestError(ErrorCodes.STORAGE_UNSUPPORTED_FORMAT, 'Unsupported file format. Use JPEG, PNG or WebP')`
+- [x] Processing error → `throw new BadRequestError(ErrorCodes.STORAGE_PROCESSING_FAILED, 'Failed to process image')`
+- [x] Upload error → `throw new BadRequestError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file')`
+- [x] Record insert → `throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to save upload record')`
+- [x] Register error → `throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload')`
 
-### 5.5 Refactor `src/services/admin/admins.ts` (~2 throw sites)
-- [ ] Import error classes + codes from `../../errors/index.js`
-- [ ] `'Cannot promote user to USER role'` → `throw new BadRequestError(ErrorCodes.ADMIN_INVALID_ROLE, 'Cannot promote user to USER role')`
-- [ ] `'Use removeAdmin to demote admin to user'` → `throw new BadRequestError(ErrorCodes.ADMIN_USE_REMOVE, 'Use removeAdmin to demote admin to user')`
+### 5.5 Refactor `src/services/admin/admins.ts` (~2 throw sites) ✅
+- [x] Import error classes + codes from `../../errors/index.js`
+- [x] `'Cannot promote user to USER role'` → `throw new BadRequestError(ErrorCodes.ADMIN_INVALID_ROLE, 'Cannot promote user to USER role')`
+- [x] `'Use removeAdmin to demote admin to user'` → `throw new BadRequestError(ErrorCodes.ADMIN_USE_REMOVE, 'Use removeAdmin to demote admin to user')`
 
-### 5.6 Keep `src/services/crypto/index.ts` unchanged
-- [ ] Verify: crypto errors remain plain `Error` (configuration/system errors, not domain errors)
+### 5.6 Keep `src/services/crypto/index.ts` unchanged ✅
+- [x] Verify: crypto errors remain plain `Error` (configuration/system errors, not domain errors)
 
-### 5.7 QA check after services
-- [ ] Run: `bun run qa`
+### 5.7 QA check after services ✅
+- [x] Run: `bun run qa`
 
 ---
 

@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, uploads } from '../../db/schema.js';
+import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
 
 export interface ItemResponse {
@@ -45,7 +46,7 @@ export async function createItem(ownerId: string, input: CreateItemInput): Promi
     .returning();
 
   if (!result[0]) {
-    throw new Error('Falha ao criar item');
+    throw new BadRequestError(ErrorCodes.ITEMS_CREATE_FAILED, 'Failed to create item');
   }
 
   if (input.images && input.images.length > 0) {
@@ -103,7 +104,7 @@ export async function updateItem(
   const result = await db.update(items).set(updateData).where(eq(items.id, itemId)).returning();
 
   if (!result[0]) {
-    throw new Error('Falha ao atualizar item');
+    throw new BadRequestError(ErrorCodes.ITEMS_UPDATE_FAILED, 'Failed to update item');
   }
 
   if (input.images && input.images.length > 0) {

@@ -92,7 +92,7 @@ describe('auth service', () => {
           email: 'test@example.com',
           password: 'password123',
         })
-      ).rejects.toThrow('Email já cadastrado');
+      ).rejects.toThrow('Email already registered');
     });
   });
 
@@ -127,7 +127,7 @@ describe('auth service', () => {
     it('should throw error with invalid token', async () => {
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(verifyEmail('invalid-token')).rejects.toThrow('Token inválido');
+      await expect(verifyEmail('invalid-token')).rejects.toThrow('Invalid token');
     });
 
     it('should throw error if token already used', async () => {
@@ -144,7 +144,7 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('used-token')).rejects.toThrow('Token já utilizado');
+      await expect(verifyEmail('used-token')).rejects.toThrow('Token already used');
     });
 
     it('should throw error if token expired', async () => {
@@ -161,7 +161,7 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('expired-token')).rejects.toThrow('Token expirado');
+      await expect(verifyEmail('expired-token')).rejects.toThrow('Token has expired');
     });
 
     it('should throw error if token type is invalid', async () => {
@@ -178,7 +178,7 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('wrong-type-token')).rejects.toThrow('Tipo de token inválido');
+      await expect(verifyEmail('wrong-type-token')).rejects.toThrow('Invalid token type');
     });
   });
 
@@ -213,7 +213,7 @@ describe('auth service', () => {
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
 
       await expect(login('nonexistent@example.com', 'password123')).rejects.toThrow(
-        'Email ou senha inválidos'
+        'Invalid email or password'
       );
     });
 
@@ -228,7 +228,7 @@ describe('auth service', () => {
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
 
       await expect(login('test@example.com', 'wrongpassword')).rejects.toThrow(
-        'Email ou senha inválidos'
+        'Invalid email or password'
       );
     });
 
@@ -243,7 +243,7 @@ describe('auth service', () => {
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
 
       await expect(login('test@example.com', 'password123')).rejects.toThrow(
-        'Use o login social para esta conta'
+        'Use social login for this account'
       );
     });
   });
@@ -305,7 +305,7 @@ describe('auth service', () => {
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
       await expect(resetPassword('invalid-token', 'newpassword123')).rejects.toThrow(
-        'Token inválido'
+        'Invalid token'
       );
     });
 
@@ -324,7 +324,7 @@ describe('auth service', () => {
       );
 
       await expect(resetPassword('used-token', 'newpassword123')).rejects.toThrow(
-        'Token já utilizado'
+        'Token already used'
       );
     });
 
@@ -343,7 +343,7 @@ describe('auth service', () => {
       );
 
       await expect(resetPassword('expired-token', 'newpassword123')).rejects.toThrow(
-        'Token expirado'
+        'Token has expired'
       );
     });
 
@@ -362,7 +362,7 @@ describe('auth service', () => {
       );
 
       await expect(resetPassword('wrong-type-token', 'newpassword123')).rejects.toThrow(
-        'Tipo de token inválido'
+        'Invalid token type'
       );
     });
   });

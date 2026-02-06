@@ -3,6 +3,13 @@ import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
 import { oauthAccounts, users, verificationTokens } from '../../db/schema.js';
+import {
+  BadRequestError,
+  ConflictError,
+  ErrorCodes,
+  GoneError,
+  UnauthorizedError,
+} from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
 import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
@@ -33,7 +40,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
   });
 
   if (existing) {
-    throw new Error('Email já cadastrado');
+    throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered');
   }
 
   const passwordHashed = await hashPassword(input.password);
@@ -51,7 +58,7 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
     .returning();
 
   if (!user) {
-    throw new Error('Erro ao criar usuário');
+    throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
   }
 
   const token = nanoid(32);
@@ -88,19 +95,19 @@ export async function verifyEmail(token: string): Promise<boolean> {
   });
 
   if (!verification) {
-    throw new Error('Token inválido');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
   }
 
   if (verification.usedAt) {
-    throw new Error('Token já utilizado');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_USED, 'Token already used');
   }
 
   if (verification.expiresAt < new Date()) {
-    throw new Error('Token expirado');
+    throw new GoneError(ErrorCodes.AUTH_TOKEN_EXPIRED, 'Token has expired');
   }
 
   if (verification.type !== 'email_verification') {
-    throw new Error('Tipo de token inválido');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_TYPE_INVALID, 'Invalid token type');
   }
 
   await db
@@ -124,16 +131,16 @@ export async function login(email: string, password: string): Promise<UserRespon
   });
 
   if (!user) {
-    throw new Error('Email ou senha inválidos');
+    throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
   if (!user.passwordHash) {
-    throw new Error('Use o login social para esta conta');
+    throw new BadRequestError(ErrorCodes.AUTH_SOCIAL_ACCOUNT, 'Use social login for this account');
   }
 
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
-    throw new Error('Email ou senha inválidos');
+    throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
   return {
@@ -183,19 +190,19 @@ export async function resetPassword(token: string, newPassword: string): Promise
   });
 
   if (!verification) {
-    throw new Error('Token inválido');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
   }
 
   if (verification.usedAt) {
-    throw new Error('Token já utilizado');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_USED, 'Token already used');
   }
 
   if (verification.expiresAt < new Date()) {
-    throw new Error('Token expirado');
+    throw new GoneError(ErrorCodes.AUTH_TOKEN_EXPIRED, 'Token has expired');
   }
 
   if (verification.type !== 'password_reset') {
-    throw new Error('Tipo de token inválido');
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_TYPE_INVALID, 'Invalid token type');
   }
 
   const passwordHashed = await hashPassword(newPassword);
@@ -279,7 +286,7 @@ export async function findOrCreateGoogleUser(
     .returning();
 
   if (!user) {
-    throw new Error('Erro ao criar usuário');
+    throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
   }
 
   await db.insert(oauthAccounts).values({

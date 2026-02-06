@@ -15,7 +15,7 @@ describe('storage service', () => {
       };
 
       await expect(processAndUploadImage(largeFile, 'user-id')).rejects.toThrow(
-        'Arquivo muito grande'
+        'File exceeds maximum size of 10MB'
       );
     });
 
@@ -31,7 +31,7 @@ describe('storage service', () => {
       };
 
       await expect(processAndUploadImage(textFile, 'user-id')).rejects.toThrow(
-        'Tipo de arquivo não permitido'
+        'Unsupported file format. Use JPEG, PNG or WebP'
       );
     });
   });

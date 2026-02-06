@@ -1,6 +1,7 @@
 import { desc, eq, ne, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { adminAuditLog, users } from '../../db/schema.js';
+import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt } from '../crypto/index.js';
 import { maskEmail, maskName } from './helpers.js';
@@ -55,7 +56,7 @@ export async function promoteToAdmin(
   ipAddress?: string
 ) {
   if (role === 'USER') {
-    throw new Error('Cannot promote user to USER role');
+    throw new BadRequestError(ErrorCodes.ADMIN_INVALID_ROLE, 'Cannot promote user to USER role');
   }
 
   await db.update(users).set({ role }).where(eq(users.id, userId));
@@ -77,7 +78,10 @@ export async function changeAdminRole(
   ipAddress?: string
 ) {
   if (newRole === 'USER') {
-    throw new Error('Use removeAdmin to demote admin to user');
+    throw new BadRequestError(
+      ErrorCodes.ADMIN_USE_REMOVE,
+      'Use removeAdmin to demote admin to user'
+    );
   }
 
   await db.update(users).set({ role: newRole }).where(eq(users.id, adminId));

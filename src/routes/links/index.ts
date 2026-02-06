@@ -64,13 +64,8 @@ export async function linksRoutes(app: FastifyInstance) {
       preHandler: [app.authenticate],
     },
     async (request, reply) => {
-      try {
-        const loan = await confirmLoan(request.params.token, request.user.userId);
-        return reply.send({ loan, message: 'Empréstimo confirmado com sucesso!' });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao confirmar empréstimo';
-        return reply.status(400).send({ error: message });
-      }
+      const loan = await confirmLoan(request.params.token, request.user.userId);
+      return reply.send({ loan, message: 'Empréstimo confirmado com sucesso!' });
     }
   );
 }

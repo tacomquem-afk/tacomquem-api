@@ -6,6 +6,7 @@ import { env } from '../../config/env.js';
 import { r2Client } from '../../config/r2.js';
 import { db } from '../../db/index.js';
 import { uploads } from '../../db/schema.js';
+import { BadRequestError, ErrorCodes, PayloadTooLargeError } from '../../errors/index.js';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const IMAGE_MAX_WIDTH = 1080;
@@ -36,12 +37,18 @@ export async function processAndUploadImage(
   const fileBuffer = Buffer.concat(buffers);
 
   if (fileBuffer.length > MAX_FILE_SIZE) {
-    throw new Error(`Arquivo muito grande (máx ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
+    throw new PayloadTooLargeError(
+      ErrorCodes.STORAGE_FILE_TOO_LARGE,
+      `File exceeds maximum size of ${MAX_FILE_SIZE / 1024 / 1024}MB`
+    );
   }
 
   const fileType = await fileTypeFromBuffer(fileBuffer);
   if (!fileType || !ALLOWED_MIMES.includes(fileType.mime)) {
-    throw new Error('Tipo de arquivo não permitido. Use JPEG, PNG ou WebP.');
+    throw new BadRequestError(
+      ErrorCodes.STORAGE_UNSUPPORTED_FORMAT,
+      'Unsupported file format. Use JPEG, PNG or WebP'
+    );
   }
 
   let processedBuffer: Buffer;
@@ -53,10 +60,8 @@ export async function processAndUploadImage(
       })
       .webp({ quality: WEBP_QUALITY })
       .toBuffer();
-  } catch (error) {
-    throw new Error(
-      `Erro ao processar imagem: ${error instanceof Error ? error.message : 'unknown'}`
-    );
+  } catch {
+    throw new BadRequestError(ErrorCodes.STORAGE_PROCESSING_FAILED, 'Failed to process image');
   }
 
   const id = nanoid(8);
@@ -74,8 +79,8 @@ export async function processAndUploadImage(
         CacheControl: 'public, max-age=31536000',
       })
     );
-  } catch (error) {
-    throw new Error(`Erro ao fazer upload: ${error instanceof Error ? error.message : 'unknown'}`);
+  } catch {
+    throw new BadRequestError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file');
   }
 
   try {
@@ -92,7 +97,7 @@ export async function processAndUploadImage(
       .returning();
 
     if (!upload) {
-      throw new Error('Failed to insert upload record');
+      throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to save upload record');
     }
 
     return {
@@ -100,7 +105,7 @@ export async function processAndUploadImage(
       key: upload.key,
       sizeBytes: upload.sizeBytes,
     };
-  } catch (error) {
+  } catch {
     try {
       await r2Client.send(
         new DeleteObjectCommand({
@@ -111,9 +116,7 @@ export async function processAndUploadImage(
     } catch {
       // Ignore cleanup error
     }
-    throw new Error(
-      `Erro ao registrar upload: ${error instanceof Error ? error.message : 'unknown'}`
-    );
+    throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload');
   }
 }
 

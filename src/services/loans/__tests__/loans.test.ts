@@ -118,7 +118,7 @@ describe('loans service', () => {
           expectedReturnDate: undefined,
           lenderNotes: undefined,
         })
-      ).rejects.toThrow('Item não encontrado');
+      ).rejects.toThrow('Item not found');
     });
 
     it('should throw error if lender not found', async () => {
@@ -132,7 +132,7 @@ describe('loans service', () => {
           expectedReturnDate: undefined,
           lenderNotes: undefined,
         })
-      ).rejects.toThrow('Usuário não encontrado');
+      ).rejects.toThrow('User not found');
     });
 
     it('should create loan with expectedReturnDate', async () => {
@@ -325,7 +325,7 @@ describe('loans service', () => {
       } as any);
 
       await expect(markLoanAsReturned('loan-123', 'lender-123')).rejects.toThrow(
-        'Apenas empréstimos confirmados podem ser marcados como devolvidos'
+        'Only confirmed loans can be marked as returned'
       );
     });
 
@@ -364,7 +364,7 @@ describe('loans service', () => {
       spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(confirmedLoan as any);
 
       await expect(cancelLoan('loan-123', 'lender-123')).rejects.toThrow(
-        'Apenas empréstimos pendentes podem ser cancelados'
+        'Only pending loans can be cancelled'
       );
     });
   });
@@ -413,7 +413,7 @@ describe('loans service', () => {
       } as any);
 
       await expect(sendReminder('loan-123', 'lender-123')).rejects.toThrow(
-        'Apenas empréstimos confirmados podem receber lembretes'
+        'Only confirmed loans can receive reminders'
       );
     });
 
@@ -427,7 +427,7 @@ describe('loans service', () => {
       } as any);
 
       await expect(sendReminder('loan-123', 'lender-123')).rejects.toThrow(
-        'Empréstimo não tem um receptor confirmado'
+        'Loan has no confirmed receiver'
       );
     });
   });
@@ -547,7 +547,9 @@ describe('loans service', () => {
     it('should throw error if token not found', async () => {
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(confirmLoan('invalid-token', 'borrower-123')).rejects.toThrow('Token inválido');
+      await expect(confirmLoan('invalid-token', 'borrower-123')).rejects.toThrow(
+        'Invalid loan token'
+      );
     });
 
     it('should throw error if token is expired', async () => {
@@ -561,7 +563,9 @@ describe('loans service', () => {
 
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(expiredToken as any);
 
-      await expect(confirmLoan('expired-token', 'borrower-123')).rejects.toThrow('Token expirado');
+      await expect(confirmLoan('expired-token', 'borrower-123')).rejects.toThrow(
+        'Loan token has expired'
+      );
     });
 
     it('should throw error if token already used', async () => {
@@ -575,7 +579,9 @@ describe('loans service', () => {
 
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(usedToken as any);
 
-      await expect(confirmLoan('used-token', 'borrower-123')).rejects.toThrow('Token já utilizado');
+      await expect(confirmLoan('used-token', 'borrower-123')).rejects.toThrow(
+        'Loan token already used'
+      );
     });
 
     it('should throw error if loan already processed', async () => {
@@ -591,7 +597,7 @@ describe('loans service', () => {
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(processedLoan as any);
 
       await expect(confirmLoan('token-abc123', 'borrower-123')).rejects.toThrow(
-        'Empréstimo já foi processado'
+        'Loan has already been processed'
       );
     });
   });

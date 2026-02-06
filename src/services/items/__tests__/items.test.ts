@@ -66,6 +66,11 @@ describe('items service', () => {
       const insertSpy = spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
       mocks.push(insertSpy);
 
+      const updateWhereMock = mock(() => Promise.resolve());
+      const updateSetMock = mock(() => ({ where: updateWhereMock }));
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: updateSetMock } as any);
+      mocks.push(updateSpy);
+
       const result = await createItem('550e8400-e29b-41d4-a716-446655440001', {
         name: 'Test Item',
         description: 'A test item',
@@ -87,7 +92,7 @@ describe('items service', () => {
           description: 'A test item',
           images: [],
         })
-      ).rejects.toThrow('Falha ao criar item');
+      ).rejects.toThrow('Failed to create item');
     });
 
     it('should create item with empty description', async () => {
@@ -230,7 +235,7 @@ describe('items service', () => {
         updateItem('550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001', {
           name: 'Updated Item',
         })
-      ).rejects.toThrow('Falha ao atualizar item');
+      ).rejects.toThrow('Failed to update item');
     });
 
     it('should only update provided fields', async () => {

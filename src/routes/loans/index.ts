@@ -66,13 +66,8 @@ export async function loansRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: result.error.flatten() });
       }
 
-      try {
-        const { loan, confirmUrl } = await createLoan(request.user.userId, result.data);
-        return reply.status(201).send({ loan, confirmUrl });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao criar empréstimo';
-        return reply.status(400).send({ error: message });
-      }
+      const { loan, confirmUrl } = await createLoan(request.user.userId, result.data);
+      return reply.status(201).send({ loan, confirmUrl });
     }
   );
 
@@ -185,18 +180,13 @@ export async function loansRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const loan = await markLoanAsReturned(request.params.id, request.user.userId);
+      const loan = await markLoanAsReturned(request.params.id, request.user.userId);
 
-        if (!loan) {
-          return reply.status(404).send({ error: 'Empréstimo não encontrado' });
-        }
-
-        return reply.send({ loan });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao marcar como devolvido';
-        return reply.status(400).send({ error: message });
+      if (!loan) {
+        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
       }
+
+      return reply.send({ loan });
     }
   );
 
@@ -221,18 +211,13 @@ export async function loansRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const cancelled = await cancelLoan(request.params.id, request.user.userId);
+      const cancelled = await cancelLoan(request.params.id, request.user.userId);
 
-        if (!cancelled) {
-          return reply.status(404).send({ error: 'Empréstimo não encontrado' });
-        }
-
-        return reply.status(204).send();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao cancelar empréstimo';
-        return reply.status(400).send({ error: message });
+      if (!cancelled) {
+        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
       }
+
+      return reply.status(204).send();
     }
   );
 
@@ -263,18 +248,13 @@ export async function loansRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const sent = await sendReminder(request.params.id, request.user.userId);
+      const sent = await sendReminder(request.params.id, request.user.userId);
 
-        if (!sent) {
-          return reply.status(404).send({ error: 'Empréstimo não encontrado' });
-        }
-
-        return reply.send({ message: 'Lembrete enviado com sucesso!' });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao enviar lembrete';
-        return reply.status(400).send({ error: message });
+      if (!sent) {
+        return reply.status(404).send({ error: 'Empréstimo não encontrado' });
       }
+
+      return reply.send({ message: 'Lembrete enviado com sucesso!' });
     }
   );
 }
