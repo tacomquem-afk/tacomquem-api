@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+
+import { BadRequestError, ErrorCodes, PayloadTooLargeError } from '../../../errors/index.js';
 import { processAndUploadImage } from '../index.js';
 
 describe('storage service', () => {
@@ -14,9 +16,15 @@ describe('storage service', () => {
         })(),
       };
 
-      await expect(processAndUploadImage(largeFile, 'user-id')).rejects.toThrow(
-        'File exceeds maximum size of 10MB'
-      );
+      let errorThrown = false;
+      try {
+        await processAndUploadImage(largeFile, 'user-id');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(PayloadTooLargeError);
+        expect((e as PayloadTooLargeError).code).toBe(ErrorCodes.STORAGE_FILE_TOO_LARGE);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should reject invalid file type', async () => {
@@ -30,9 +38,15 @@ describe('storage service', () => {
         })(),
       };
 
-      await expect(processAndUploadImage(textFile, 'user-id')).rejects.toThrow(
-        'Unsupported file format. Use JPEG, PNG or WebP'
-      );
+      let errorThrown = false;
+      try {
+        await processAndUploadImage(textFile, 'user-id');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.STORAGE_UNSUPPORTED_FORMAT);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 });

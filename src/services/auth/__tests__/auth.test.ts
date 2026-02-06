@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { db } from '../../../db/index.js';
+import {
+  BadRequestError,
+  ConflictError,
+  ErrorCodes,
+  GoneError,
+  UnauthorizedError,
+} from '../../../errors/index.js';
 import * as cryptoService from '../../crypto/index.js';
 import * as emailService from '../../email/index.js';
 import * as passwordService from '../../password/index.js';
@@ -86,13 +93,19 @@ describe('auth service', () => {
         emailHash: 'hash_test@example.com',
       } as any);
 
-      await expect(
-        createUser({
+      let errorThrown = false;
+      try {
+        await createUser({
           name: 'Test User',
           email: 'test@example.com',
           password: 'password123',
-        })
-      ).rejects.toThrow('Email already registered');
+        });
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(ConflictError);
+        expect((e as ConflictError).code).toBe(ErrorCodes.AUTH_EMAIL_TAKEN);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -127,7 +140,15 @@ describe('auth service', () => {
     it('should throw error with invalid token', async () => {
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(verifyEmail('invalid-token')).rejects.toThrow('Invalid token');
+      let errorThrown = false;
+      try {
+        await verifyEmail('invalid-token');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_INVALID);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token already used', async () => {
@@ -144,7 +165,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('used-token')).rejects.toThrow('Token already used');
+      let errorThrown = false;
+      try {
+        await verifyEmail('used-token');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_USED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token expired', async () => {
@@ -161,7 +190,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('expired-token')).rejects.toThrow('Token has expired');
+      let errorThrown = false;
+      try {
+        await verifyEmail('expired-token');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(GoneError);
+        expect((e as GoneError).code).toBe(ErrorCodes.AUTH_TOKEN_EXPIRED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token type is invalid', async () => {
@@ -178,7 +215,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(verifyEmail('wrong-type-token')).rejects.toThrow('Invalid token type');
+      let errorThrown = false;
+      try {
+        await verifyEmail('wrong-type-token');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_TYPE_INVALID);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -212,9 +257,15 @@ describe('auth service', () => {
     it('should throw error with non-existent email', async () => {
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(login('nonexistent@example.com', 'password123')).rejects.toThrow(
-        'Invalid email or password'
-      );
+      let errorThrown = false;
+      try {
+        await login('nonexistent@example.com', 'password123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error with incorrect password', async () => {
@@ -227,9 +278,15 @@ describe('auth service', () => {
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
 
-      await expect(login('test@example.com', 'wrongpassword')).rejects.toThrow(
-        'Invalid email or password'
-      );
+      let errorThrown = false;
+      try {
+        await login('test@example.com', 'wrongpassword');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error when trying to login with password on OAuth account', async () => {
@@ -242,9 +299,15 @@ describe('auth service', () => {
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
 
-      await expect(login('test@example.com', 'password123')).rejects.toThrow(
-        'Use social login for this account'
-      );
+      let errorThrown = false;
+      try {
+        await login('test@example.com', 'password123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_SOCIAL_ACCOUNT);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -304,9 +367,15 @@ describe('auth service', () => {
     it('should throw error with invalid token', async () => {
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(resetPassword('invalid-token', 'newpassword123')).rejects.toThrow(
-        'Invalid token'
-      );
+      let errorThrown = false;
+      try {
+        await resetPassword('invalid-token', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_INVALID);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token already used', async () => {
@@ -323,9 +392,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(resetPassword('used-token', 'newpassword123')).rejects.toThrow(
-        'Token already used'
-      );
+      let errorThrown = false;
+      try {
+        await resetPassword('used-token', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_USED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token expired', async () => {
@@ -342,9 +417,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(resetPassword('expired-token', 'newpassword123')).rejects.toThrow(
-        'Token has expired'
-      );
+      let errorThrown = false;
+      try {
+        await resetPassword('expired-token', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(GoneError);
+        expect((e as GoneError).code).toBe(ErrorCodes.AUTH_TOKEN_EXPIRED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token type is invalid', async () => {
@@ -361,9 +442,15 @@ describe('auth service', () => {
         mockVerification as any
       );
 
-      await expect(resetPassword('wrong-type-token', 'newpassword123')).rejects.toThrow(
-        'Invalid token type'
-      );
+      let errorThrown = false;
+      try {
+        await resetPassword('wrong-type-token', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_TOKEN_TYPE_INVALID);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 

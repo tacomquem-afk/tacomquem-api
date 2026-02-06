@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+
 import { db } from '../../../db/index.js';
+import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../../errors/index.js';
 import * as cryptoModule from '../../crypto/index.js';
 import * as emailModule from '../../email/index.js';
 import {
@@ -111,28 +113,40 @@ describe('loans service', () => {
     it('should throw error if item not found', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(
-        createLoan('lender-123', {
+      let errorThrown = false;
+      try {
+        await createLoan('lender-123', {
           itemId: 'nonexistent-item',
           borrowerEmail: 'borrower@example.com',
           expectedReturnDate: undefined,
           lenderNotes: undefined,
-        })
-      ).rejects.toThrow('Item not found');
+        });
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(NotFoundError);
+        expect((e as NotFoundError).code).toBe(ErrorCodes.LOANS_ITEM_NOT_FOUND);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if lender not found', async () => {
       spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(
-        createLoan('nonexistent-lender', {
+      let errorThrown = false;
+      try {
+        await createLoan('nonexistent-lender', {
           itemId: 'item-123',
           borrowerEmail: 'borrower@example.com',
           expectedReturnDate: undefined,
           lenderNotes: undefined,
-        })
-      ).rejects.toThrow('User not found');
+        });
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(NotFoundError);
+        expect((e as NotFoundError).code).toBe(ErrorCodes.LOANS_USER_NOT_FOUND);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should create loan with expectedReturnDate', async () => {
@@ -324,9 +338,15 @@ describe('loans service', () => {
         borrower: null,
       } as any);
 
-      await expect(markLoanAsReturned('loan-123', 'lender-123')).rejects.toThrow(
-        'Only confirmed loans can be marked as returned'
-      );
+      let errorThrown = false;
+      try {
+        await markLoanAsReturned('loan-123', 'lender-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_INVALID_STATE);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should return null if loan not found', async () => {
@@ -363,9 +383,15 @@ describe('loans service', () => {
       const confirmedLoan = { ...mockLoanData, status: 'confirmed' as const };
       spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(confirmedLoan as any);
 
-      await expect(cancelLoan('loan-123', 'lender-123')).rejects.toThrow(
-        'Only pending loans can be cancelled'
-      );
+      let errorThrown = false;
+      try {
+        await cancelLoan('loan-123', 'lender-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_INVALID_STATE);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -412,9 +438,15 @@ describe('loans service', () => {
         borrower: null,
       } as any);
 
-      await expect(sendReminder('loan-123', 'lender-123')).rejects.toThrow(
-        'Only confirmed loans can receive reminders'
-      );
+      let errorThrown = false;
+      try {
+        await sendReminder('loan-123', 'lender-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_INVALID_STATE);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if borrower not confirmed', async () => {
@@ -426,9 +458,15 @@ describe('loans service', () => {
         borrower: null,
       } as any);
 
-      await expect(sendReminder('loan-123', 'lender-123')).rejects.toThrow(
-        'Loan has no confirmed receiver'
-      );
+      let errorThrown = false;
+      try {
+        await sendReminder('loan-123', 'lender-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_NO_RECEIVER);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -547,9 +585,15 @@ describe('loans service', () => {
     it('should throw error if token not found', async () => {
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(undefined);
 
-      await expect(confirmLoan('invalid-token', 'borrower-123')).rejects.toThrow(
-        'Invalid loan token'
-      );
+      let errorThrown = false;
+      try {
+        await confirmLoan('invalid-token', 'borrower-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_TOKEN_INVALID);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token is expired', async () => {
@@ -563,9 +607,15 @@ describe('loans service', () => {
 
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(expiredToken as any);
 
-      await expect(confirmLoan('expired-token', 'borrower-123')).rejects.toThrow(
-        'Loan token has expired'
-      );
+      let errorThrown = false;
+      try {
+        await confirmLoan('expired-token', 'borrower-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(GoneError);
+        expect((e as GoneError).code).toBe(ErrorCodes.LOANS_TOKEN_EXPIRED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if token already used', async () => {
@@ -579,9 +629,15 @@ describe('loans service', () => {
 
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(usedToken as any);
 
-      await expect(confirmLoan('used-token', 'borrower-123')).rejects.toThrow(
-        'Loan token already used'
-      );
+      let errorThrown = false;
+      try {
+        await confirmLoan('used-token', 'borrower-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_TOKEN_USED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should throw error if loan already processed', async () => {
@@ -596,9 +652,15 @@ describe('loans service', () => {
 
       spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(processedLoan as any);
 
-      await expect(confirmLoan('token-abc123', 'borrower-123')).rejects.toThrow(
-        'Loan has already been processed'
-      );
+      let errorThrown = false;
+      try {
+        await confirmLoan('token-abc123', 'borrower-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_ALREADY_PROCESSED);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 });

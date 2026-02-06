@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { validatorCompiler } from 'fastify-type-provider-zod';
-import { AppError, errorStatusMap } from '../../../errors/index.js';
+
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
 import * as adminModule from '../../../services/admin/index.js';
@@ -31,12 +31,61 @@ describe('Admin User Routes', () => {
     await app.register(jwtPlugin);
     await app.register(rbacPlugin);
 
-    app.setErrorHandler((error, _request, reply) => {
-      if (error instanceof AppError) {
-        const statusCode = errorStatusMap.get(error.constructor) || 500;
-        return reply.status(statusCode).send({ error: error.message });
-      }
-      return reply.status(500).send({ error: 'Internal Server Error' });
+    app.setErrorHandler((error, request, reply) => {
+      // Use the same error format as the production app
+      const statusCode =
+        error && typeof error === 'object' && 'constructor' in error
+          ? (error.constructor as any).name === 'ConflictError'
+            ? 409
+            : (error.constructor as any).name === 'UnauthorizedError'
+              ? 401
+              : (error.constructor as any).name === 'ForbiddenError'
+                ? 403
+                : (error.constructor as any).name === 'NotFoundError'
+                  ? 404
+                  : (error.constructor as any).name === 'ValidationError'
+                    ? 422
+                    : (error.constructor as any).name === 'GoneError'
+                      ? 410
+                      : (error.constructor as any).name === 'PayloadTooLargeError'
+                        ? 413
+                        : (error.constructor as any).name === 'BadRequestError'
+                          ? 400
+                          : 500
+          : 500;
+
+      const errorCode =
+        error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : 'INTERNAL_SERVER_ERROR';
+
+      const problemDetails = {
+        type: 'about:blank',
+        title:
+          statusCode === 400
+            ? 'Bad Request'
+            : statusCode === 401
+              ? 'Unauthorized'
+              : statusCode === 403
+                ? 'Forbidden'
+                : statusCode === 404
+                  ? 'Not Found'
+                  : statusCode === 409
+                    ? 'Conflict'
+                    : statusCode === 410
+                      ? 'Gone'
+                      : statusCode === 413
+                        ? 'Payload Too Large'
+                        : statusCode === 422
+                          ? 'Unprocessable Entity'
+                          : 'Internal Server Error',
+        status: statusCode,
+        detail: error instanceof Error ? error.message : 'An error occurred',
+        errorCode,
+        instance: request.url,
+      };
+
+      reply.status(statusCode).type('application/problem+json').send(problemDetails);
     });
 
     await app.register(userRoutes, { prefix: '/api/admin/users' });

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+
 import { db } from '../../../db/index.js';
+import { BadRequestError, ErrorCodes } from '../../../errors/index.js';
 import {
   createItem,
   deleteItem,
@@ -86,13 +88,19 @@ describe('items service', () => {
       const insertSpy = spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
       mocks.push(insertSpy);
 
-      await expect(
-        createItem('550e8400-e29b-41d4-a716-446655440001', {
+      let errorThrown = false;
+      try {
+        await createItem('550e8400-e29b-41d4-a716-446655440001', {
           name: 'Test Item',
           description: 'A test item',
           images: [],
-        })
-      ).rejects.toThrow('Failed to create item');
+        });
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.ITEMS_CREATE_FAILED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should create item with empty description', async () => {
@@ -231,11 +239,21 @@ describe('items service', () => {
       const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
       mocks.push(updateSpy);
 
-      await expect(
-        updateItem('550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001', {
-          name: 'Updated Item',
-        })
-      ).rejects.toThrow('Failed to update item');
+      let errorThrown = false;
+      try {
+        await updateItem(
+          '550e8400-e29b-41d4-a716-446655440000',
+          '550e8400-e29b-41d4-a716-446655440001',
+          {
+            name: 'Updated Item',
+          }
+        );
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.ITEMS_UPDATE_FAILED);
+      }
+      expect(errorThrown).toBe(true);
     });
 
     it('should only update provided fields', async () => {

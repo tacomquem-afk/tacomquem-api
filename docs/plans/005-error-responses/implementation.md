@@ -273,32 +273,32 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 7: Test Updates
+## Phase 7: Test Updates ✅
 
-### 7.1 Update `src/services/auth/__tests__/auth.test.ts`
-- [ ] Update all error assertions from Portuguese string matching to error class + code assertions
-- [ ] Example: `expect(fn).rejects.toThrow(ConflictError)` + verify `.code === ErrorCodes.AUTH_EMAIL_TAKEN`
-- [ ] Ensure all happy paths still pass
+### 7.1 Update `src/services/auth/__tests__/auth.test.ts` ✅
+- [x] Update all error assertions from Portuguese string matching to error class + code assertions
+- [x] Example: `expect(fn).rejects.toThrow(ConflictError)` + verify `.code === ErrorCodes.AUTH_EMAIL_TAKEN`
+- [x] Ensure all happy paths still pass
 
-### 7.2 Update `src/services/items/__tests__/items.test.ts`
-- [ ] Update error assertions to match new domain error classes
-- [ ] Verify `.code` matches expected error code
+### 7.2 Update `src/services/items/__tests__/items.test.ts` ✅
+- [x] Update error assertions to match new domain error classes
+- [x] Verify `.code` matches expected error code
 
-### 7.3 Update `src/services/loans/__tests__/loans.test.ts`
-- [ ] Update all error assertions (~12 test cases)
-- [ ] Verify correct error class per scenario (NotFoundError, BadRequestError, GoneError)
-- [ ] Verify `.code` matches expected error code
+### 7.3 Update `src/services/loans/__tests__/loans.test.ts` ✅
+- [x] Update all error assertions (~12 test cases)
+- [x] Verify correct error class per scenario (NotFoundError, BadRequestError, GoneError)
+- [x] Verify `.code` matches expected error code
 
-### 7.4 Update `src/services/storage/__tests__/storage.test.ts` (if exists)
-- [ ] Update error assertions to match new domain error classes
+### 7.4 Update `src/services/storage/__tests__/storage.test.ts` (if exists) ✅
+- [x] Update error assertions to match new domain error classes
 
-### 7.5 Update `src/services/admin/__tests__/admins.test.ts` (if exists)
-- [ ] Update error assertions to match new domain error classes
+### 7.5 Update `src/services/admin/__tests__/admins.test.ts` (if exists) ✅
+- [x] Update error assertions to match new domain error classes
 
-### 7.6 Update any route-level tests
-- [ ] Update error response assertions to match RFC 9457 format
-- [ ] Verify `Content-Type: application/problem+json` in error responses
-- [ ] Verify `errorCode` field is present
+### 7.6 Update any route-level tests ✅
+- [x] Update error response assertions to match RFC 9457 format
+- [x] Verify `Content-Type: application/problem+json` in error responses
+- [x] Verify `errorCode` field is present
 
 ---
 
