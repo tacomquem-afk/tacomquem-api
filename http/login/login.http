@@ -1,0 +1,22 @@
+# @name login
+
+POST {{$dotenv BASE_URL}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{$dotenv DEFAULT_EMAIL}}",
+  "password": "{{$dotenv DEFAULT_PASSWORD}}"
+}
+
+###
+@accessToken = {{login.response.body.accessToken}}
+
+###
+GET {{$dotenv BASE_URL}}/auth/me
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "email": "{{$dotenv DEFAULT_EMAIL}}",
+  "password": "{{$dotenv DEFAULT_PASSWORD}}"
+}

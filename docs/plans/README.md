@@ -28,3 +28,4 @@ plans/
 | 001.1 | [upload-r2](./001-mvp/002-upload-r2-implementation.md) | Pronto para implementar | Upload de fotos com compactação para R2 |
 | 003 | [admin-backoffice](./003-admin-backoffice/) | Design validado | Sistema admin com RBAC, moderação e analytics |
 | 004 | [auth-swagger-fix](./004-auth-swagger-fix/) | Proposto | Correção de bug de role no login + documentação Swagger |
+| 005 | [error-responses](./005-error-responses/) | Design validado | Padronização de error responses com RFC 9457 + domain error classes + fastify-type-provider-zod |

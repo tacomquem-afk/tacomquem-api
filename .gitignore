@@ -32,3 +32,6 @@ drizzle/meta/
 # Bun
 bun.lock
 .history
+
+# Test credentials (local use only)
+test-users.json
