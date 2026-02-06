@@ -138,7 +138,7 @@ export async function buildApp() {
     }
 
     if (error instanceof AppError) {
-      const statusCode = errorStatusMap.get(error.constructor) || 500;
+      const statusCode = errorStatusMap.get(error.constructor as any) || 500;
       const problemDetails = formatProblemDetails(error, request);
       if (statusCode >= 500) {
         request.log.error({ err: error }, error.message);

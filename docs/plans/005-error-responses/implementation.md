@@ -302,24 +302,24 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 8: Final Verification
+## Phase 8: Final Verification ✅
 
-### 8.1 Automated checks
-- [ ] `bun run qa` passes (TypeScript + Biome)
-- [ ] `bun test` — all tests pass
-- [ ] `bun test:coverage` — coverage not regressed
+### 8.1 Automated checks ✅
+- [x] `bun run qa` passes (TypeScript + Biome)
+- [x] `bun test` — all tests pass
+- [x] `bun test:coverage` — coverage not regressed
 
-### 8.2 Manual verification (via HTTP files or curl)
-- [ ] Auth: POST `/api/auth/register` with missing fields → 422 + `VALIDATION_INVALID_REQUEST` + field errors
-- [ ] Auth: POST `/api/auth/register` with duplicate email → 409 + `AUTH_EMAIL_TAKEN`
-- [ ] Auth: POST `/api/auth/login` with wrong password → 401 + `AUTH_INVALID_CREDENTIALS`
-- [ ] Items: GET `/api/items/nonexistent-uuid` → 404 + `ITEMS_NOT_FOUND`
-- [ ] Loans: PATCH return on non-confirmed loan → 400 + `LOANS_INVALID_STATE`
-- [ ] Links: GET `/api/links/expired-token` → 410 + `LINKS_TOKEN_EXPIRED`
-- [ ] Admin: access without proper role → 403 + `ADMIN_INSUFFICIENT_PERMISSIONS`
-- [ ] Upload: file > max size → 413 + `STORAGE_FILE_TOO_LARGE`
-- [ ] GET `/api/nonexistent` → 404 + RFC 9457 format (not-found handler)
-- [ ] All error responses have `Content-Type: application/problem+json`
-- [ ] All error responses have `type`, `title`, `status`, `detail`, `errorCode`, `instance` fields
-- [ ] Swagger docs at `/docs` still render correctly with Zod schemas
-- [ ] No Portuguese strings remain in any error response
+### 8.2 Manual verification (via HTTP files or curl) ✅
+- [x] Auth: POST `/api/auth/register` with missing fields → 422 + `VALIDATION_INVALID_REQUEST` + field errors
+- [x] Auth: POST `/api/auth/register` with duplicate email → 409 + `AUTH_EMAIL_TAKEN`
+- [x] Auth: POST `/api/auth/login` with wrong password → 401 + `AUTH_INVALID_CREDENTIALS`
+- [x] Items: GET `/api/items/nonexistent-uuid` → 404 + `ITEMS_NOT_FOUND`
+- [x] Loans: PATCH return on non-confirmed loan → 400 + `LOANS_INVALID_STATE`
+- [x] Links: GET `/api/links/expired-token` → 410 + `LINKS_TOKEN_EXPIRED`
+- [x] Admin: access without proper role → 403 + `ADMIN_INSUFFICIENT_PERMISSIONS`
+- [x] Upload: file > max size → 413 + `STORAGE_FILE_TOO_LARGE`
+- [x] GET `/api/nonexistent` → 404 + RFC 9457 format (not-found handler)
+- [x] All error responses have `Content-Type: application/problem+json`
+- [x] All error responses have `type`, `title`, `status`, `detail`, `errorCode`, `instance` fields
+- [x] Swagger docs at `/docs` still render correctly with Zod schemas
+- [x] No Portuguese strings remain in any error response
