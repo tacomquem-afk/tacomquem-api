@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { beforeEach, describe, expect, it } from 'bun:test';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
+
+import { ErrorCodes, ForbiddenError, UnauthorizedError } from '../../errors/index.js';
 import rbacPlugin from '../rbac.js';
 
 describe('RBAC Plugin', () => {
@@ -12,7 +14,7 @@ describe('RBAC Plugin', () => {
     // Register mock JWT plugin with proper name
     await app.register(
       async (fastify: FastifyInstance) => {
-        fastify.decorate('authenticate', async (_request: FastifyRequest, _reply: FastifyReply) => {
+        fastify.decorate('authenticate', async (_request: FastifyRequest) => {
           // Mock authenticate - does nothing in tests
         });
       },
@@ -30,76 +32,74 @@ describe('RBAC Plugin', () => {
   it('should return 401 if user is not authenticated', async () => {
     const handler = (app as any).requireRole('SUPER_ADMIN');
     const mockRequest = { user: null } as any;
-    const mockReply = {
-      code: mock((_code: number) => mockReply),
-    } as any;
 
     let error: Error | null = null;
     try {
-      await handler(mockRequest, mockReply);
+      await handler(mockRequest);
     } catch (_error) {
       error = _error as Error;
     }
 
-    expect(mockReply.code).toHaveBeenCalledWith(401);
+    expect(error).toBeInstanceOf(UnauthorizedError);
+    expect((error as any)?.code).toBe(ErrorCodes.AUTH_UNAUTHORIZED);
     expect(error?.message).toBe('Authentication required');
   });
 
   it('should return 403 if user role is insufficient', async () => {
     const handler = (app as any).requireRole('SUPER_ADMIN');
     const mockRequest = { user: { userId: 'test', role: 'USER' } } as any;
-    const mockReply = {
-      code: mock((_code: number) => mockReply),
-    } as any;
 
     let error: Error | null = null;
     try {
-      await handler(mockRequest, mockReply);
+      await handler(mockRequest);
     } catch (_error) {
       error = _error as Error;
     }
 
-    expect(mockReply.code).toHaveBeenCalledWith(403);
-    expect(error?.message).toBe('Insufficient permissions');
+    expect(error).toBeInstanceOf(ForbiddenError);
+    expect((error as any)?.code).toBe(ErrorCodes.ADMIN_INSUFFICIENT_PERMISSIONS);
+    expect(error?.message).toBe('Insufficient permissions for this role');
   });
 
   it('should allow access if user has exact role', async () => {
     const handler = (app as any).requireRole('MODERATOR');
     const mockRequest = { user: { userId: 'test', role: 'MODERATOR' } } as any;
-    const mockReply = {
-      code: mock(),
-      send: mock(),
-    } as any;
 
-    await handler(mockRequest, mockReply);
+    let error: Error | null = null;
+    try {
+      await handler(mockRequest);
+    } catch (_error) {
+      error = _error as Error;
+    }
 
-    expect(mockReply.code).not.toHaveBeenCalled();
-    expect(mockReply.send).not.toHaveBeenCalled();
+    expect(error).toBeNull();
   });
 
   it('should allow access if user has higher role in hierarchy', async () => {
     const handler = (app as any).requireRole('ANALYST');
     const mockRequest = { user: { userId: 'test', role: 'SUPER_ADMIN' } } as any;
-    const mockReply = {
-      code: mock(),
-      send: mock(),
-    } as any;
 
-    await handler(mockRequest, mockReply);
+    let error: Error | null = null;
+    try {
+      await handler(mockRequest);
+    } catch (_error) {
+      error = _error as Error;
+    }
 
-    expect(mockReply.code).not.toHaveBeenCalled();
+    expect(error).toBeNull();
   });
 
   it('should accept array of roles', async () => {
     const handler = (app as any).requireRole(['ANALYST', 'SUPPORT']);
     const mockRequest = { user: { userId: 'test', role: 'SUPPORT' } } as any;
-    const mockReply = {
-      code: mock(),
-      send: mock(),
-    } as any;
 
-    await handler(mockRequest, mockReply);
+    let error: Error | null = null;
+    try {
+      await handler(mockRequest);
+    } catch (_error) {
+      error = _error as Error;
+    }
 
-    expect(mockReply.code).not.toHaveBeenCalled();
+    expect(error).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import jwt from '@fastify/jwt';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { env } from '../config/env.js';
+import { ErrorCodes, UnauthorizedError } from '../errors/index.js';
 import type { UserRole } from './rbac.js';
 
 interface TokenPayload {
@@ -33,7 +34,7 @@ async function jwtPlugin(fastify: FastifyInstance) {
     });
   });
 
-  fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.decorate('authenticate', async (request: FastifyRequest, _reply: FastifyReply) => {
     try {
       const decoded = await request.jwtVerify<TokenPayload>();
       request.user = {
@@ -41,8 +42,7 @@ async function jwtPlugin(fastify: FastifyInstance) {
         role: decoded.role || 'USER',
       };
     } catch (_err) {
-      reply.code(401);
-      throw new Error('Unauthorized');
+      throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Invalid or expired token');
     }
   });
 }

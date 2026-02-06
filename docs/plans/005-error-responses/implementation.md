@@ -51,46 +51,46 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 2: App Configuration
+## Phase 2: App Configuration ✅
 
-### 2.1 Configure type provider in `src/app.ts`
-- [ ] Import `serializerCompiler`, `validatorCompiler`, `ZodTypeProvider` from `fastify-type-provider-zod`
-- [ ] Import `jsonSchemaTransform` from `fastify-type-provider-zod`
-- [ ] Register `app.setValidatorCompiler(validatorCompiler)`
-- [ ] Register `app.setSerializerCompiler(serializerCompiler)`
-- [ ] Update `@fastify/swagger` config to use `transform: jsonSchemaTransform`
+### 2.1 Configure type provider in `src/app.ts` ✅
+- [x] Import `serializerCompiler`, `validatorCompiler`, `ZodTypeProvider` from `fastify-type-provider-zod`
+- [x] Import `jsonSchemaTransform` from `fastify-type-provider-zod`
+- [x] Register `app.setValidatorCompiler(validatorCompiler)`
+- [x] Register `app.setSerializerCompiler(serializerCompiler)`
+- [x] Update `@fastify/swagger` config to use `transform: jsonSchemaTransform`
 
-### 2.2 Implement global error handler in `src/app.ts`
-- [ ] Import `hasZodFastifySchemaValidationErrors` from `fastify-type-provider-zod`
-- [ ] Add `app.setErrorHandler()` with 3 branches:
-  - [ ] Branch 1: `hasZodFastifySchemaValidationErrors(error)` → 422 + `VALIDATION_INVALID_REQUEST` + field errors array
-  - [ ] Branch 2: `error instanceof AppError` → map to HTTP status via `errorStatusMap` + `formatProblemDetails()`
-  - [ ] Branch 3: Unknown error → 500 + `INTERNAL_SERVER_ERROR` (no stack trace in response)
-- [ ] Set `Content-Type: application/problem+json` on all error responses
-- [ ] Bypass Fastify serializer: `reply.serializer((payload) => JSON.stringify(payload))`
-- [ ] Logging:
-  - [ ] 5xx: `request.log.error({ err: error }, 'Internal server error')`
-  - [ ] 4xx: `request.log.warn({ errorCode: error.code }, error.message)`
+### 2.2 Implement global error handler in `src/app.ts` ✅
+- [x] Import `hasZodFastifySchemaValidationErrors` from `fastify-type-provider-zod`
+- [x] Add `app.setErrorHandler()` with 3 branches:
+  - [x] Branch 1: `hasZodFastifySchemaValidationErrors(error)` → 422 + `VALIDATION_INVALID_REQUEST` + field errors array
+  - [x] Branch 2: `error instanceof AppError` → map to HTTP status via `errorStatusMap` + `formatProblemDetails()`
+  - [x] Branch 3: Unknown error → 500 + `INTERNAL_SERVER_ERROR` (no stack trace in response)
+- [x] Set `Content-Type: application/problem+json` on all error responses
+- [x] Bypass Fastify serializer: `reply.serializer((payload) => JSON.stringify(payload))`
+- [x] Logging:
+  - [x] 5xx: `request.log.error({ err: error }, 'Internal server error')`
+  - [x] 4xx: `request.log.warn({ errorCode: error.code }, error.message)`
 
-### 2.3 Implement not-found handler in `src/app.ts`
-- [ ] Add `app.setNotFoundHandler()` returning RFC 9457 format
-- [ ] Set `Content-Type: application/problem+json`
-- [ ] Include `instance: request.url` and `detail: 'Route METHOD:URL not found'`
+### 2.3 Implement not-found handler in `src/app.ts` ✅
+- [x] Add `app.setNotFoundHandler()` returning RFC 9457 format
+- [x] Set `Content-Type: application/problem+json`
+- [x] Include `instance: request.url` and `detail: 'Route METHOD:URL not found'`
 
-### 2.4 Update rate limiter config in `src/app.ts`
-- [ ] Add `errorResponseBuilder` to `@fastify/rate-limit` registration
-- [ ] Return RFC 9457 format with `errorCode: 'RATE_LIMIT_EXCEEDED'`
-- [ ] Include `instance: request.url`
+### 2.4 Update rate limiter config in `src/app.ts` ✅
+- [x] Add `errorResponseBuilder` to `@fastify/rate-limit` registration
+- [x] Return RFC 9457 format with `errorCode: 'RATE_LIMIT_EXCEEDED'`
+- [x] Include `instance: request.url`
 
-### 2.5 Create `src/__tests__/error-handler.test.ts`
-- [ ] Test AppError subclass → correct HTTP status + RFC 9457 response format
-- [ ] Test Zod validation error (from type provider) → 422 + field errors
-- [ ] Test generic `Error` → 500 without stack trace or internal details
-- [ ] Test not-found handler → 404 RFC 9457 format
-- [ ] Test `Content-Type: application/problem+json` header on all error responses
-- [ ] Test that 5xx errors don't expose stack traces
-- [ ] Run: `bun test src/__tests__/error-handler.test.ts`
-- [ ] Run: `bun run qa`
+### 2.5 Create `src/__tests__/error-handler.test.ts` ✅
+- [x] Test AppError subclass → correct HTTP status + RFC 9457 response format
+- [x] Test Zod validation error (from type provider) → 422 + field errors
+- [x] Test generic `Error` → 500 without stack trace or internal details
+- [x] Test not-found handler → 404 RFC 9457 format
+- [x] Test `Content-Type: application/problem+json` header on all error responses
+- [x] Test that 5xx errors don't expose stack traces
+- [x] Run: `bun test src/__tests__/error-handler.test.ts`
+- [x] Run: `bun run qa`
 
 ---
 
@@ -121,22 +121,22 @@ Tracking tasks for [design.md](./design.md).
 
 ---
 
-## Phase 4: Plugin Refactoring
+## Phase 4: Plugin Refactoring ✅
 
-### 4.1 Refactor `src/plugins/jwt.ts`
-- [ ] Import `UnauthorizedError`, `ErrorCodes` from `../../errors/index.js`
-- [ ] Replace `reply.code(401); throw new Error('Unauthorized')` with:
+### 4.1 Refactor `src/plugins/jwt.ts` ✅
+- [x] Import `UnauthorizedError`, `ErrorCodes` from `../../errors/index.js`
+- [x] Replace `reply.code(401); throw new Error('Unauthorized')` with:
   `throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Invalid or expired token')`
-- [ ] Remove `reply.code()` call (error handler sets status)
+- [x] Remove `reply.code()` call (error handler sets status)
 
-### 4.2 Refactor `src/plugins/rbac.ts`
-- [ ] Import `UnauthorizedError`, `ForbiddenError`, `ErrorCodes` from `../../errors/index.js`
-- [ ] Replace `reply.code(401); throw new Error('Authentication required')` with:
+### 4.2 Refactor `src/plugins/rbac.ts` ✅
+- [x] Import `UnauthorizedError`, `ForbiddenError`, `ErrorCodes` from `../../errors/index.js`
+- [x] Replace `reply.code(401); throw new Error('Authentication required')` with:
   `throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Authentication required')`
-- [ ] Replace `reply.code(403); throw new Error('Insufficient permissions')` with:
+- [x] Replace `reply.code(403); throw new Error('Insufficient permissions')` with:
   `throw new ForbiddenError(ErrorCodes.ADMIN_INSUFFICIENT_PERMISSIONS, 'Insufficient permissions for this role')`
-- [ ] Remove `reply.code()` calls
-- [ ] Run: `bun run qa`
+- [x] Remove `reply.code()` calls
+- [x] Run: `bun run qa`
 
 ---
 
