@@ -23,11 +23,7 @@ async function googleAuthRoutes(app: FastifyInstance) {
       schema: {
         description: 'Initiate Google OAuth flow',
         tags: ['Authentication', 'OAuth'],
-        response: {
-          302: {
-            description: 'Redirect to Google OAuth page',
-          },
-        },
+        hide: true,
       },
     },
     async (_request, reply) => {
@@ -53,16 +49,12 @@ async function googleAuthRoutes(app: FastifyInstance) {
       schema: {
         description: 'Google OAuth callback endpoint',
         tags: ['Authentication', 'OAuth'],
+        hide: true,
         querystring: {
           type: 'object',
           properties: {
             code: { type: 'string', description: 'OAuth authorization code' },
             error: { type: 'string', description: 'OAuth error' },
-          },
-        },
-        response: {
-          302: {
-            description: 'Redirect to frontend with tokens',
           },
         },
       },

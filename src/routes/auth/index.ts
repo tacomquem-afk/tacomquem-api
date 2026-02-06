@@ -27,29 +27,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Register a new user with email and password',
         tags: ['Authentication'],
         body: registerSchema,
-        response: {
-          201: {
-            description: 'User registered successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-            },
-          },
-        },
       },
       config: {
         rateLimit: {
@@ -74,30 +51,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Authenticate with email and password',
         tags: ['Authentication'],
         body: loginSchema,
-        response: {
-          200: {
-            description: 'Authentication successful',
-            type: 'object',
-            properties: {
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-              accessToken: { type: 'string', description: 'JWT access token (7 days)' },
-              refreshToken: { type: 'string', description: 'JWT refresh token (30 days)' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -116,15 +69,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Verify email address with token sent via email',
         tags: ['Authentication'],
         body: verifyEmailSchema,
-        response: {
-          200: {
-            description: 'Email verified successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -140,15 +84,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Request password reset email',
         tags: ['Authentication'],
         body: forgotPasswordSchema,
-        response: {
-          200: {
-            description: 'Password reset email sent (always returns success for security)',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       config: {
         rateLimit: {
@@ -177,15 +112,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Reset password with token from email',
         tags: ['Authentication'],
         body: resetPasswordSchema,
-        response: {
-          200: {
-            description: 'Password reset successful',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -201,15 +127,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Refresh access token using refresh token',
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
-        response: {
-          200: {
-            description: 'Token refreshed successfully',
-            type: 'object',
-            properties: {
-              accessToken: { type: 'string', description: 'New JWT access token (7 days)' },
-            },
-          },
-        },
       },
       preHandler: [app.authenticate],
     },
@@ -227,28 +144,6 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Get current authenticated user',
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
-        response: {
-          200: {
-            description: 'User profile',
-            type: 'object',
-            properties: {
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-            },
-          },
-        },
       },
       preHandler: [app.authenticate],
     },

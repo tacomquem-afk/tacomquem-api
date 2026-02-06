@@ -30,26 +30,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Create a new loan and generate a confirmation link',
         security: [{ BearerAuth: [] }],
         body: createLoanSchema,
-        response: {
-          201: {
-            description: 'Loan created successfully',
-            type: 'object',
-            properties: {
-              loan: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  itemId: { type: 'string', format: 'uuid' },
-                  lenderId: { type: 'string', format: 'uuid' },
-                  borrowerId: { type: 'string', format: 'uuid' },
-                  status: { type: 'string' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                },
-              },
-              confirmUrl: { type: 'string', description: 'Public confirmation link' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -66,26 +46,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'List all loans for the authenticated user',
         security: [{ BearerAuth: [] }],
         querystring: loanFilterSchema,
-        response: {
-          200: {
-            description: 'List of loans',
-            type: 'object',
-            properties: {
-              loans: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    itemId: { type: 'string', format: 'uuid' },
-                    status: { type: 'string' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -102,15 +62,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Get loan details',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            description: 'Loan details',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -132,15 +83,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Mark a loan as returned',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            description: 'Loan marked as returned',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -162,9 +104,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Cancel a loan',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          204: { description: 'Loan cancelled successfully' },
-        },
       },
     },
     async (request, reply) => {
@@ -186,15 +125,6 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Send a reminder for a loan',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            description: 'Reminder sent successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {

@@ -23,14 +23,7 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         tags: ['Admin - Moderation'],
         description: 'Get item details for moderation (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
-        params: idParamSchema,
-        response: {
-          200: {
-            description: 'Item details',
-            type: 'object',
-          },
-        },
-      },
+        params: idParamSchema,},
       preHandler: [
         fastify.authenticate,
         fastify.requireRole(['SUPPORT', 'MODERATOR', 'SUPER_ADMIN']),
@@ -56,16 +49,6 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: removeContentSchema,
-        response: {
-          200: {
-            description: 'Item removed successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole(['MODERATOR', 'SUPER_ADMIN'])],
     },
@@ -86,14 +69,7 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         tags: ['Admin - Moderation'],
         description: 'Get loan details for moderation (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
-        params: idParamSchema,
-        response: {
-          200: {
-            description: 'Loan details',
-            type: 'object',
-          },
-        },
-      },
+        params: idParamSchema,},
       preHandler: [
         fastify.authenticate,
         fastify.requireRole(['SUPPORT', 'MODERATOR', 'SUPER_ADMIN']),
@@ -119,16 +95,6 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: removeContentSchema,
-        response: {
-          200: {
-            description: 'Loan cancelled successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole(['MODERATOR', 'SUPER_ADMIN'])],
     },

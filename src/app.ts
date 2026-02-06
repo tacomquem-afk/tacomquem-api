@@ -182,56 +182,18 @@ export async function buildApp() {
       });
   });
 
-  app.get(
-    '/api/health',
-    {
-      schema: {
-        description: 'Check API health status',
-        tags: ['Health'],
-        response: {
-          200: {
-            description: 'API is healthy',
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              timestamp: { type: 'string', format: 'date-time' },
-            },
-          },
-        },
-      },
-    },
-    async () => {
-      return { status: 'ok', timestamp: new Date().toISOString() };
-    }
-  );
+  app.get('/api/health', async () => {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  });
 
-  app.get(
-    '/api/health/db',
-    {
-      schema: {
-        description: 'Check database connection',
-        tags: ['Health'],
-        response: {
-          200: {
-            description: 'Database status',
-            type: 'object',
-            properties: {
-              status: { type: 'string', enum: ['ok', 'error'] },
-              database: { type: 'string', enum: ['connected', 'disconnected'] },
-            },
-          },
-        },
-      },
-    },
-    async () => {
-      try {
-        await db.execute(sql`SELECT 1`);
-        return { status: 'ok', database: 'connected' };
-      } catch (_error) {
-        return { status: 'error', database: 'disconnected' };
-      }
+  app.get('/api/health/db', async () => {
+    try {
+      await db.execute(sql`SELECT 1`);
+      return { status: 'ok', database: 'connected' };
+    } catch (_error) {
+      return { status: 'error', database: 'disconnected' };
     }
-  );
+  });
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });

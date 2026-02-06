@@ -19,23 +19,6 @@ export async function uploadRoutes(app: FastifyInstance) {
         tags: ['Upload'],
         security: [{ BearerAuth: [] }],
         consumes: ['multipart/form-data'],
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              images: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    url: { type: 'string', format: 'uri' },
-                    sizeBytes: { type: 'number' },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
       preHandler: [app.authenticate],
     },

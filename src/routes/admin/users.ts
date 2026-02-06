@@ -19,17 +19,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
         description: 'List all users (requires ANALYST role or higher)',
         security: [{ BearerAuth: [] }],
         querystring: listUsersSchema,
-        response: {
-          200: {
-            description: 'Users list',
-            type: 'object',
-            properties: {
-              users: { type: 'array' },
-              total: { type: 'number' },
-              page: { type: 'number' },
-            },
-          },
-        },
       },
       preHandler: [
         fastify.authenticate,
@@ -49,12 +38,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
         description: 'Get user details (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            description: 'User details',
-            type: 'object',
-          },
-        },
       },
       preHandler: [
         fastify.authenticate,
@@ -81,16 +64,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: blockUserSchema,
-        response: {
-          200: {
-            description: 'User blocked successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
@@ -112,16 +85,6 @@ export default async function userRoutes(fastify: FastifyInstance) {
         description: 'Unblock a user (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            description: 'User unblocked successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },

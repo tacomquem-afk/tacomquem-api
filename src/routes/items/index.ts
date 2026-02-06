@@ -25,25 +25,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         body: createItemSchema,
-        response: {
-          201: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -59,28 +40,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
         description: 'List all items owned by the current user',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              items: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    name: { type: 'string' },
-                    description: { type: ['string', 'null'] },
-                    images: { type: 'array', items: { type: 'string' } },
-                    isActive: { type: 'boolean' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                    updatedAt: { type: 'string', format: 'date-time' },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -97,25 +56,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -138,25 +78,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: updateItemSchema,
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
-        },
       },
     },
     async (request, reply) => {
@@ -178,9 +99,6 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
-        response: {
-          204: { type: 'null' },
-        },
       },
     },
     async (request, reply) => {

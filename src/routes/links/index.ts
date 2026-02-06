@@ -15,14 +15,7 @@ export async function linksRoutes(app: FastifyInstance) {
       schema: {
         tags: ['Links'],
         description: 'Get public loan information via token (no authentication required)',
-        params: tokenParamSchema,
-        response: {
-          200: {
-            description: 'Public loan information',
-            type: 'object',
-          },
-        },
-      },
+        params: tokenParamSchema,},
     },
     async (request, reply) => {
       const info = await getPublicLoanInfo(request.params.token);
@@ -43,16 +36,6 @@ export async function linksRoutes(app: FastifyInstance) {
         description: 'Confirm a loan by token (requires authentication)',
         security: [{ BearerAuth: [] }],
         params: tokenParamSchema,
-        response: {
-          200: {
-            description: 'Loan confirmed successfully',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-              message: { type: 'string' },
-            },
-          },
-        },
       },
       preHandler: [app.authenticate],
     },
