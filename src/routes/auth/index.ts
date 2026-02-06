@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import {
   forgotPasswordSchema,
@@ -8,6 +9,17 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from '../../schemas/auth.js';
+import {
+  authTokensResponseSchema,
+  errorResponse400,
+  errorResponse401,
+  errorResponse404,
+  errorResponse409,
+  errorResponse410,
+  errorResponse422,
+  messageResponseSchema,
+  userResponseSchema,
+} from '../../schemas/responses.js';
 import {
   createUser,
   getUserById,
@@ -27,6 +39,14 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Register a new user with email and password',
         tags: ['Authentication'],
         body: registerSchema,
+        response: {
+          201: z.object({
+            message: z.string(),
+            user: userResponseSchema,
+          }),
+          409: errorResponse409,
+          422: errorResponse422,
+        },
       },
       config: {
         rateLimit: {
@@ -51,6 +71,11 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Authenticate with email and password',
         tags: ['Authentication'],
         body: loginSchema,
+        response: {
+          200: authTokensResponseSchema,
+          401: errorResponse401,
+          422: errorResponse422,
+        },
       },
     },
     async (request, reply) => {
@@ -69,6 +94,11 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Verify email address with token sent via email',
         tags: ['Authentication'],
         body: verifyEmailSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponse400,
+          410: errorResponse410,
+        },
       },
     },
     async (request, reply) => {
@@ -84,6 +114,9 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Request password reset email',
         tags: ['Authentication'],
         body: forgotPasswordSchema,
+        response: {
+          200: messageResponseSchema,
+        },
       },
       config: {
         rateLimit: {
@@ -112,6 +145,11 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Reset password with token from email',
         tags: ['Authentication'],
         body: resetPasswordSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponse400,
+          410: errorResponse410,
+        },
       },
     },
     async (request, reply) => {
@@ -127,6 +165,10 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Refresh access token using refresh token',
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
+        response: {
+          200: z.object({ accessToken: z.string() }),
+          401: errorResponse401,
+        },
       },
       preHandler: [app.authenticate],
     },
@@ -144,6 +186,11 @@ async function authRoutes(app: FastifyInstance) {
         description: 'Get current authenticated user',
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
+        response: {
+          200: z.object({ user: userResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
       preHandler: [app.authenticate],
     },

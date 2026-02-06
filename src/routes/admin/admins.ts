@@ -3,6 +3,14 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { auditLogQuerySchema, changeRoleSchema, promoteAdminSchema } from '../../schemas/admin.js';
 import {
+  adminUserSchema,
+  auditLogResponseSchema,
+  errorResponse400,
+  errorResponse401,
+  errorResponse403,
+  successResponseSchema,
+} from '../../schemas/responses.js';
+import {
   changeAdminRole,
   getAuditLog,
   listAdmins,
@@ -23,6 +31,11 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         tags: ['Admin - Admins'],
         description: 'List all admin users (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
+        response: {
+          200: z.array(adminUserSchema),
+          401: errorResponse401,
+          403: errorResponse403,
+        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
@@ -39,6 +52,12 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         description: 'Promote a user to admin (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
         body: promoteAdminSchema,
+        response: {
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
@@ -61,6 +80,12 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: changeRoleSchema,
+        response: {
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
@@ -82,6 +107,11 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         description: 'Get audit log (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
         querystring: auditLogQuerySchema,
+        response: {
+          200: auditLogResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },
@@ -98,6 +128,12 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         description: 'Remove an admin (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
     },

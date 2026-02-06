@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { createItemSchema, updateItemSchema } from '../../schemas/items.js';
 import {
+  errorResponse401,
+  errorResponse404,
+  errorResponse422,
+  itemResponseSchema,
+} from '../../schemas/responses.js';
+import {
   createItem,
   deleteItem,
   getItemById,
@@ -25,6 +31,11 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         body: createItemSchema,
+        response: {
+          201: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          422: errorResponse422,
+        },
       },
     },
     async (request, reply) => {
@@ -40,6 +51,10 @@ export default async function itemsRoutes(app: FastifyInstance) {
         description: 'List all items owned by the current user',
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
+        response: {
+          200: z.object({ items: z.array(itemResponseSchema) }),
+          401: errorResponse401,
+        },
       },
     },
     async (request, reply) => {
@@ -56,6 +71,11 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {
@@ -78,6 +98,12 @@ export default async function itemsRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: updateItemSchema,
+        response: {
+          200: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
+          422: errorResponse422,
+        },
       },
     },
     async (request, reply) => {
@@ -99,6 +125,11 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          204: z.null(),
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {
@@ -108,7 +139,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
         throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'Item not found');
       }
 
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     }
   );
 }

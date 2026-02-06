@@ -7,6 +7,7 @@ import Fastify from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
+  serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 
@@ -35,6 +36,7 @@ export async function buildApp() {
   });
 
   app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
     origin: env.FRONTEND_URL,
@@ -182,18 +184,36 @@ export async function buildApp() {
       });
   });
 
-  app.get('/api/health', async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
-  });
-
-  app.get('/api/health/db', async () => {
-    try {
-      await db.execute(sql`SELECT 1`);
-      return { status: 'ok', database: 'connected' };
-    } catch (_error) {
-      return { status: 'error', database: 'disconnected' };
+  app.get(
+    '/api/health',
+    {
+      schema: {
+        description: 'Health check endpoint',
+        tags: ['Health'],
+      },
+    },
+    async () => {
+      return { status: 'ok', timestamp: new Date().toISOString() };
     }
-  });
+  );
+
+  app.get(
+    '/api/health/db',
+    {
+      schema: {
+        description: 'Database health check endpoint',
+        tags: ['Health'],
+      },
+    },
+    async () => {
+      try {
+        await db.execute(sql`SELECT 1`);
+        return { status: 'ok', database: 'connected' };
+      } catch (_error) {
+        return { status: 'error', database: 'disconnected' };
+      }
+    }
+  );
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });

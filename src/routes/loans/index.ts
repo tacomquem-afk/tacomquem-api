@@ -4,6 +4,14 @@ import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { createLoanSchema } from '../../schemas/loans.js';
 import {
+  errorResponse400,
+  errorResponse401,
+  errorResponse404,
+  errorResponse422,
+  loanResponseSchema,
+  messageResponseSchema,
+} from '../../schemas/responses.js';
+import {
   cancelLoan,
   createLoan,
   getLoanById,
@@ -30,6 +38,15 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Create a new loan and generate a confirmation link',
         security: [{ BearerAuth: [] }],
         body: createLoanSchema,
+        response: {
+          201: z.object({
+            loan: loanResponseSchema,
+            confirmUrl: z.string().url(),
+          }),
+          401: errorResponse401,
+          404: errorResponse404,
+          422: errorResponse422,
+        },
       },
     },
     async (request, reply) => {
@@ -46,6 +63,10 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'List all loans for the authenticated user',
         security: [{ BearerAuth: [] }],
         querystring: loanFilterSchema,
+        response: {
+          200: z.object({ loans: z.array(loanResponseSchema) }),
+          401: errorResponse401,
+        },
       },
     },
     async (request, reply) => {
@@ -62,6 +83,11 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Get loan details',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: z.object({ loan: loanResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {
@@ -83,6 +109,12 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Mark a loan as returned',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: z.object({ loan: loanResponseSchema }),
+          400: errorResponse400,
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {
@@ -104,6 +136,11 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Cancel a loan',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          204: z.null(),
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {
@@ -113,7 +150,7 @@ export async function loansRoutes(app: FastifyInstance) {
         throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     }
   );
 
@@ -125,6 +162,12 @@ export async function loansRoutes(app: FastifyInstance) {
         description: 'Send a reminder for a loan',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          404: errorResponse404,
+        },
       },
     },
     async (request, reply) => {

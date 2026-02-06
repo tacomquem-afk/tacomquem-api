@@ -35,8 +35,8 @@ export interface MaskedUser {
   loansAsLender: number;
   loansAsBorrower: number;
   itemsCount: number;
-  createdAt: Date;
-  lastActivityAt?: Date;
+  createdAt: string;
+  lastActivityAt?: string;
 }
 
 export async function listUsers(params: ListUsersParams) {
@@ -82,8 +82,8 @@ export async function listUsers(params: ListUsersParams) {
       loansAsLender: user.lentLoans?.length || 0,
       loansAsBorrower: user.borrowedLoans?.length || 0,
       itemsCount: user.items?.length || 0,
-      createdAt: user.createdAt || new Date(),
-      lastActivityAt: user.updatedAt || undefined,
+      createdAt: (user.createdAt || new Date()).toISOString(),
+      lastActivityAt: user.updatedAt?.toISOString(),
     };
   });
 

@@ -12,7 +12,7 @@ export interface AdminUser {
   email: string;
   name: string;
   role: UserRole;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface AuditLogEntry {
@@ -27,7 +27,7 @@ export interface AuditLogEntry {
   targetId: string | undefined;
   metadata: unknown | undefined;
   ipAddress: string | undefined;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface AuditLogParams {
@@ -45,7 +45,7 @@ export async function listAdmins(): Promise<AdminUser[]> {
     email: maskEmail(decrypt(admin.emailEncrypted)),
     name: maskName(decrypt(admin.nameEncrypted)),
     role: admin.role as UserRole,
-    createdAt: admin.createdAt || new Date(),
+    createdAt: (admin.createdAt || new Date()).toISOString(),
   }));
 }
 
@@ -137,7 +137,7 @@ export async function getAuditLog(params: AuditLogParams) {
     targetId: log.targetId || undefined,
     metadata: log.metadata ? JSON.parse(log.metadata) : undefined,
     ipAddress: log.ipAddress || undefined,
-    createdAt: log.createdAt,
+    createdAt: log.createdAt.toISOString(),
   }));
 
   return {
