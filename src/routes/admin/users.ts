@@ -5,6 +5,7 @@ import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { blockUserSchema, listUsersSchema } from '../../schemas/admin.js';
 import {
   adminListUsersResponseSchema,
+  adminUserDetailsSchema,
   errorResponse401,
   errorResponse403,
   errorResponse404,
@@ -42,7 +43,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/:id',
     {
       schema: {
@@ -50,6 +51,12 @@ export default async function userRoutes(fastify: FastifyInstance) {
         description: 'Get user details (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: adminUserDetailsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
+        },
       },
       preHandler: [
         fastify.authenticate,

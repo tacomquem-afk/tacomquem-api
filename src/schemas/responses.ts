@@ -127,7 +127,7 @@ export const dashboardDataSchema = z.object({
     z.object({
       id: uuidSchema,
       itemName: z.string(),
-      borrowerEmail: z.string().email(),
+      borrowerEmail: z.string().email().nullable(),
       createdAt: dateSchema,
     })
   ),

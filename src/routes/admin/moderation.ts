@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { removeContentSchema } from '../../schemas/admin.js';
 import {
+  adminItemDetailsSchema,
+  adminLoanDetailsSchema,
   errorResponse401,
   errorResponse403,
   errorResponse404,
@@ -22,7 +24,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 export default async function moderationRoutes(fastify: FastifyInstance) {
   const typed = fastify.withTypeProvider<ZodTypeProvider>();
 
-  fastify.get(
+  typed.get(
     '/items/:id',
     {
       schema: {
@@ -30,6 +32,12 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         description: 'Get item details for moderation (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: adminItemDetailsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
+        },
       },
       preHandler: [
         fastify.authenticate,
@@ -75,7 +83,7 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/loans/:id',
     {
       schema: {
@@ -83,6 +91,12 @@ export default async function moderationRoutes(fastify: FastifyInstance) {
         description: 'Get loan details for moderation (requires SUPPORT role or higher)',
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
+        response: {
+          200: adminLoanDetailsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
+        },
       },
       preHandler: [
         fastify.authenticate,

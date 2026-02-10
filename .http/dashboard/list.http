@@ -15,8 +15,3 @@ Content-Type: application/json
 GET {{$dotenv BASE_URL}}/dashboard
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
-
-{
-  "email": "{{$dotenv DEFAULT_EMAIL}}",
-  "password": "{{$dotenv DEFAULT_PASSWORD}}"
-}

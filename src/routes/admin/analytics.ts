@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   adminDashboardStatsSchema,
   errorResponse401,
@@ -9,7 +10,9 @@ import {
 import { getDashboardStats, getLoansStats, getUsersStats } from '../../services/admin/analytics.js';
 
 export default async function analyticsRoutes(fastify: FastifyInstance) {
-  fastify.get(
+  const typed = fastify.withTypeProvider<ZodTypeProvider>();
+
+  typed.get(
     '/dashboard',
     {
       schema: {
@@ -32,7 +35,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/users/stats',
     {
       schema: {
@@ -55,7 +58,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/loans/stats',
     {
       schema: {

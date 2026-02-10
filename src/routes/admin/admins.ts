@@ -24,7 +24,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 export default async function adminsRoutes(fastify: FastifyInstance) {
   const typed = fastify.withTypeProvider<ZodTypeProvider>();
 
-  fastify.get(
+  typed.get(
     '/',
     {
       schema: {

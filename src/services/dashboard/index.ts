@@ -14,7 +14,7 @@ export interface RecentActivity {
   id: string;
   type: 'loan_created' | 'loan_confirmed' | 'loan_returned' | 'loan_reminder';
   message: string;
-  createdAt: Date;
+  createdAt: string;
   read: boolean;
 }
 
@@ -24,8 +24,8 @@ export interface DashboardData {
   pendingLoans: Array<{
     id: string;
     itemName: string;
-    borrowerEmail: string;
-    createdAt: Date;
+    borrowerEmail: string | null;
+    createdAt: string;
   }>;
   activeLoans: Array<{
     id: string;
@@ -33,8 +33,8 @@ export interface DashboardData {
     itemImages: string[];
     otherParty: string;
     role: 'lender' | 'borrower';
-    expectedReturnDate: Date | null;
-    confirmedAt: Date;
+    expectedReturnDate: string | null;
+    confirmedAt: string;
   }>;
 }
 
@@ -105,33 +105,37 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       id: n.id,
       type: n.type,
       message: n.message,
-      createdAt: n.createdAt,
+      createdAt: n.createdAt.toISOString(),
       read: n.read,
     })),
-    pendingLoans: pendingLoans.map((l) => ({
-      id: l.id,
-      itemName: l.item.name,
-      borrowerEmail: l.borrowerEmail || '',
-      createdAt: l.createdAt,
-    })),
-    activeLoans: activeLoans.map((l) => {
-      const isLender = l.lenderId === userId;
-      const otherParty = isLender
-        ? l.borrower
-          ? decrypt(l.borrower.nameEncrypted)
-          : 'Pendente'
-        : decrypt(l.lender.nameEncrypted);
-
-      return {
+    pendingLoans: pendingLoans
+      .filter((l) => l.item)
+      .map((l) => ({
         id: l.id,
         itemName: l.item.name,
-        itemImages: parseImages(l.item.images),
-        otherParty,
-        role: isLender ? 'lender' : 'borrower',
-        expectedReturnDate: l.expectedReturnDate,
-        confirmedAt: l.confirmedAt ?? new Date(),
-      };
-    }),
+        borrowerEmail: l.borrowerEmail,
+        createdAt: l.createdAt.toISOString(),
+      })),
+    activeLoans: activeLoans
+      .filter((l) => l.item && (l.lenderId === userId || l.lender))
+      .map((l) => {
+        const isLender = l.lenderId === userId;
+        const otherParty = isLender
+          ? l.borrower
+            ? decrypt(l.borrower.nameEncrypted)
+            : 'Pendente'
+          : decrypt(l.lender.nameEncrypted);
+
+        return {
+          id: l.id,
+          itemName: l.item.name,
+          itemImages: parseImages(l.item.images),
+          otherParty,
+          role: isLender ? 'lender' : 'borrower',
+          expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
+          confirmedAt: (l.confirmedAt ?? new Date()).toISOString(),
+        };
+      }),
   };
 }
 
