@@ -15,7 +15,7 @@ import { inArray, or } from 'drizzle-orm';
 
 import { encrypt, hash } from '../services/crypto/index';
 import { db } from './index';
-import { items, loans, users } from './schema';
+import { items, loans, notifications, users } from './schema';
 
 interface TestUser {
   id: string;
@@ -135,9 +135,16 @@ async function createTestItemsAndLoans(
 
   const itemsToInsert: InferInsertModel<typeof items>[] = [];
   const loansToInsert: InferInsertModel<typeof loans>[] = [];
+  const notificationsToInsert: InferInsertModel<typeof notifications>[] = [];
+
+  const notificationMessages: Record<string, { title: string; message: string }> = {
+    loan_created: { title: 'New loan created', message: 'A new item has been loaned' },
+    loan_confirmed: { title: 'Loan confirmed', message: 'The borrower has confirmed the loan' },
+    loan_reminder: { title: 'Return reminder', message: 'Reminder to return the borrowed item' },
+    loan_returned: { title: 'Item returned', message: 'The borrowed item has been returned' },
+  };
 
   for (const testUser of testUsers) {
-    // Create 2-3 items per test user
     const itemCount = faker.number.int({ min: 2, max: 3 });
 
     for (let i = 0; i < itemCount; i++) {
@@ -151,7 +158,6 @@ async function createTestItemsAndLoans(
         'Drill',
       ]);
 
-      // Generate 1-3 fake images per item
       const imageCount = faker.number.int({ min: 1, max: 3 });
       const fakeImages = Array.from({ length: imageCount }, () =>
         faker.image.url({ width: 400, height: 400 })
@@ -168,26 +174,62 @@ async function createTestItemsAndLoans(
         updatedAt: new Date(),
       });
 
-      // Create 1-2 loans per item
       const loanCount = faker.number.int({ min: 1, max: 2 });
       for (let j = 0; j < loanCount; j++) {
         const borrower = faker.helpers.arrayElement(allUsers.filter((u) => u.id !== testUser.id));
+        const status = faker.helpers.arrayElement(['pending', 'confirmed', 'returned']);
+        const loanId = crypto.randomUUID();
+        const createdAt = faker.date.recent({ days: 30 });
 
         loansToInsert.push({
-          id: crypto.randomUUID(),
+          id: loanId,
           itemId,
           lenderId: testUser.id,
           borrowerId: borrower.id,
-          status: faker.helpers.arrayElement(['pending', 'confirmed', 'returned']),
+          status,
           expectedReturnDate: faker.date.future(),
-          createdAt: new Date(),
+          createdAt,
           updatedAt: new Date(),
+        });
+
+        const notifType = faker.helpers.arrayElement([
+          'loan_created',
+          'loan_confirmed',
+          'loan_reminder',
+          'loan_returned',
+        ] as const);
+        const msg = notificationMessages[notifType] ?? {
+          title: 'Notification',
+          message: 'You have a new notification',
+        };
+
+        notificationsToInsert.push({
+          id: crypto.randomUUID(),
+          userId: testUser.id,
+          loanId,
+          type: notifType,
+          title: msg.title,
+          message: msg.message,
+          read: faker.datatype.boolean(0.4),
+          sentAt: createdAt,
+          createdAt,
+        });
+
+        notificationsToInsert.push({
+          id: crypto.randomUUID(),
+          userId: borrower.id,
+          loanId,
+          type: notifType,
+          title: msg.title,
+          message: msg.message,
+          read: faker.datatype.boolean(0.4),
+          sentAt: createdAt,
+          createdAt,
         });
       }
     }
   }
 
-  // Insert items in batches
   const batchSize = 50;
   for (let i = 0; i < itemsToInsert.length; i += batchSize) {
     const batch = itemsToInsert.slice(i, i + batchSize);
@@ -196,13 +238,19 @@ async function createTestItemsAndLoans(
 
   logSuccess(`Created ${itemsToInsert.length} items`);
 
-  // Insert loans in batches
   for (let i = 0; i < loansToInsert.length; i += batchSize) {
     const batch = loansToInsert.slice(i, i + batchSize);
     await db.insert(loans).values(batch);
   }
 
   logSuccess(`Created ${loansToInsert.length} loans`);
+
+  for (let i = 0; i < notificationsToInsert.length; i += batchSize) {
+    const batch = notificationsToInsert.slice(i, i + batchSize);
+    await db.insert(notifications).values(batch);
+  }
+
+  logSuccess(`Created ${notificationsToInsert.length} notifications`);
 }
 
 async function saveCredentialsFile(testUsers: TestUser[]) {

@@ -1,6 +1,13 @@
 import multipart, { type MultipartFile } from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
+import {
+  errorResponse400,
+  errorResponse401,
+  errorResponse413,
+  uploadResultSchema,
+} from '../../schemas/responses.js';
 import { processAndUploadImage, type UploadResult } from '../../services/storage/index.js';
 
 export async function uploadRoutes(app: FastifyInstance) {
@@ -20,21 +27,10 @@ export async function uploadRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         consumes: ['multipart/form-data'],
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              images: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    url: { type: 'string', format: 'uri' },
-                    sizeBytes: { type: 'number' },
-                  },
-                },
-              },
-            },
-          },
+          200: z.object({ images: z.array(uploadResultSchema) }),
+          400: errorResponse400,
+          401: errorResponse401,
+          413: errorResponse413,
         },
       },
       preHandler: [app.authenticate],

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import {
   forgotPasswordSchema,
@@ -8,6 +9,17 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from '../../schemas/auth.js';
+import {
+  authTokensResponseSchema,
+  errorResponse400,
+  errorResponse401,
+  errorResponse404,
+  errorResponse409,
+  errorResponse410,
+  errorResponse422,
+  messageResponseSchema,
+  userResponseSchema,
+} from '../../schemas/responses.js';
 import {
   createUser,
   getUserById,
@@ -28,27 +40,12 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: registerSchema,
         response: {
-          201: {
-            description: 'User registered successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-            },
-          },
+          201: z.object({
+            message: z.string(),
+            user: userResponseSchema,
+          }),
+          409: errorResponse409,
+          422: errorResponse422,
         },
       },
       config: {
@@ -75,28 +72,9 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: loginSchema,
         response: {
-          200: {
-            description: 'Authentication successful',
-            type: 'object',
-            properties: {
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-              accessToken: { type: 'string', description: 'JWT access token (7 days)' },
-              refreshToken: { type: 'string', description: 'JWT refresh token (30 days)' },
-            },
-          },
+          200: authTokensResponseSchema,
+          401: errorResponse401,
+          422: errorResponse422,
         },
       },
     },
@@ -117,13 +95,9 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: verifyEmailSchema,
         response: {
-          200: {
-            description: 'Email verified successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
+          200: messageResponseSchema,
+          400: errorResponse400,
+          410: errorResponse410,
         },
       },
     },
@@ -141,13 +115,7 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: forgotPasswordSchema,
         response: {
-          200: {
-            description: 'Password reset email sent (always returns success for security)',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
+          200: messageResponseSchema,
         },
       },
       config: {
@@ -178,13 +146,9 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: resetPasswordSchema,
         response: {
-          200: {
-            description: 'Password reset successful',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
+          200: messageResponseSchema,
+          400: errorResponse400,
+          410: errorResponse410,
         },
       },
     },
@@ -202,13 +166,8 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'Token refreshed successfully',
-            type: 'object',
-            properties: {
-              accessToken: { type: 'string', description: 'New JWT access token (7 days)' },
-            },
-          },
+          200: z.object({ accessToken: z.string() }),
+          401: errorResponse401,
         },
       },
       preHandler: [app.authenticate],
@@ -228,26 +187,9 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'User profile',
-            type: 'object',
-            properties: {
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  email: { type: 'string' },
-                  avatarUrl: { type: 'string', nullable: true },
-                  emailVerified: { type: 'boolean' },
-                  role: {
-                    type: 'string',
-                    enum: ['USER', 'ANALYST', 'SUPPORT', 'MODERATOR', 'SUPER_ADMIN'],
-                  },
-                },
-              },
-            },
-          },
+          200: z.object({ user: userResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
       preHandler: [app.authenticate],

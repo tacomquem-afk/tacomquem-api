@@ -31,12 +31,12 @@ export interface LoanResponse {
   } | null;
   borrowerEmail: string | null;
   status: 'pending' | 'confirmed' | 'returned' | 'cancelled';
-  expectedReturnDate: Date | null;
+  expectedReturnDate: string | null;
   lenderNotes: string | null;
   borrowerNotes: string | null;
-  confirmedAt: Date | null;
-  returnedAt: Date | null;
-  createdAt: Date;
+  confirmedAt: string | null;
+  returnedAt: string | null;
+  createdAt: string;
 }
 
 export interface PublicLoanInfo {
@@ -122,12 +122,12 @@ export async function createLoan(
       borrower: null,
       borrowerEmail: input.borrowerEmail,
       status: loan.status,
-      expectedReturnDate: loan.expectedReturnDate,
+      expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
       lenderNotes: loan.lenderNotes,
       borrowerNotes: loan.borrowerNotes,
-      confirmedAt: loan.confirmedAt,
-      returnedAt: loan.returnedAt,
-      createdAt: loan.createdAt,
+      confirmedAt: loan.confirmedAt?.toISOString() ?? null,
+      returnedAt: loan.returnedAt?.toISOString() ?? null,
+      createdAt: loan.createdAt.toISOString(),
     },
     confirmUrl,
   };
@@ -197,12 +197,12 @@ export async function getLoansByUser(
       : null,
     borrowerEmail: loan.borrowerEmail,
     status: loan.status,
-    expectedReturnDate: loan.expectedReturnDate,
+    expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
     lenderNotes: loan.lenderNotes,
     borrowerNotes: loan.borrowerNotes,
-    confirmedAt: loan.confirmedAt,
-    returnedAt: loan.returnedAt,
-    createdAt: loan.createdAt,
+    confirmedAt: loan.confirmedAt?.toISOString() ?? null,
+    returnedAt: loan.returnedAt?.toISOString() ?? null,
+    createdAt: loan.createdAt.toISOString(),
   }));
 }
 
@@ -239,12 +239,12 @@ export async function getLoanById(loanId: string, userId: string): Promise<LoanR
       : null,
     borrowerEmail: loan.borrowerEmail,
     status: loan.status,
-    expectedReturnDate: loan.expectedReturnDate,
+    expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
     lenderNotes: loan.lenderNotes,
     borrowerNotes: loan.borrowerNotes,
-    confirmedAt: loan.confirmedAt,
-    returnedAt: loan.returnedAt,
-    createdAt: loan.createdAt,
+    confirmedAt: loan.confirmedAt?.toISOString() ?? null,
+    returnedAt: loan.returnedAt?.toISOString() ?? null,
+    createdAt: loan.createdAt.toISOString(),
   };
 }
 

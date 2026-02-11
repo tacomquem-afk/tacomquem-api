@@ -35,8 +35,8 @@ export interface MaskedUser {
   loansAsLender: number;
   loansAsBorrower: number;
   itemsCount: number;
-  createdAt: Date;
-  lastActivityAt?: Date;
+  createdAt: string;
+  lastActivityAt?: string;
 }
 
 export async function listUsers(params: ListUsersParams) {
@@ -82,8 +82,8 @@ export async function listUsers(params: ListUsersParams) {
       loansAsLender: user.lentLoans?.length || 0,
       loansAsBorrower: user.borrowedLoans?.length || 0,
       itemsCount: user.items?.length || 0,
-      createdAt: user.createdAt || new Date(),
-      lastActivityAt: user.updatedAt || undefined,
+      createdAt: (user.createdAt || new Date()).toISOString(),
+      lastActivityAt: user.updatedAt?.toISOString(),
     };
   });
 
@@ -117,20 +117,89 @@ export async function getUserDetails(userId: string) {
   const emailPlain = decrypt(user.emailEncrypted);
   const namePlain = decrypt(user.nameEncrypted);
 
+  const parseImages = (images: unknown): string[] => {
+    if (typeof images === 'string') {
+      try {
+        return JSON.parse(images);
+      } catch {
+        return [];
+      }
+    }
+    return images as string[];
+  };
+
+  const name = maskName(namePlain);
+
   return {
     id: user.id,
     email: maskEmail(emailPlain),
-    name: maskName(namePlain),
+    name,
     role: user.role,
     isActive: user.isActive,
     emailVerified: user.emailVerified,
-    blockedAt: user.blockedAt,
+    blockedAt: user.blockedAt?.toISOString() || null,
     blockedReason: user.blockedReason,
-    lentLoans: user.lentLoans || [],
-    borrowedLoans: user.borrowedLoans || [],
-    items: user.items || [],
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
+    lentLoans: (user.lentLoans || []).map((loan) => ({
+      id: loan.id,
+      item: {
+        id: loan.item.id,
+        name: loan.item.name,
+        images: parseImages(loan.item.images),
+      },
+      lender: {
+        id: user.id,
+        name,
+      },
+      borrower: loan.borrower
+        ? {
+            id: loan.borrower.id,
+            name: maskName(decrypt(loan.borrower.nameEncrypted)),
+          }
+        : null,
+      borrowerEmail: loan.borrowerEmail,
+      status: loan.status,
+      expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
+      lenderNotes: loan.lenderNotes,
+      borrowerNotes: loan.borrowerNotes,
+      confirmedAt: loan.confirmedAt?.toISOString() || null,
+      returnedAt: loan.returnedAt?.toISOString() || null,
+      createdAt: (loan.createdAt || new Date()).toISOString(),
+    })),
+    borrowedLoans: (user.borrowedLoans || []).map((loan) => ({
+      id: loan.id,
+      item: {
+        id: loan.item.id,
+        name: loan.item.name,
+        images: parseImages(loan.item.images),
+      },
+      lender: {
+        id: loan.lender.id,
+        name: maskName(decrypt(loan.lender.nameEncrypted)),
+      },
+      borrower: {
+        id: user.id,
+        name,
+      },
+      borrowerEmail: loan.borrowerEmail,
+      status: loan.status,
+      expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
+      lenderNotes: loan.lenderNotes,
+      borrowerNotes: loan.borrowerNotes,
+      confirmedAt: loan.confirmedAt?.toISOString() || null,
+      returnedAt: loan.returnedAt?.toISOString() || null,
+      createdAt: (loan.createdAt || new Date()).toISOString(),
+    })),
+    items: (user.items || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      images: parseImages(item.images),
+      isActive: item.isActive,
+      createdAt: (item.createdAt || new Date()).toISOString(),
+      updatedAt: (item.updatedAt || new Date()).toISOString(),
+    })),
+    createdAt: (user.createdAt || new Date()).toISOString(),
+    updatedAt: (user.updatedAt || new Date()).toISOString(),
   };
 }
 

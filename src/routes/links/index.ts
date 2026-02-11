@@ -2,6 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
+import {
+  errorResponse400,
+  errorResponse401,
+  errorResponse404,
+  errorResponse410,
+  loanResponseSchema,
+  publicLoanInfoSchema,
+} from '../../schemas/responses.js';
 import { confirmLoan, getPublicLoanInfo } from '../../services/loans/index.js';
 
 const tokenParamSchema = z.object({ token: z.string().min(1) });
@@ -17,10 +25,8 @@ export async function linksRoutes(app: FastifyInstance) {
         description: 'Get public loan information via token (no authentication required)',
         params: tokenParamSchema,
         response: {
-          200: {
-            description: 'Public loan information',
-            type: 'object',
-          },
+          200: publicLoanInfoSchema,
+          404: errorResponse404,
         },
       },
     },
@@ -44,14 +50,14 @@ export async function linksRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: tokenParamSchema,
         response: {
-          200: {
-            description: 'Loan confirmed successfully',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-              message: { type: 'string' },
-            },
-          },
+          200: z.object({
+            loan: loanResponseSchema,
+            message: z.string(),
+          }),
+          401: errorResponse401,
+          404: errorResponse404,
+          410: errorResponse410,
+          400: errorResponse400,
         },
       },
       preHandler: [app.authenticate],

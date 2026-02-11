@@ -7,6 +7,7 @@ import Fastify from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
+  serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 
@@ -35,6 +36,7 @@ export async function buildApp() {
   });
 
   app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
     origin: env.FRONTEND_URL,
@@ -138,7 +140,7 @@ export async function buildApp() {
     }
 
     if (error instanceof AppError) {
-      const statusCode = errorStatusMap.get(error.constructor) || 500;
+      const statusCode = errorStatusMap.get(error.constructor as any) || 500;
       const problemDetails = formatProblemDetails(error, request);
       if (statusCode >= 500) {
         request.log.error({ err: error }, error.message);
@@ -186,18 +188,8 @@ export async function buildApp() {
     '/api/health',
     {
       schema: {
-        description: 'Check API health status',
+        description: 'Health check endpoint',
         tags: ['Health'],
-        response: {
-          200: {
-            description: 'API is healthy',
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              timestamp: { type: 'string', format: 'date-time' },
-            },
-          },
-        },
       },
     },
     async () => {
@@ -209,18 +201,8 @@ export async function buildApp() {
     '/api/health/db',
     {
       schema: {
-        description: 'Check database connection',
+        description: 'Database health check endpoint',
         tags: ['Health'],
-        response: {
-          200: {
-            description: 'Database status',
-            type: 'object',
-            properties: {
-              status: { type: 'string', enum: ['ok', 'error'] },
-              database: { type: 'string', enum: ['connected', 'disconnected'] },
-            },
-          },
-        },
       },
     },
     async () => {

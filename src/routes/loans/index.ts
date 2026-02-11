@@ -4,6 +4,14 @@ import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { createLoanSchema } from '../../schemas/loans.js';
 import {
+  errorResponse400,
+  errorResponse401,
+  errorResponse404,
+  errorResponse422,
+  loanResponseSchema,
+  messageResponseSchema,
+} from '../../schemas/responses.js';
+import {
   cancelLoan,
   createLoan,
   getLoanById,
@@ -31,24 +39,13 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         body: createLoanSchema,
         response: {
-          201: {
-            description: 'Loan created successfully',
-            type: 'object',
-            properties: {
-              loan: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  itemId: { type: 'string', format: 'uuid' },
-                  lenderId: { type: 'string', format: 'uuid' },
-                  borrowerId: { type: 'string', format: 'uuid' },
-                  status: { type: 'string' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                },
-              },
-              confirmUrl: { type: 'string', description: 'Public confirmation link' },
-            },
-          },
+          201: z.object({
+            loan: loanResponseSchema,
+            confirmUrl: z.string().url(),
+          }),
+          401: errorResponse401,
+          404: errorResponse404,
+          422: errorResponse422,
         },
       },
     },
@@ -67,24 +64,8 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         querystring: loanFilterSchema,
         response: {
-          200: {
-            description: 'List of loans',
-            type: 'object',
-            properties: {
-              loans: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    itemId: { type: 'string', format: 'uuid' },
-                    status: { type: 'string' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                  },
-                },
-              },
-            },
-          },
+          200: z.object({ loans: z.array(loanResponseSchema) }),
+          401: errorResponse401,
         },
       },
     },
@@ -103,13 +84,9 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'Loan details',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-            },
-          },
+          200: z.object({ loan: loanResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },
@@ -133,13 +110,10 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'Loan marked as returned',
-            type: 'object',
-            properties: {
-              loan: { type: 'object' },
-            },
-          },
+          200: z.object({ loan: loanResponseSchema }),
+          400: errorResponse400,
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },
@@ -163,7 +137,9 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          204: { description: 'Loan cancelled successfully' },
+          204: z.null(),
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },
@@ -174,7 +150,7 @@ export async function loansRoutes(app: FastifyInstance) {
         throw new NotFoundError(ErrorCodes.LOANS_NOT_FOUND, 'Loan not found');
       }
 
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     }
   );
 
@@ -187,13 +163,10 @@ export async function loansRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'Reminder sent successfully',
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
+          200: messageResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },

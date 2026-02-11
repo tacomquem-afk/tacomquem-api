@@ -137,6 +137,8 @@ interface ProblemDetails {
   errors?: FieldError[];
 }
 
+type ErrorClass = new (...args: any[]) => AppError;
+
 const HTTP_STATUS_TEXTS: Record<number, string> = {
   400: 'Bad Request',
   401: 'Unauthorized',
@@ -150,7 +152,7 @@ const HTTP_STATUS_TEXTS: Record<number, string> = {
 };
 
 export function formatProblemDetails(error: AppError, request: FastifyRequest): ProblemDetails {
-  const statusCode = errorStatusMap.get(error.constructor) || 500;
+  const statusCode = errorStatusMap.get(error.constructor as ErrorClass) || 500;
   const title = HTTP_STATUS_TEXTS[statusCode] || 'Internal Server Error';
 
   const details: ProblemDetails = {
@@ -169,8 +171,7 @@ export function formatProblemDetails(error: AppError, request: FastifyRequest): 
   return details;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const errorStatusMap = new Map<any, number>([
+export const errorStatusMap = new Map<ErrorClass, number>([
   [NotFoundError, 404],
   [BadRequestError, 400],
   [ConflictError, 409],

@@ -10,8 +10,8 @@ export interface ItemResponse {
   description: string | null;
   images: string[];
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 function parseImages(imagesJson: string): string[] {
@@ -29,8 +29,8 @@ function toItemResponse(item: typeof items.$inferSelect): ItemResponse {
     description: item.description,
     images: parseImages(item.images),
     isActive: item.isActive,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
   };
 }
 

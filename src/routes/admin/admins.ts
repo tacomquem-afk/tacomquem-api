@@ -3,6 +3,14 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { auditLogQuerySchema, changeRoleSchema, promoteAdminSchema } from '../../schemas/admin.js';
 import {
+  adminUserSchema,
+  auditLogResponseSchema,
+  errorResponse400,
+  errorResponse401,
+  errorResponse403,
+  successResponseSchema,
+} from '../../schemas/responses.js';
+import {
   changeAdminRole,
   getAuditLog,
   listAdmins,
@@ -16,7 +24,7 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 export default async function adminsRoutes(fastify: FastifyInstance) {
   const typed = fastify.withTypeProvider<ZodTypeProvider>();
 
-  fastify.get(
+  typed.get(
     '/',
     {
       schema: {
@@ -24,19 +32,9 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         description: 'List all admin users (requires SUPER_ADMIN role)',
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'Admin users list',
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                email: { type: 'string', format: 'email' },
-                role: { type: 'string' },
-                createdAt: { type: 'string', format: 'date-time' },
-              },
-            },
-          },
+          200: z.array(adminUserSchema),
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
@@ -55,14 +53,10 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         body: promoteAdminSchema,
         response: {
-          200: {
-            description: 'User promoted successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
@@ -87,14 +81,10 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         params: idParamSchema,
         body: changeRoleSchema,
         response: {
-          200: {
-            description: 'Admin role changed successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
@@ -109,6 +99,27 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
     }
   );
 
+  typed.get(
+    '/audit-log',
+    {
+      schema: {
+        tags: ['Admin - Admins'],
+        description: 'Get audit log (requires SUPER_ADMIN role)',
+        security: [{ BearerAuth: [] }],
+        querystring: auditLogQuerySchema,
+        response: {
+          200: auditLogResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
+    },
+    async (request) => {
+      return await getAuditLog(request.query as Parameters<typeof getAuditLog>[0]);
+    }
+  );
+
   typed.delete(
     '/:id',
     {
@@ -118,14 +129,10 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'Admin removed successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
+          200: successResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
@@ -137,33 +144,6 @@ export default async function adminsRoutes(fastify: FastifyInstance) {
       await removeAdmin(request.params.id, adminId, ipAddress);
 
       return { success: true, message: 'Admin removed' };
-    }
-  );
-
-  typed.get(
-    '/audit-log',
-    {
-      schema: {
-        tags: ['Admin - Admins'],
-        description: 'Get audit log (requires SUPER_ADMIN role)',
-        security: [{ BearerAuth: [] }],
-        querystring: auditLogQuerySchema,
-        response: {
-          200: {
-            description: 'Audit log entries',
-            type: 'object',
-            properties: {
-              logs: { type: 'array' },
-              total: { type: 'number' },
-              page: { type: 'number' },
-            },
-          },
-        },
-      },
-      preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
-    },
-    async (request) => {
-      return await getAuditLog(request.query as Parameters<typeof getAuditLog>[0]);
     }
   );
 }

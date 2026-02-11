@@ -1,8 +1,18 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import {
+  adminDashboardStatsSchema,
+  errorResponse401,
+  errorResponse403,
+  loanStatsSchema,
+  userStatsSchema,
+} from '../../schemas/responses.js';
 import { getDashboardStats, getLoansStats, getUsersStats } from '../../services/admin/analytics.js';
 
 export default async function analyticsRoutes(fastify: FastifyInstance) {
-  fastify.get(
+  const typed = fastify.withTypeProvider<ZodTypeProvider>();
+
+  typed.get(
     '/dashboard',
     {
       schema: {
@@ -10,16 +20,9 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
         description: 'Get dashboard statistics (requires ANALYST role or higher)',
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'Dashboard statistics',
-            type: 'object',
-            properties: {
-              totalUsers: { type: 'number' },
-              activeLoans: { type: 'number' },
-              totalLoans: { type: 'number' },
-              averageLoanValue: { type: 'number' },
-            },
-          },
+          200: adminDashboardStatsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [
@@ -32,7 +35,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/users/stats',
     {
       schema: {
@@ -40,16 +43,9 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
         description: 'Get user statistics (requires ANALYST role or higher)',
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'User statistics',
-            type: 'object',
-            properties: {
-              totalUsers: { type: 'number' },
-              newUsersThisMonth: { type: 'number' },
-              activeUsers: { type: 'number' },
-              blockedUsers: { type: 'number' },
-            },
-          },
+          200: userStatsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [
@@ -62,7 +58,7 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get(
+  typed.get(
     '/loans/stats',
     {
       schema: {
@@ -70,17 +66,9 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
         description: 'Get loan statistics (requires ANALYST role or higher)',
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            description: 'Loan statistics',
-            type: 'object',
-            properties: {
-              totalLoans: { type: 'number' },
-              activeLoans: { type: 'number' },
-              returnedLoans: { type: 'number' },
-              cancelledLoans: { type: 'number' },
-              averageLoanDuration: { type: 'number' },
-            },
-          },
+          200: loanStatsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [

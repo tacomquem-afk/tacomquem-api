@@ -171,7 +171,7 @@ describe('loans service', () => {
         lenderNotes: 'Test notes',
       });
 
-      expect(result.loan.expectedReturnDate).toEqual(new Date('2026-02-11'));
+      expect(result.loan.expectedReturnDate).toEqual(new Date('2026-02-11').toISOString());
       expect(result.loan.lenderNotes).toBe('Test notes');
     });
   });
