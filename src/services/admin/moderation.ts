@@ -23,23 +23,22 @@ export async function getItemDetails(itemId: string) {
   const ownerEmail = decrypt(item.owner.emailEncrypted);
   const ownerName = decrypt(item.owner.nameEncrypted);
 
+  const activeLoans = item.loans.filter((l) => l.status === 'confirmed').length;
+
   return {
-    ...item,
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    images: typeof item.images === 'string' ? JSON.parse(item.images) : item.images,
+    isActive: item.isActive,
     owner: {
       id: item.owner.id,
       email: maskEmail(ownerEmail),
       name: maskName(ownerName),
     },
-    loans: item.loans.map((loan) => ({
-      ...loan,
-      borrower: loan.borrower
-        ? {
-            id: loan.borrower.id,
-            email: maskEmail(decrypt(loan.borrower.emailEncrypted)),
-            name: maskName(decrypt(loan.borrower.nameEncrypted)),
-          }
-        : null,
-    })),
+    activeLoans,
+    createdAt: (item.createdAt || new Date()).toISOString(),
+    updatedAt: (item.updatedAt || new Date()).toISOString(),
   };
 }
 
@@ -73,12 +72,21 @@ export async function getLoanDetails(loanId: string) {
 
   if (!loan) return null;
 
+  const lenderEmail = decrypt(loan.lender.emailEncrypted);
+  const lenderName = decrypt(loan.lender.nameEncrypted);
+
   return {
-    ...loan,
+    id: loan.id,
+    item: {
+      id: loan.item.id,
+      name: loan.item.name,
+      images:
+        typeof loan.item.images === 'string' ? JSON.parse(loan.item.images) : loan.item.images,
+    },
     lender: {
       id: loan.lender.id,
-      email: maskEmail(decrypt(loan.lender.emailEncrypted)),
-      name: maskName(decrypt(loan.lender.nameEncrypted)),
+      email: maskEmail(lenderEmail),
+      name: maskName(lenderName),
     },
     borrower: loan.borrower
       ? {
@@ -87,6 +95,14 @@ export async function getLoanDetails(loanId: string) {
           name: maskName(decrypt(loan.borrower.nameEncrypted)),
         }
       : null,
+    borrowerEmail: loan.borrowerEmail,
+    status: loan.status,
+    expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
+    lenderNotes: loan.lenderNotes,
+    borrowerNotes: loan.borrowerNotes,
+    confirmedAt: loan.confirmedAt?.toISOString() || null,
+    returnedAt: loan.returnedAt?.toISOString() || null,
+    createdAt: (loan.createdAt || new Date()).toISOString(),
   };
 }
 

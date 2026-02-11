@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { createItemSchema, updateItemSchema } from '../../schemas/items.js';
 import {
+  errorResponse401,
+  errorResponse404,
+  errorResponse422,
+  itemResponseSchema,
+} from '../../schemas/responses.js';
+import {
   createItem,
   deleteItem,
   getItemById,
@@ -26,23 +32,9 @@ export default async function itemsRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         body: createItemSchema,
         response: {
-          201: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
+          201: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          422: errorResponse422,
         },
       },
     },
@@ -60,26 +52,8 @@ export default async function itemsRoutes(app: FastifyInstance) {
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              items: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string', format: 'uuid' },
-                    name: { type: 'string' },
-                    description: { type: ['string', 'null'] },
-                    images: { type: 'array', items: { type: 'string' } },
-                    isActive: { type: 'boolean' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                    updatedAt: { type: 'string', format: 'date-time' },
-                  },
-                },
-              },
-            },
-          },
+          200: z.object({ items: z.array(itemResponseSchema) }),
+          401: errorResponse401,
         },
       },
     },
@@ -98,23 +72,9 @@ export default async function itemsRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
+          200: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },
@@ -139,23 +99,10 @@ export default async function itemsRoutes(app: FastifyInstance) {
         params: idParamSchema,
         body: updateItemSchema,
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              item: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string', format: 'uuid' },
-                  name: { type: 'string' },
-                  description: { type: ['string', 'null'] },
-                  images: { type: 'array', items: { type: 'string' } },
-                  isActive: { type: 'boolean' },
-                  createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' },
-                },
-              },
-            },
-          },
+          200: z.object({ item: itemResponseSchema }),
+          401: errorResponse401,
+          404: errorResponse404,
+          422: errorResponse422,
         },
       },
     },
@@ -179,7 +126,9 @@ export default async function itemsRoutes(app: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          204: { type: 'null' },
+          204: z.null(),
+          401: errorResponse401,
+          404: errorResponse404,
         },
       },
     },
@@ -190,7 +139,7 @@ export default async function itemsRoutes(app: FastifyInstance) {
         throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'Item not found');
       }
 
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     }
   );
 }

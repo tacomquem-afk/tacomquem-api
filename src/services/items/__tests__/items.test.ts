@@ -31,8 +31,8 @@ const expectedItemResponse: ItemResponse = {
   description: 'A test item',
   images: ['https://example.com/image1.jpg'],
   isActive: true,
-  createdAt: new Date('2026-02-04'),
-  updatedAt: new Date('2026-02-04'),
+  createdAt: new Date('2026-02-04').toISOString(),
+  updatedAt: new Date('2026-02-04').toISOString(),
 };
 
 beforeEach(() => {

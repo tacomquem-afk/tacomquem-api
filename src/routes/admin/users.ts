@@ -3,6 +3,14 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { blockUserSchema, listUsersSchema } from '../../schemas/admin.js';
+import {
+  adminListUsersResponseSchema,
+  adminUserDetailsSchema,
+  errorResponse401,
+  errorResponse403,
+  errorResponse404,
+  successResponseSchema,
+} from '../../schemas/responses.js';
 import { getClientIp } from '../../services/admin/helpers.js';
 import { blockUser, getUserDetails, listUsers, unblockUser } from '../../services/admin/index.js';
 
@@ -20,15 +28,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         querystring: listUsersSchema,
         response: {
-          200: {
-            description: 'Users list',
-            type: 'object',
-            properties: {
-              users: { type: 'array' },
-              total: { type: 'number' },
-              page: { type: 'number' },
-            },
-          },
+          200: adminListUsersResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
         },
       },
       preHandler: [
@@ -50,10 +52,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'User details',
-            type: 'object',
-          },
+          200: adminUserDetailsSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
         },
       },
       preHandler: [
@@ -62,7 +64,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       ],
     },
     async (request) => {
-      const user = await getUserDetails(request.params.id);
+      const user = await getUserDetails((request.params as { id: string }).id);
 
       if (!user) {
         throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User not found');
@@ -82,14 +84,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
         params: idParamSchema,
         body: blockUserSchema,
         response: {
-          200: {
-            description: 'User blocked successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
+          200: successResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
@@ -113,14 +111,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
-          200: {
-            description: 'User unblocked successfully',
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
+          200: successResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
         },
       },
       preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],

@@ -157,22 +157,32 @@ function generateLoan(itemId: string, lenderId: string, allUsers: { id: string }
   const borrower = faker.helpers.arrayElement(allUsers.filter((u) => u.id !== lenderId));
   const borrowerId = borrower.id;
 
+  const now = new Date();
   const createdAt = faker.date.past({ years: 1 });
-  const expectedReturnDate = faker.date.future({ years: 0.5, refDate: createdAt });
-  const confirmedAt =
-    status !== 'pending'
-      ? faker.date.between({
-          from: createdAt,
-          to: expectedReturnDate,
-        })
-      : null;
-  const returnedAt =
-    status === 'returned'
-      ? faker.date.between({
-          from: confirmedAt || createdAt,
-          to: new Date(),
-        })
-      : null;
+
+  let expectedReturnDate: Date;
+  let confirmedAt: Date | null = null;
+  let returnedAt: Date | null = null;
+
+  if (status === 'returned') {
+    expectedReturnDate = faker.date.between({ from: createdAt, to: now });
+    confirmedAt = faker.date.between({ from: createdAt, to: expectedReturnDate });
+    returnedAt = faker.date.between({ from: confirmedAt, to: now });
+  } else if (status === 'confirmed') {
+    expectedReturnDate = faker.date.future({ years: 0.5, refDate: createdAt });
+    confirmedAt = faker.date.between({
+      from: createdAt,
+      to: new Date(Math.min(expectedReturnDate.getTime(), now.getTime())),
+    });
+  } else if (status === 'cancelled') {
+    expectedReturnDate = faker.date.future({ years: 0.5, refDate: createdAt });
+    confirmedAt = faker.date.between({
+      from: createdAt,
+      to: new Date(Math.min(expectedReturnDate.getTime(), now.getTime())),
+    });
+  } else {
+    expectedReturnDate = faker.date.future({ years: 0.5, refDate: createdAt });
+  }
 
   return {
     id: faker.string.uuid(),
