@@ -11,6 +11,7 @@ import {
   buildLoanReminderEmail,
   sendEmail,
 } from '../email/index.js';
+import { resolveImageKeys } from '../storage/index.js';
 
 const TOKEN_EXPIRY_DAYS = 7;
 
@@ -43,14 +44,6 @@ export interface PublicLoanInfo {
   itemName: string;
   itemImages: string[];
   lenderName: string;
-}
-
-function parseImages(imagesJson: string): string[] {
-  try {
-    return JSON.parse(imagesJson);
-  } catch {
-    return [];
-  }
 }
 
 export async function createLoan(
@@ -113,7 +106,7 @@ export async function createLoan(
       item: {
         id: item.id,
         name: item.name,
-        images: parseImages(item.images),
+        images: await resolveImageKeys(item.images),
       },
       lender: {
         id: lenderId,
@@ -178,32 +171,34 @@ export async function getLoansByUser(
     orderBy: [desc(loans.createdAt)],
   });
 
-  return result.map((loan) => ({
-    id: loan.id,
-    item: {
-      id: loan.item.id,
-      name: loan.item.name,
-      images: parseImages(loan.item.images),
-    },
-    lender: {
-      id: loan.lender.id,
-      name: decrypt(loan.lender.nameEncrypted),
-    },
-    borrower: loan.borrower
-      ? {
-          id: loan.borrower.id,
-          name: decrypt(loan.borrower.nameEncrypted),
-        }
-      : null,
-    borrowerEmail: loan.borrowerEmail,
-    status: loan.status,
-    expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
-    lenderNotes: loan.lenderNotes,
-    borrowerNotes: loan.borrowerNotes,
-    confirmedAt: loan.confirmedAt?.toISOString() ?? null,
-    returnedAt: loan.returnedAt?.toISOString() ?? null,
-    createdAt: loan.createdAt.toISOString(),
-  }));
+  return Promise.all(
+    result.map(async (loan) => ({
+      id: loan.id,
+      item: {
+        id: loan.item.id,
+        name: loan.item.name,
+        images: await resolveImageKeys(loan.item.images),
+      },
+      lender: {
+        id: loan.lender.id,
+        name: decrypt(loan.lender.nameEncrypted),
+      },
+      borrower: loan.borrower
+        ? {
+            id: loan.borrower.id,
+            name: decrypt(loan.borrower.nameEncrypted),
+          }
+        : null,
+      borrowerEmail: loan.borrowerEmail,
+      status: loan.status,
+      expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
+      lenderNotes: loan.lenderNotes,
+      borrowerNotes: loan.borrowerNotes,
+      confirmedAt: loan.confirmedAt?.toISOString() ?? null,
+      returnedAt: loan.returnedAt?.toISOString() ?? null,
+      createdAt: loan.createdAt.toISOString(),
+    }))
+  );
 }
 
 export async function getLoanById(loanId: string, userId: string): Promise<LoanResponse | null> {
@@ -225,7 +220,7 @@ export async function getLoanById(loanId: string, userId: string): Promise<LoanR
     item: {
       id: loan.item.id,
       name: loan.item.name,
-      images: parseImages(loan.item.images),
+      images: await resolveImageKeys(loan.item.images),
     },
     lender: {
       id: loan.lender.id,
@@ -383,7 +378,7 @@ export async function getPublicLoanInfo(token: string): Promise<PublicLoanInfo |
 
   return {
     itemName: loanToken.loan.item.name,
-    itemImages: parseImages(loanToken.loan.item.images),
+    itemImages: await resolveImageKeys(loanToken.loan.item.images),
     lenderName: decrypt(loanToken.loan.lender.nameEncrypted),
   };
 }

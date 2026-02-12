@@ -1,5 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+const deleteUploadsFromR2Mock = mock(() =>
+  Promise.resolve({ deleted: [] as string[], failed: [] as Array<{ key: string; error: string }> })
+);
+
+mock.module('../../storage/index.js', () => ({
+  resolveImageKeys: async (json: string) => {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return [];
+    }
+  },
+  deleteUploadsFromR2: deleteUploadsFromR2Mock,
+}));
+
 import { db } from '../../../db/index.js';
 import { BadRequestError, ErrorCodes } from '../../../errors/index.js';
 import {
@@ -51,6 +66,7 @@ beforeEach(() => {
   spyOn(db, 'update').mockClear();
   spyOn(db.query.items, 'findMany').mockClear();
   spyOn(db.query.items, 'findFirst').mockClear();
+  deleteUploadsFromR2Mock.mockClear();
 });
 
 afterEach(() => {
@@ -336,6 +352,106 @@ describe('items service', () => {
 
       expect(findFirstSpy).toHaveBeenCalled();
       expect(updateSpy).toHaveBeenCalled();
+    });
+
+    it('should delete images from R2 when item is deleted', async () => {
+      const itemWithImages = {
+        ...mockItemData,
+        images: '["items/user/abc-123.webp", "items/user/def-456.webp"]',
+      };
+
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(itemWithImages as any);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
+
+      expect(deleteUploadsFromR2Mock).toHaveBeenCalledWith([
+        'items/user/abc-123.webp',
+        'items/user/def-456.webp',
+      ]);
+    });
+
+    it('should handle R2 deletion failure gracefully', async () => {
+      const itemWithImages = {
+        ...mockItemData,
+        images: '["items/user/abc-123.webp"]',
+      };
+
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(itemWithImages as any);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      deleteUploadsFromR2Mock.mockResolvedValueOnce({
+        deleted: [],
+        failed: [{ key: 'items/user/abc-123.webp', error: 'R2 connection failed' }],
+      });
+
+      const result = await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('should handle empty images array', async () => {
+      const itemWithNoImages = {
+        ...mockItemData,
+        images: '[]',
+      };
+
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        itemWithNoImages as any
+      );
+      mocks.push(findFirstSpy);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
+
+      const result = await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
+
+      expect(result).toBe(true);
+      expect(deleteUploadsFromR2Mock).not.toHaveBeenCalled();
+    });
+
+    it('should handle invalid JSON in images field', async () => {
+      const itemWithInvalidImages = {
+        ...mockItemData,
+        images: 'invalid-json',
+      };
+
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        itemWithInvalidImages as any
+      );
+      mocks.push(findFirstSpy);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      const updateSpy = spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      mocks.push(updateSpy);
+
+      deleteUploadsFromR2Mock.mockClear();
+
+      const result = await deleteItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001'
+      );
+
+      expect(result).toBe(true);
+      expect(deleteUploadsFromR2Mock).not.toHaveBeenCalled();
     });
   });
 

@@ -2,6 +2,7 @@ import { and, count, desc, eq, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans, notifications } from '../../db/schema.js';
 import { decrypt } from '../crypto/index.js';
+import { resolveImageKeys } from '../storage/index.js';
 
 export interface DashboardStats {
   itemsCount: number;
@@ -36,14 +37,6 @@ export interface DashboardData {
     expectedReturnDate: string | null;
     confirmedAt: string;
   }>;
-}
-
-function parseImages(imagesJson: string): string[] {
-  try {
-    return JSON.parse(imagesJson);
-  } catch {
-    return [];
-  }
 }
 
 export async function getDashboardData(userId: string): Promise<DashboardData> {
@@ -116,26 +109,28 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
         borrowerEmail: l.borrowerEmail,
         createdAt: l.createdAt.toISOString(),
       })),
-    activeLoans: activeLoans
-      .filter((l) => l.item && (l.lenderId === userId || l.lender))
-      .map((l) => {
-        const isLender = l.lenderId === userId;
-        const otherParty = isLender
-          ? l.borrower
-            ? decrypt(l.borrower.nameEncrypted)
-            : 'Pendente'
-          : decrypt(l.lender.nameEncrypted);
+    activeLoans: await Promise.all(
+      activeLoans
+        .filter((l) => l.item && (l.lenderId === userId || l.lender))
+        .map(async (l) => {
+          const isLender = l.lenderId === userId;
+          const otherParty = isLender
+            ? l.borrower
+              ? decrypt(l.borrower.nameEncrypted)
+              : 'Pendente'
+            : decrypt(l.lender.nameEncrypted);
 
-        return {
-          id: l.id,
-          itemName: l.item.name,
-          itemImages: parseImages(l.item.images),
-          otherParty,
-          role: isLender ? 'lender' : 'borrower',
-          expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
-          confirmedAt: (l.confirmedAt ?? new Date()).toISOString(),
-        };
-      }),
+          return {
+            id: l.id,
+            itemName: l.item.name,
+            itemImages: await resolveImageKeys(l.item.images),
+            otherParty,
+            role: isLender ? ('lender' as const) : ('borrower' as const),
+            expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
+            confirmedAt: (l.confirmedAt ?? new Date()).toISOString(),
+          };
+        })
+    ),
   };
 }
 

@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+mock.module('../../storage/index.js', () => ({
+  resolveImageKeys: async (json: string) => {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return [];
+    }
+  },
+}));
+
 import { db } from '../../../db/index.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../../errors/index.js';
 import * as cryptoModule from '../../crypto/index.js';

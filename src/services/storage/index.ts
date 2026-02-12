@@ -1,4 +1,6 @@
-import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { FastifyBaseLogger } from 'fastify';
 import { fileTypeFromBuffer } from 'file-type';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
@@ -12,9 +14,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const IMAGE_MAX_WIDTH = 1080;
 const WEBP_QUALITY = 80;
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/tiff'];
+const PRESIGNED_URL_EXPIRY = 3600;
 
 export interface UploadResult {
-  url: string;
   key: string;
   sizeBytes: number;
 }
@@ -28,13 +30,19 @@ export interface ImageFile {
 
 export async function processAndUploadImage(
   file: ImageFile,
-  userId: string
+  userId: string,
+  log: FastifyBaseLogger
 ): Promise<UploadResult> {
   const buffers: Buffer[] = [];
   for await (const chunk of file.file) {
     buffers.push(chunk);
   }
   const fileBuffer = Buffer.concat(buffers);
+
+  log.info(
+    { filename: file.filename, originalSize: fileBuffer.length, mimetype: file.mimetype },
+    'Image file buffered'
+  );
 
   if (fileBuffer.length > MAX_FILE_SIZE) {
     throw new PayloadTooLargeError(
@@ -45,6 +53,7 @@ export async function processAndUploadImage(
 
   const fileType = await fileTypeFromBuffer(fileBuffer);
   if (!fileType || !ALLOWED_MIMES.includes(fileType.mime)) {
+    log.warn({ filename: file.filename, detectedType: fileType?.mime }, 'Unsupported file format');
     throw new BadRequestError(
       ErrorCodes.STORAGE_UNSUPPORTED_FORMAT,
       'Unsupported file format. Use JPEG, PNG or WebP'
@@ -60,16 +69,27 @@ export async function processAndUploadImage(
       })
       .webp({ quality: WEBP_QUALITY })
       .toBuffer();
-  } catch {
+
+    log.info(
+      {
+        filename: file.filename,
+        originalSize: fileBuffer.length,
+        compressedSize: processedBuffer.length,
+      },
+      'Image compressed to WebP'
+    );
+  } catch (error) {
+    log.error({ err: error, filename: file.filename }, 'Failed to process image with sharp');
     throw new BadRequestError(ErrorCodes.STORAGE_PROCESSING_FAILED, 'Failed to process image');
   }
 
   const id = nanoid(8);
   const timestamp = Date.now();
   const key = `items/${userId}/${id}-${timestamp}.webp`;
-  const publicUrl = `${env.R2_PUBLIC_URL}/${key}`;
 
   try {
+    log.info({ key, bucket: env.R2_BUCKET_NAME, size: processedBuffer.length }, 'Uploading to R2');
+
     await r2Client.send(
       new PutObjectCommand({
         Bucket: env.R2_BUCKET_NAME,
@@ -79,7 +99,10 @@ export async function processAndUploadImage(
         CacheControl: 'public, max-age=31536000',
       })
     );
-  } catch {
+
+    log.info({ key }, 'Upload to R2 completed');
+  } catch (error) {
+    log.error({ err: error, key, bucket: env.R2_BUCKET_NAME }, 'Failed to upload to R2');
     throw new BadRequestError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file');
   }
 
@@ -88,7 +111,7 @@ export async function processAndUploadImage(
       .insert(uploads)
       .values({
         userId,
-        url: publicUrl,
+        url: key,
         key,
         filename: file.filename,
         mimeType: 'image/webp',
@@ -101,11 +124,11 @@ export async function processAndUploadImage(
     }
 
     return {
-      url: publicUrl,
       key: upload.key,
       sizeBytes: upload.sizeBytes,
     };
-  } catch {
+  } catch (error) {
+    log.error({ err: error, key }, 'Failed to save upload record, rolling back R2 upload');
     try {
       await r2Client.send(
         new DeleteObjectCommand({
@@ -113,11 +136,31 @@ export async function processAndUploadImage(
           Key: key,
         })
       );
-    } catch {
-      // Ignore cleanup error
+    } catch (cleanupError) {
+      log.error({ err: cleanupError, key }, 'Failed to clean up R2 object after DB error');
     }
     throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload');
   }
+}
+
+export async function generatePresignedUrl(key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: env.R2_BUCKET_NAME,
+    Key: key,
+  });
+  // biome-ignore lint/suspicious/noExplicitAny: S3Client type mismatch between aws-sdk packages
+  return getSignedUrl(r2Client as any, command, { expiresIn: PRESIGNED_URL_EXPIRY });
+}
+
+export async function resolveImageKeys(imagesJson: string): Promise<string[]> {
+  let keys: string[];
+  try {
+    keys = JSON.parse(imagesJson);
+  } catch {
+    return [];
+  }
+  if (keys.length === 0) return [];
+  return Promise.all(keys.map(generatePresignedUrl));
 }
 
 export async function deleteUploadFromR2(key: string): Promise<void> {
@@ -127,4 +170,29 @@ export async function deleteUploadFromR2(key: string): Promise<void> {
       Key: key,
     })
   );
+}
+
+export async function deleteUploadsFromR2(
+  keys: string[]
+): Promise<{ deleted: string[]; failed: Array<{ key: string; error: string }> }> {
+  if (keys.length === 0) {
+    return { deleted: [], failed: [] };
+  }
+
+  const results = await Promise.allSettled(keys.map((key) => deleteUploadFromR2(key)));
+
+  const deleted: string[] = [];
+  const failed: Array<{ key: string; error: string }> = [];
+
+  results.forEach((result, index) => {
+    const key = keys[index] as string;
+    if (result.status === 'fulfilled') {
+      deleted.push(key);
+    } else {
+      const errorMessage = result.reason instanceof Error ? result.reason.message : 'Unknown error';
+      failed.push({ key, error: errorMessage });
+    }
+  });
+
+  return { deleted, failed };
 }

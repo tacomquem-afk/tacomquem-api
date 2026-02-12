@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { items, uploads } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
+import { deleteUploadsFromR2, resolveImageKeys } from '../storage/index.js';
 
 export interface ItemResponse {
   id: string;
@@ -14,20 +15,12 @@ export interface ItemResponse {
   updatedAt: string;
 }
 
-function parseImages(imagesJson: string): string[] {
-  try {
-    return JSON.parse(imagesJson);
-  } catch {
-    return [];
-  }
-}
-
-function toItemResponse(item: typeof items.$inferSelect): ItemResponse {
+async function toItemResponse(item: typeof items.$inferSelect): Promise<ItemResponse> {
   return {
     id: item.id,
     name: item.name,
     description: item.description,
-    images: parseImages(item.images),
+    images: await resolveImageKeys(item.images),
     isActive: item.isActive,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
@@ -53,7 +46,7 @@ export async function createItem(ownerId: string, input: CreateItemInput): Promi
     await db
       .update(uploads)
       .set({ confirmedAt: new Date() })
-      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.key, input.images)));
   }
 
   return toItemResponse(result[0]);
@@ -65,7 +58,7 @@ export async function getItemsByOwner(ownerId: string): Promise<ItemResponse[]> 
     orderBy: (items, { desc }) => [desc(items.createdAt)],
   });
 
-  return result.map(toItemResponse);
+  return Promise.all(result.map(toItemResponse));
 }
 
 export async function getItemById(itemId: string, ownerId: string): Promise<ItemResponse | null> {
@@ -111,7 +104,7 @@ export async function updateItem(
     await db
       .update(uploads)
       .set({ confirmedAt: new Date() })
-      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.key, input.images)));
   }
 
   return toItemResponse(result[0]);
@@ -130,6 +123,18 @@ export async function deleteItem(itemId: string, ownerId: string): Promise<boole
     .update(items)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(items.id, itemId));
+
+  let imageKeys: string[] = [];
+  try {
+    imageKeys = JSON.parse(existing.images);
+  } catch {}
+
+  if (imageKeys.length > 0) {
+    const { failed } = await deleteUploadsFromR2(imageKeys);
+    if (failed.length > 0) {
+      console.warn(`Failed to delete ${failed.length} images from R2`, { failed });
+    }
+  }
 
   return true;
 }

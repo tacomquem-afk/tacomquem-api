@@ -37,29 +37,30 @@ export async function uploadRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const parts = request.parts();
-      const uploadPromises: Promise<UploadResult>[] = [];
-      let fileCount = 0;
+      const results: UploadResult[] = [];
 
       for await (const part of parts) {
         if (part.type === 'file') {
-          fileCount++;
-          if (fileCount > 5) {
+          if (results.length >= 5) {
             throw new BadRequestError(ErrorCodes.STORAGE_MAX_FILES, 'Maximum 5 files per upload');
           }
 
-          uploadPromises.push(processAndUploadImage(part as MultipartFile, request.user.userId));
+          const result = await processAndUploadImage(
+            part as MultipartFile,
+            request.user.userId,
+            request.log
+          );
+          results.push(result);
         }
       }
 
-      if (uploadPromises.length === 0) {
+      if (results.length === 0) {
         throw new BadRequestError(ErrorCodes.STORAGE_NO_FILE, 'No files were uploaded');
       }
 
-      const results = await Promise.all(uploadPromises);
-
       return reply.send({
         images: results.map((r) => ({
-          url: r.url,
+          key: r.key,
           sizeBytes: r.sizeBytes,
         })),
       });

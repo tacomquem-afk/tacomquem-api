@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 const uuidSchema = z.string().uuid();
-const urlSchema = z.string().url();
 const dateSchema = z.string().datetime();
 
 export const fieldErrorSchema = z.object({
@@ -57,7 +56,7 @@ export const itemResponseSchema = z.object({
   id: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
-  images: z.array(urlSchema),
+  images: z.array(z.string()),
   isActive: z.boolean(),
   createdAt: dateSchema,
   updatedAt: dateSchema,
@@ -68,7 +67,7 @@ export const loanResponseSchema = z.object({
   item: z.object({
     id: uuidSchema,
     name: z.string(),
-    images: z.array(urlSchema),
+    images: z.array(z.string()),
   }),
   lender: z.object({
     id: uuidSchema,
@@ -92,7 +91,7 @@ export const loanResponseSchema = z.object({
 
 export const publicLoanInfoSchema = z.object({
   itemName: z.string(),
-  itemImages: z.array(urlSchema),
+  itemImages: z.array(z.string()),
   lenderName: z.string(),
 });
 
@@ -135,7 +134,7 @@ export const dashboardDataSchema = z.object({
     z.object({
       id: uuidSchema,
       itemName: z.string(),
-      itemImages: z.array(urlSchema),
+      itemImages: z.array(z.string()),
       otherParty: z.string(),
       role: z.enum(['lender', 'borrower']),
       expectedReturnDate: dateSchema.nullable(),
@@ -145,7 +144,7 @@ export const dashboardDataSchema = z.object({
 });
 
 export const uploadResultSchema = z.object({
-  url: urlSchema,
+  key: z.string(),
   sizeBytes: z.number(),
 });
 
@@ -265,7 +264,7 @@ export const adminItemDetailsSchema = z.object({
   id: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
-  images: z.array(urlSchema),
+  images: z.array(z.string()),
   isActive: z.boolean(),
   owner: z.object({
     id: uuidSchema,
@@ -282,7 +281,7 @@ export const adminLoanDetailsSchema = z.object({
   item: z.object({
     id: uuidSchema,
     name: z.string(),
-    images: z.array(urlSchema),
+    images: z.array(z.string()),
   }),
   lender: z.object({
     id: uuidSchema,

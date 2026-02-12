@@ -3,6 +3,7 @@ import { db } from '../../db/index.js';
 import { adminAuditLog, users } from '../../db/schema.js';
 import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt } from '../crypto/index.js';
+import { resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
 type AdminAction =
@@ -117,17 +118,6 @@ export async function getUserDetails(userId: string) {
   const emailPlain = decrypt(user.emailEncrypted);
   const namePlain = decrypt(user.nameEncrypted);
 
-  const parseImages = (images: unknown): string[] => {
-    if (typeof images === 'string') {
-      try {
-        return JSON.parse(images);
-      } catch {
-        return [];
-      }
-    }
-    return images as string[];
-  };
-
   const name = maskName(namePlain);
 
   return {
@@ -139,65 +129,71 @@ export async function getUserDetails(userId: string) {
     emailVerified: user.emailVerified,
     blockedAt: user.blockedAt?.toISOString() || null,
     blockedReason: user.blockedReason,
-    lentLoans: (user.lentLoans || []).map((loan) => ({
-      id: loan.id,
-      item: {
-        id: loan.item.id,
-        name: loan.item.name,
-        images: parseImages(loan.item.images),
-      },
-      lender: {
-        id: user.id,
-        name,
-      },
-      borrower: loan.borrower
-        ? {
-            id: loan.borrower.id,
-            name: maskName(decrypt(loan.borrower.nameEncrypted)),
-          }
-        : null,
-      borrowerEmail: loan.borrowerEmail,
-      status: loan.status,
-      expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
-      lenderNotes: loan.lenderNotes,
-      borrowerNotes: loan.borrowerNotes,
-      confirmedAt: loan.confirmedAt?.toISOString() || null,
-      returnedAt: loan.returnedAt?.toISOString() || null,
-      createdAt: (loan.createdAt || new Date()).toISOString(),
-    })),
-    borrowedLoans: (user.borrowedLoans || []).map((loan) => ({
-      id: loan.id,
-      item: {
-        id: loan.item.id,
-        name: loan.item.name,
-        images: parseImages(loan.item.images),
-      },
-      lender: {
-        id: loan.lender.id,
-        name: maskName(decrypt(loan.lender.nameEncrypted)),
-      },
-      borrower: {
-        id: user.id,
-        name,
-      },
-      borrowerEmail: loan.borrowerEmail,
-      status: loan.status,
-      expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
-      lenderNotes: loan.lenderNotes,
-      borrowerNotes: loan.borrowerNotes,
-      confirmedAt: loan.confirmedAt?.toISOString() || null,
-      returnedAt: loan.returnedAt?.toISOString() || null,
-      createdAt: (loan.createdAt || new Date()).toISOString(),
-    })),
-    items: (user.items || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      images: parseImages(item.images),
-      isActive: item.isActive,
-      createdAt: (item.createdAt || new Date()).toISOString(),
-      updatedAt: (item.updatedAt || new Date()).toISOString(),
-    })),
+    lentLoans: await Promise.all(
+      (user.lentLoans || []).map(async (loan) => ({
+        id: loan.id,
+        item: {
+          id: loan.item.id,
+          name: loan.item.name,
+          images: await resolveImageKeys(loan.item.images),
+        },
+        lender: {
+          id: user.id,
+          name,
+        },
+        borrower: loan.borrower
+          ? {
+              id: loan.borrower.id,
+              name: maskName(decrypt(loan.borrower.nameEncrypted)),
+            }
+          : null,
+        borrowerEmail: loan.borrowerEmail,
+        status: loan.status,
+        expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
+        lenderNotes: loan.lenderNotes,
+        borrowerNotes: loan.borrowerNotes,
+        confirmedAt: loan.confirmedAt?.toISOString() || null,
+        returnedAt: loan.returnedAt?.toISOString() || null,
+        createdAt: (loan.createdAt || new Date()).toISOString(),
+      }))
+    ),
+    borrowedLoans: await Promise.all(
+      (user.borrowedLoans || []).map(async (loan) => ({
+        id: loan.id,
+        item: {
+          id: loan.item.id,
+          name: loan.item.name,
+          images: await resolveImageKeys(loan.item.images),
+        },
+        lender: {
+          id: loan.lender.id,
+          name: maskName(decrypt(loan.lender.nameEncrypted)),
+        },
+        borrower: {
+          id: user.id,
+          name,
+        },
+        borrowerEmail: loan.borrowerEmail,
+        status: loan.status,
+        expectedReturnDate: loan.expectedReturnDate?.toISOString() || null,
+        lenderNotes: loan.lenderNotes,
+        borrowerNotes: loan.borrowerNotes,
+        confirmedAt: loan.confirmedAt?.toISOString() || null,
+        returnedAt: loan.returnedAt?.toISOString() || null,
+        createdAt: (loan.createdAt || new Date()).toISOString(),
+      }))
+    ),
+    items: await Promise.all(
+      (user.items || []).map(async (item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        images: await resolveImageKeys(item.images),
+        isActive: item.isActive,
+        createdAt: (item.createdAt || new Date()).toISOString(),
+        updatedAt: (item.updatedAt || new Date()).toISOString(),
+      }))
+    ),
     createdAt: (user.createdAt || new Date()).toISOString(),
     updatedAt: (user.updatedAt || new Date()).toISOString(),
   };
