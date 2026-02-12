@@ -1,8 +1,10 @@
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import type { SwaggerTransform } from '@fastify/swagger';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { sql } from 'drizzle-orm';
+import type { FastifySchema } from 'fastify';
 import Fastify from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
@@ -35,7 +37,13 @@ export async function buildApp() {
     },
   });
 
-  app.setValidatorCompiler(validatorCompiler);
+  // biome-ignore lint/suspicious/noExplicitAny: wrapper handles both Zod and raw JSON schemas (e.g. multipart)
+  app.setValidatorCompiler(((opts: any) => {
+    if (typeof opts.schema?.safeParse !== 'function') {
+      return (data: unknown) => ({ value: data });
+    }
+    return validatorCompiler(opts);
+  }) as typeof validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
@@ -55,6 +63,17 @@ export async function buildApp() {
       instance: request.url,
     }),
   });
+
+  const multipartAwareTransform: SwaggerTransform<FastifySchema> = (input) => {
+    const { schema } = input;
+    if (schema?.body && typeof schema.body === 'object' && !('_zod' in schema.body)) {
+      const { body, ...restSchema } = schema;
+      const result = jsonSchemaTransform({ ...input, schema: restSchema });
+      result.schema.body = body;
+      return result;
+    }
+    return jsonSchemaTransform(input);
+  };
 
   await app.register(swagger, {
     openapi: {
@@ -98,7 +117,7 @@ export async function buildApp() {
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
-    transform: jsonSchemaTransform,
+    transform: multipartAwareTransform,
   });
 
   await app.register(swaggerUi, {

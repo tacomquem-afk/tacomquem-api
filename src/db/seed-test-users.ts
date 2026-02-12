@@ -2,20 +2,28 @@
  * Seed script for creating test users with known credentials
  *
  * Usage:
- *   bun run db:seed-test-users          # Create 10 test users
- *   bun run db:seed-test-users --items  # Create users with items and loans
- *   bun run db:seed-test-users --help   # Show options
+ *   bun run db:seed-test-users                    # Create 10 test users
+ *   bun run db:seed-test-users --count 3           # Create 3 test users (1-10)
+ *   bun run db:seed-test-users --items             # Create users with items and loans
+ *   bun run db:seed-test-users --count 5 --items   # 5 users with items/loans + R2 images
+ *   bun run db:seed-test-users --help              # Show options
  *
  * Generates a test-users.json file with login credentials for frontend testing
  */
 
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { faker } from '@faker-js/faker';
 import type { InferInsertModel } from 'drizzle-orm';
 import { inArray, or } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
+import sharp from 'sharp';
 
+import { env } from '../config/env';
+import { r2Client } from '../config/r2';
 import { encrypt, hash } from '../services/crypto/index';
+import { deleteUploadsFromR2 } from '../services/storage/index';
 import { db } from './index';
-import { items, loans, notifications, users } from './schema';
+import { items, loans, notifications, uploads, users } from './schema';
 
 interface TestUser {
   id: string;
@@ -88,20 +96,54 @@ async function createTestUser(
   };
 }
 
+async function generateAndUploadImage(userId: string): Promise<{ key: string; sizeBytes: number }> {
+  const color = faker.color.rgb({ format: 'hex' });
+  const width = faker.number.int({ min: 300, max: 600 });
+  const height = faker.number.int({ min: 300, max: 600 });
+
+  const svgText = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="${color}"/>
+    <text x="50%" y="50%" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif">
+      Test Item
+    </text>
+  </svg>`;
+
+  const webpBuffer = await sharp(Buffer.from(svgText))
+    .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toBuffer();
+
+  const id = nanoid(8);
+  const timestamp = Date.now();
+  const key = `items/${userId}/${id}-${timestamp}.webp`;
+
+  await r2Client.send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET_NAME,
+      Key: key,
+      Body: webpBuffer,
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000',
+    })
+  );
+
+  return { key, sizeBytes: webpBuffer.length };
+}
+
 async function deleteExistingTestUsers() {
   logSection('Removing existing test users...');
 
   const testEmails = [
+    'admin.test@example.com',
+    'borrower@example.com',
+    'lender@example.com',
+    'moderator@example.com',
     'test1@example.com',
     'test2@example.com',
     'test3@example.com',
     'test4@example.com',
     'test5@example.com',
-    'admin.test@example.com',
     'unverified@example.com',
-    'lender@example.com',
-    'borrower@example.com',
-    'moderator@example.com',
   ];
 
   const emailHashes = testEmails.map((email) => hash(email));
@@ -118,6 +160,31 @@ async function deleteExistingTestUsers() {
 
   const userIds = existingUsers.map((u) => u.id);
 
+  const existingItems = await db
+    .select({ images: items.images })
+    .from(items)
+    .where(inArray(items.ownerId, userIds));
+
+  const r2Keys: string[] = [];
+  for (const item of existingItems) {
+    try {
+      const parsed = JSON.parse(item.images);
+      if (Array.isArray(parsed)) {
+        for (const key of parsed) {
+          if (typeof key === 'string' && key.startsWith('items/')) {
+            r2Keys.push(key);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (r2Keys.length > 0) {
+    logInfo(`Cleaning up ${r2Keys.length} R2 images...`);
+    const result = await deleteUploadsFromR2(r2Keys);
+    logInfo(`Deleted ${result.deleted.length} R2 objects (${result.failed.length} failed)`);
+  }
+
   await db
     .delete(loans)
     .where(or(inArray(loans.lenderId, userIds), inArray(loans.borrowerId, userIds)));
@@ -131,9 +198,10 @@ async function createTestItemsAndLoans(
   testUsers: TestUser[],
   allUsers: (typeof users.$inferSelect)[]
 ) {
-  logSection('Creating test items and loans...');
+  logSection('Creating test items and loans (uploading images to R2)...');
 
   const itemsToInsert: InferInsertModel<typeof items>[] = [];
+  const uploadsToInsert: InferInsertModel<typeof uploads>[] = [];
   const loansToInsert: InferInsertModel<typeof loans>[] = [];
   const notificationsToInsert: InferInsertModel<typeof notifications>[] = [];
 
@@ -159,20 +227,37 @@ async function createTestItemsAndLoans(
       ]);
 
       const imageCount = faker.number.int({ min: 1, max: 3 });
-      const fakeImages = Array.from({ length: imageCount }, () =>
-        faker.image.url({ width: 400, height: 400 })
-      );
+      const imageKeys: string[] = [];
+
+      for (let img = 0; img < imageCount; img++) {
+        const uploaded = await generateAndUploadImage(testUser.id);
+        imageKeys.push(uploaded.key);
+
+        uploadsToInsert.push({
+          userId: testUser.id,
+          url: uploaded.key,
+          key: uploaded.key,
+          filename: `seed-${itemType.toLowerCase()}-${img}.webp`,
+          mimeType: 'image/webp',
+          sizeBytes: uploaded.sizeBytes,
+          createdAt: new Date(),
+        });
+      }
+
+      logInfo(`Uploaded ${imageCount} image(s) for "${itemType} (Test)" [${testUser.email}]`);
 
       itemsToInsert.push({
         id: itemId,
         ownerId: testUser.id,
         name: `${itemType} (Test)`,
         description: faker.commerce.productDescription(),
-        images: JSON.stringify(fakeImages),
+        images: JSON.stringify(imageKeys),
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+
+      if (allUsers.length < 2) continue;
 
       const loanCount = faker.number.int({ min: 1, max: 2 });
       for (let j = 0; j < loanCount; j++) {
@@ -231,6 +316,14 @@ async function createTestItemsAndLoans(
   }
 
   const batchSize = 50;
+
+  for (let i = 0; i < uploadsToInsert.length; i += batchSize) {
+    const batch = uploadsToInsert.slice(i, i + batchSize);
+    await db.insert(uploads).values(batch);
+  }
+
+  logSuccess(`Registered ${uploadsToInsert.length} uploads`);
+
   for (let i = 0; i < itemsToInsert.length; i += batchSize) {
     const batch = itemsToInsert.slice(i, i + batchSize);
     await db.insert(items).values(batch);
@@ -274,9 +367,29 @@ async function saveCredentialsFile(testUsers: TestUser[]) {
   logInfo('Share this file with your frontend team for testing!');
 }
 
+function parseCount(args: string[]): number {
+  const countIdx = args.indexOf('--count');
+  if (countIdx === -1) return 10;
+
+  const raw = args[countIdx + 1];
+  if (!raw) {
+    logError('--count requires a number (1-10)');
+    process.exit(1);
+  }
+
+  const count = Number.parseInt(raw, 10);
+  if (Number.isNaN(count) || count < 1 || count > 10) {
+    logError('--count must be between 1 and 10');
+    process.exit(1);
+  }
+
+  return count;
+}
+
 async function seedTestUsers() {
   const args = process.argv.slice(2);
   const includeItems = args.includes('--items');
+  const count = parseCount(args);
 
   if (args.includes('--help')) {
     // biome-ignore lint: CLI help output
@@ -287,12 +400,15 @@ Usage:
   bun run db:seed-test-users [options]
 
 Options:
-  --items    Create items and loans for test users
+  --count N  Number of test users to create (1-10, default: 10)
+  --items    Create items and loans for test users (uploads real images to R2)
   --help     Show this help message
 
 Examples:
-  bun run db:seed-test-users              # Create 10 test users
-  bun run db:seed-test-users --items      # Create users with items and loans
+  bun run db:seed-test-users                    # Create 10 test users
+  bun run db:seed-test-users --count 3          # Create 3 test users
+  bun run db:seed-test-users --items            # Create users with items, loans and R2 images
+  bun run db:seed-test-users --count 5 --items  # 5 users with items/loans + R2 images
     `);
     process.exit(0);
   }
@@ -300,16 +416,15 @@ Examples:
   try {
     await deleteExistingTestUsers();
 
-    logSection('Creating 10 test users with known credentials...');
+    logSection(`Creating ${count} test user(s) with known credentials...`);
 
-    // Test users with predictable credentials
     const testUserCredentials = [
+      { email: 'admin.test@example.com', password: 'AdminTest@123456', name: 'Admin Test' },
       { email: 'test1@example.com', password: 'Test@123456', name: 'Test User 1' },
       { email: 'test2@example.com', password: 'Test@234567', name: 'Test User 2' },
       { email: 'test3@example.com', password: 'Test@345678', name: 'Test User 3' },
       { email: 'test4@example.com', password: 'Test@456789', name: 'Test User 4' },
       { email: 'test5@example.com', password: 'Test@567890', name: 'Test User 5' },
-      { email: 'admin.test@example.com', password: 'AdminTest@123456', name: 'Admin Test' },
       {
         email: 'unverified@example.com',
         password: 'Unverified@123456',
@@ -321,9 +436,10 @@ Examples:
       { email: 'moderator@example.com', password: 'Moderator@123456', name: 'Moderator Test' },
     ];
 
+    const selectedCredentials = testUserCredentials.slice(0, count);
     const createdUsers: TestUser[] = [];
 
-    for (const cred of testUserCredentials) {
+    for (const cred of selectedCredentials) {
       const testUser = await createTestUser(
         cred.email,
         cred.password,
@@ -333,15 +449,13 @@ Examples:
       createdUsers.push(testUser);
     }
 
-    logSuccess(`Created ${createdUsers.length} test users`);
+    logSuccess(`Created ${createdUsers.length} test user(s)`);
 
-    // If --items flag is set, create items and loans
     if (includeItems) {
       const allUsers = await db.select().from(users);
       await createTestItemsAndLoans(createdUsers, allUsers);
     }
 
-    // Save credentials to file
     await saveCredentialsFile(createdUsers);
 
     logSection('✨ Test users creation complete!');

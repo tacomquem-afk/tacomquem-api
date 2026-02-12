@@ -8,7 +8,12 @@ import { env } from '../../config/env.js';
 import { r2Client } from '../../config/r2.js';
 import { db } from '../../db/index.js';
 import { uploads } from '../../db/schema.js';
-import { BadRequestError, ErrorCodes, PayloadTooLargeError } from '../../errors/index.js';
+import {
+  BadRequestError,
+  ErrorCodes,
+  InternalServerError,
+  PayloadTooLargeError,
+} from '../../errors/index.js';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const IMAGE_MAX_WIDTH = 1080;
@@ -19,6 +24,11 @@ const PRESIGNED_URL_EXPIRY = 3600;
 export interface UploadResult {
   key: string;
   sizeBytes: number;
+}
+
+export interface PresignedUrlResult {
+  url: string;
+  expiresAt: string;
 }
 
 export interface ImageFile {
@@ -56,7 +66,7 @@ export async function processAndUploadImage(
     log.warn({ filename: file.filename, detectedType: fileType?.mime }, 'Unsupported file format');
     throw new BadRequestError(
       ErrorCodes.STORAGE_UNSUPPORTED_FORMAT,
-      'Unsupported file format. Use JPEG, PNG or WebP'
+      'Unsupported file format. Use JPEG, PNG, WebP, HEIC or TIFF'
     );
   }
 
@@ -103,7 +113,7 @@ export async function processAndUploadImage(
     log.info({ key }, 'Upload to R2 completed');
   } catch (error) {
     log.error({ err: error, key, bucket: env.R2_BUCKET_NAME }, 'Failed to upload to R2');
-    throw new BadRequestError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file');
+    throw new InternalServerError(ErrorCodes.STORAGE_UPLOAD_FAILED, 'Failed to upload file');
   }
 
   try {
@@ -139,7 +149,7 @@ export async function processAndUploadImage(
     } catch (cleanupError) {
       log.error({ err: cleanupError, key }, 'Failed to clean up R2 object after DB error');
     }
-    throw new BadRequestError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload');
+    throw new InternalServerError(ErrorCodes.STORAGE_RECORD_FAILED, 'Failed to register upload');
   }
 }
 
@@ -152,13 +162,21 @@ export async function generatePresignedUrl(key: string): Promise<string> {
   return getSignedUrl(r2Client as any, command, { expiresIn: PRESIGNED_URL_EXPIRY });
 }
 
+export async function generatePresignedUrlResult(key: string): Promise<PresignedUrlResult> {
+  const url = await generatePresignedUrl(key);
+  const expiresAt = new Date(Date.now() + PRESIGNED_URL_EXPIRY * 1000).toISOString();
+  return { url, expiresAt };
+}
+
 export async function resolveImageKeys(imagesJson: string): Promise<string[]> {
-  let keys: string[];
+  let parsed: unknown;
   try {
-    keys = JSON.parse(imagesJson);
+    parsed = JSON.parse(imagesJson);
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) return [];
+  const keys = parsed.filter((k): k is string => typeof k === 'string' && k.length > 0);
   if (keys.length === 0) return [];
   return Promise.all(keys.map(generatePresignedUrl));
 }

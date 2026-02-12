@@ -26,6 +26,7 @@ export const errorResponse409 = problemDetailsSchema;
 export const errorResponse410 = problemDetailsSchema;
 export const errorResponse413 = problemDetailsSchema;
 export const errorResponse422 = problemDetailsSchema;
+export const errorResponse500 = problemDetailsSchema;
 
 export const messageResponseSchema = z.object({
   message: z.string(),
@@ -145,6 +146,8 @@ export const dashboardDataSchema = z.object({
 
 export const uploadResultSchema = z.object({
   key: z.string(),
+  url: z.string().url(),
+  expiresAt: z.string().datetime(),
   sizeBytes: z.number(),
 });
 

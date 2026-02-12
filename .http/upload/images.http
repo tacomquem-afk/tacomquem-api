@@ -24,8 +24,9 @@ Content-Type: image/png
 --boundary--
 
 ###
-# Usar URL do upload para criar item
-@imageUrl = {{upload.response.body.images[0].key}}
+# Use o key do upload para criar item
+@imageKey = {{upload.response.body.images[0].key}}
+@imageUrl = {{upload.response.body.images[0].url}}
 
 ###
 POST {{$dotenv BASE_URL}}/items
@@ -35,5 +36,5 @@ Authorization: Bearer {{accessToken}}
 {
   "name": "Item de Teste",
   "description": "Item criado com imagem do upload",
-  "images": ["{{imageUrl}}"]
+  "images": ["{{imageKey}}"]
 }

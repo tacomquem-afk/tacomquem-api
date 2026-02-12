@@ -75,6 +75,13 @@ export class PayloadTooLargeError extends AppError {
   }
 }
 
+export class InternalServerError extends AppError {
+  constructor(code: string, message: string) {
+    super(code, message);
+    Object.setPrototypeOf(this, InternalServerError.prototype);
+  }
+}
+
 export const ErrorCodes = {
   AUTH_EMAIL_TAKEN: 'AUTH_EMAIL_TAKEN',
   AUTH_INVALID_CREDENTIALS: 'AUTH_INVALID_CREDENTIALS',
@@ -180,4 +187,5 @@ export const errorStatusMap = new Map<ErrorClass, number>([
   [ValidationError, 422],
   [GoneError, 410],
   [PayloadTooLargeError, 413],
+  [InternalServerError, 500],
 ]);
