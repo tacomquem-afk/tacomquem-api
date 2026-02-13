@@ -20,24 +20,22 @@ export interface RecentActivity {
   read: boolean;
 }
 
+export interface DashboardLoan {
+  id: string;
+  itemName: string;
+  itemImages: string[];
+  status: 'pending' | 'confirmed';
+  otherParty: string | null;
+  role: 'lender' | 'borrower';
+  expectedReturnDate: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
   recentActivity: RecentActivity[];
-  pendingLoans: Array<{
-    id: string;
-    itemName: string;
-    borrowerEmail: string | null;
-    createdAt: string;
-  }>;
-  activeLoans: Array<{
-    id: string;
-    itemName: string;
-    itemImages: string[];
-    otherParty: string;
-    role: 'lender' | 'borrower';
-    expectedReturnDate: string | null;
-    confirmedAt: string;
-  }>;
+  loans: DashboardLoan[];
 }
 
 export async function getDashboardData(userId: string): Promise<DashboardData> {
@@ -67,25 +65,17 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     limit: 10,
   });
 
-  const pendingLoans = await db.query.loans.findMany({
-    where: and(eq(loans.lenderId, userId), eq(loans.status, 'pending')),
-    with: { item: true },
-    orderBy: [desc(loans.createdAt)],
-    limit: 5,
-  });
-
-  const activeLoans = await db.query.loans.findMany({
+  const allLoans = await db.query.loans.findMany({
     where: and(
       or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId)),
-      eq(loans.status, 'confirmed')
+      or(eq(loans.status, 'pending'), eq(loans.status, 'confirmed'))
     ),
     with: {
       item: true,
       lender: true,
       borrower: true,
     },
-    orderBy: [desc(loans.confirmedAt)],
-    limit: 10,
+    orderBy: [desc(loans.createdAt)],
   });
 
   return {
@@ -102,33 +92,27 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       createdAt: n.createdAt.toISOString(),
       read: n.read,
     })),
-    pendingLoans: pendingLoans
-      .filter((l) => l.item)
-      .map((l) => ({
-        id: l.id,
-        itemName: l.item.name,
-        borrowerEmail: l.borrowerEmail,
-        createdAt: l.createdAt.toISOString(),
-      })),
-    activeLoans: await Promise.all(
-      activeLoans
-        .filter((l) => l.status === 'confirmed' && l.item && (l.lenderId === userId || l.lender))
+    loans: await Promise.all(
+      allLoans
+        .filter((l) => l.item && (l.lenderId === userId || l.borrowerId === userId))
         .map(async (l) => {
           const isLender = l.lenderId === userId;
           const otherParty = isLender
             ? l.borrower
               ? decrypt(l.borrower.nameEncrypted)
-              : 'Pendente'
+              : (l.borrowerEmail ?? 'Pendente')
             : decrypt(l.lender.nameEncrypted);
 
           return {
             id: l.id,
             itemName: l.item.name,
             itemImages: await resolveImageKeys(l.item.images),
+            status: l.status as 'pending' | 'confirmed',
             otherParty,
             role: isLender ? ('lender' as const) : ('borrower' as const),
             expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
-            confirmedAt: (l.confirmedAt ?? new Date()).toISOString(),
+            createdAt: l.createdAt.toISOString(),
+            confirmedAt: l.confirmedAt?.toISOString() ?? null,
           };
         })
     ),

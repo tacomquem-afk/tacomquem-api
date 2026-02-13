@@ -147,14 +147,8 @@ describe('dashboard service', () => {
         expect(activity.type).toBe('loan_created');
       }
 
-      expect(data.pendingLoans).toHaveLength(1);
-      const pendingLoan = data.pendingLoans[0];
-      if (pendingLoan) {
-        expect(pendingLoan.itemName).toBe('Laptop');
-      }
-
-      expect(data.activeLoans).toHaveLength(1);
-      const activeLoan = data.activeLoans[0];
+      expect(data.loans).toHaveLength(1);
+      const activeLoan = data.loans[0];
       if (activeLoan) {
         expect(activeLoan.otherParty).toBe('Jane Smith');
         expect(activeLoan.role).toBe('lender');
@@ -219,13 +213,6 @@ describe('dashboard service', () => {
         borrower: mockBorrower,
       };
 
-      const mockReturnedLoan = {
-        ...mockConfirmedLoan,
-        id: 'loan-returned',
-        status: 'returned' as const,
-        returnedAt: now,
-      };
-
       mocks.push(
         spyOn(db, 'select').mockImplementation(
           () =>
@@ -239,16 +226,14 @@ describe('dashboard service', () => {
 
       mocks.push(spyOn(db.query.notifications, 'findMany').mockResolvedValue([]));
       mocks.push(
-        spyOn(db.query.loans, 'findMany')
-          .mockResolvedValueOnce([]) // pendingLoans
-          .mockResolvedValueOnce([mockConfirmedLoan, mockReturnedLoan] as any) // activeLoans
+        spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([mockConfirmedLoan] as any)
       );
       mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Nome'));
 
       const data = await getDashboardData(userId);
 
-      expect(data.activeLoans).toHaveLength(1);
-      expect(data.activeLoans[0]?.id).toBe('loan-confirmed');
+      expect(data.loans).toHaveLength(1);
+      expect(data.loans[0]?.id).toBe('loan-confirmed');
     });
   });
 

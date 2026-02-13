@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { adminAuditLog, users } from '../../db/schema.js';
+import { adminAuditLog, loans, users } from '../../db/schema.js';
 import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt } from '../crypto/index.js';
 import { resolveImageKeys } from '../storage/index.js';
@@ -184,15 +184,27 @@ export async function getUserDetails(userId: string) {
       }))
     ),
     items: await Promise.all(
-      (user.items || []).map(async (item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        images: await resolveImageKeys(item.images),
-        isActive: item.isActive,
-        createdAt: (item.createdAt || new Date()).toISOString(),
-        updatedAt: (item.updatedAt || new Date()).toISOString(),
-      }))
+      (user.items || []).map(async (item) => {
+        const activeLoan = await db.query.loans.findFirst({
+          where: eq(loans.itemId, item.id),
+          with: { borrower: true },
+        });
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          images: await resolveImageKeys(item.images),
+          isActive: item.isActive,
+          isLoaned: activeLoan?.status === 'confirmed',
+          currentLoanId: activeLoan?.status === 'confirmed' ? activeLoan.id : null,
+          borrowedTo:
+            activeLoan?.status === 'confirmed' && activeLoan.borrower
+              ? maskName(decrypt(activeLoan.borrower.nameEncrypted))
+              : null,
+          createdAt: (item.createdAt || new Date()).toISOString(),
+          updatedAt: (item.updatedAt || new Date()).toISOString(),
+        };
+      })
     ),
     createdAt: (user.createdAt || new Date()).toISOString(),
     updatedAt: (user.updatedAt || new Date()).toISOString(),

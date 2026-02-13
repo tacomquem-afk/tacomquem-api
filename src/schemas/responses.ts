@@ -59,6 +59,9 @@ export const itemResponseSchema = z.object({
   description: z.string().nullable(),
   images: z.array(z.string()),
   isActive: z.boolean(),
+  isLoaned: z.boolean(),
+  currentLoanId: uuidSchema.nullable(),
+  borrowedTo: z.string().nullable(),
   createdAt: dateSchema,
   updatedAt: dateSchema,
 });
@@ -120,28 +123,22 @@ export const recentActivitySchema = z.object({
   read: z.boolean(),
 });
 
+export const dashboardLoanSchema = z.object({
+  id: uuidSchema,
+  itemName: z.string(),
+  itemImages: z.array(z.string()),
+  status: z.enum(['pending', 'confirmed']),
+  otherParty: z.string().nullable(),
+  role: z.enum(['lender', 'borrower']),
+  expectedReturnDate: dateSchema.nullable(),
+  createdAt: dateSchema,
+  confirmedAt: dateSchema.nullable(),
+});
+
 export const dashboardDataSchema = z.object({
   stats: dashboardStatsSchema,
   recentActivity: z.array(recentActivitySchema),
-  pendingLoans: z.array(
-    z.object({
-      id: uuidSchema,
-      itemName: z.string(),
-      borrowerEmail: z.string().email().nullable(),
-      createdAt: dateSchema,
-    })
-  ),
-  activeLoans: z.array(
-    z.object({
-      id: uuidSchema,
-      itemName: z.string(),
-      itemImages: z.array(z.string()),
-      otherParty: z.string(),
-      role: z.enum(['lender', 'borrower']),
-      expectedReturnDate: dateSchema.nullable(),
-      confirmedAt: dateSchema,
-    })
-  ),
+  loans: z.array(dashboardLoanSchema),
 });
 
 export const uploadResultSchema = z.object({

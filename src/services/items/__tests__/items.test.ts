@@ -46,6 +46,9 @@ const expectedItemResponse: ItemResponse = {
   description: 'A test item',
   images: ['https://example.com/image1.jpg'],
   isActive: true,
+  isLoaned: false,
+  currentLoanId: null,
+  borrowedTo: null,
   createdAt: new Date('2026-02-04').toISOString(),
   updatedAt: new Date('2026-02-04').toISOString(),
 };
@@ -66,6 +69,7 @@ beforeEach(() => {
   spyOn(db, 'update').mockClear();
   spyOn(db.query.items, 'findMany').mockClear();
   spyOn(db.query.items, 'findFirst').mockClear();
+  spyOn(db.query.loans, 'findFirst').mockClear();
   deleteUploadsFromR2Mock.mockClear();
 });
 
