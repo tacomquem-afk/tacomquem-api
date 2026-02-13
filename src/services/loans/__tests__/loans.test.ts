@@ -14,6 +14,7 @@ import { db } from '../../../db/index.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../../errors/index.js';
 import * as cryptoModule from '../../crypto/index.js';
 import * as emailModule from '../../email/index.js';
+import * as friendshipsModule from '../../friendships/index.js';
 import {
   cancelLoan,
   confirmLoan,
@@ -85,13 +86,17 @@ beforeEach(() => {
   spyOn(db.query.items, 'findFirst').mockClear();
   spyOn(db.query.users, 'findFirst').mockClear();
   spyOn(db.query.loanTokens, 'findFirst').mockClear();
+  spyOn(db, 'transaction').mockClear();
   spyOn(cryptoModule, 'decrypt').mockClear();
   spyOn(emailModule, 'sendEmail').mockClear();
+  spyOn(friendshipsModule, 'createFriendshipIfNotExists').mockClear();
 });
 
 afterEach(() => {
   spyOn(cryptoModule, 'decrypt').mockRestore();
   spyOn(emailModule, 'sendEmail').mockRestore();
+  spyOn(friendshipsModule, 'createFriendshipIfNotExists').mockRestore();
+  spyOn(db, 'transaction').mockRestore();
 });
 
 describe('loans service', () => {
@@ -580,9 +585,16 @@ describe('loans service', () => {
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      spyOn(db, 'transaction').mockImplementation(async (callback: any) => callback(db as any));
 
       const valuesMock = mock(() => Promise.resolve());
       spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      const createFriendshipSpy = spyOn(
+        friendshipsModule,
+        'createFriendshipIfNotExists'
+      ).mockResolvedValue({
+        created: true,
+      });
 
       spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
 
@@ -590,6 +602,12 @@ describe('loans service', () => {
 
       expect(result).not.toBeNull();
       expect(result.status).toBe('confirmed');
+      expect(createFriendshipSpy).toHaveBeenCalledWith(
+        'lender-123',
+        'borrower-123',
+        'loan-123',
+        db
+      );
     });
 
     it('should throw error if token not found', async () => {

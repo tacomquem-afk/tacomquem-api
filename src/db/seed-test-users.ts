@@ -2,11 +2,13 @@
  * Seed script for creating test users with known credentials
  *
  * Usage:
- *   bun run db:seed-test-users                    # Create 10 test users
- *   bun run db:seed-test-users --count 3           # Create 3 test users (1-10)
- *   bun run db:seed-test-users --items             # Create users with items and loans
- *   bun run db:seed-test-users --count 5 --items   # 5 users with items/loans + R2 images
- *   bun run db:seed-test-users --help              # Show options
+ *   bun run db:seed-test-users                                # Create 10 test users
+ *   bun run db:seed-test-users --count 3                      # Create 3 test users (1-10)
+ *   bun run db:seed-test-users --items                        # Create users with items and loans
+ *   bun run db:seed-test-users --count 5 --items              # 5 users with items/loans + R2 images
+ *   bun run db:seed-test-users --items --real-loans           # Create users with confirmed loans and friendships
+ *   bun run db:seed-test-users --count 2 --items --real-loans # 2 users with real loans
+ *   bun run db:seed-test-users --help                         # Show options
  *
  * Generates a test-users.json file with login credentials for frontend testing
  */
@@ -23,7 +25,7 @@ import { r2Client } from '../config/r2';
 import { encrypt, hash } from '../services/crypto/index';
 import { deleteUploadsFromR2 } from '../services/storage/index';
 import { db } from './index';
-import { items, loans, notifications, uploads, users } from './schema';
+import { friendships, items, loans, loanTokens, notifications, uploads, users } from './schema';
 
 interface TestUser {
   id: string;
@@ -196,14 +198,21 @@ async function deleteExistingTestUsers() {
 
 async function createTestItemsAndLoans(
   testUsers: TestUser[],
-  allUsers: (typeof users.$inferSelect)[]
+  allUsers: (typeof users.$inferSelect)[],
+  createRealLoans: boolean = false
 ) {
-  logSection('Creating test items and loans (uploading images to R2)...');
+  logSection(
+    createRealLoans
+      ? 'Creating real loans with friendships (uploading images to R2)...'
+      : 'Creating test items and loans (uploading images to R2)...'
+  );
 
   const itemsToInsert: InferInsertModel<typeof items>[] = [];
   const uploadsToInsert: InferInsertModel<typeof uploads>[] = [];
   const loansToInsert: InferInsertModel<typeof loans>[] = [];
   const notificationsToInsert: InferInsertModel<typeof notifications>[] = [];
+  const friendshipsToInsert: InferInsertModel<typeof friendships>[] = [];
+  const loanTokensToInsert: InferInsertModel<typeof loanTokens>[] = [];
 
   const notificationMessages: Record<string, { title: string; message: string }> = {
     loan_created: { title: 'New loan created', message: 'A new item has been loaned' },
@@ -259,12 +268,18 @@ async function createTestItemsAndLoans(
 
       if (allUsers.length < 2) continue;
 
-      const loanCount = faker.number.int({ min: 1, max: 2 });
+      const loanCount = createRealLoans ? 1 : faker.number.int({ min: 1, max: 2 });
       for (let j = 0; j < loanCount; j++) {
         const borrower = faker.helpers.arrayElement(allUsers.filter((u) => u.id !== testUser.id));
-        const status = faker.helpers.arrayElement(['pending', 'confirmed', 'returned']);
+        const status = createRealLoans
+          ? 'confirmed'
+          : faker.helpers.arrayElement(['pending', 'confirmed', 'returned']);
         const loanId = crypto.randomUUID();
         const createdAt = faker.date.recent({ days: 30 });
+        const confirmedAt =
+          createRealLoans || status === 'confirmed'
+            ? faker.date.between({ from: createdAt, to: new Date() })
+            : null;
 
         loansToInsert.push({
           id: loanId,
@@ -273,16 +288,53 @@ async function createTestItemsAndLoans(
           borrowerId: borrower.id,
           status,
           expectedReturnDate: faker.date.future(),
+          confirmedAt: confirmedAt ?? undefined,
           createdAt,
           updatedAt: new Date(),
         });
 
-        const notifType = faker.helpers.arrayElement([
-          'loan_created',
-          'loan_confirmed',
-          'loan_reminder',
-          'loan_returned',
-        ] as const);
+        if (createRealLoans) {
+          const userAId = testUser.id < borrower.id ? testUser.id : borrower.id;
+          const userBId = testUser.id < borrower.id ? borrower.id : testUser.id;
+
+          const friendshipExists = friendshipsToInsert.some(
+            (f) =>
+              (f.userAId === userAId && f.userBId === userBId) ||
+              (f.userAId === userBId && f.userBId === userAId)
+          );
+
+          if (!friendshipExists && confirmedAt) {
+            friendshipsToInsert.push({
+              id: crypto.randomUUID(),
+              userAId,
+              userBId,
+              originLoanId: loanId,
+              createdAt: confirmedAt,
+              updatedAt: new Date(),
+            });
+          }
+
+          if (confirmedAt) {
+            const token = nanoid(32);
+            loanTokensToInsert.push({
+              id: crypto.randomUUID(),
+              loanId,
+              token,
+              expiresAt: new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000),
+              usedAt: confirmedAt,
+              createdAt,
+            });
+          }
+        }
+
+        const notifType = createRealLoans
+          ? 'loan_confirmed'
+          : faker.helpers.arrayElement([
+              'loan_created',
+              'loan_confirmed',
+              'loan_reminder',
+              'loan_returned',
+            ] as const);
         const msg = notificationMessages[notifType] ?? {
           title: 'Notification',
           message: 'You have a new notification',
@@ -338,6 +390,22 @@ async function createTestItemsAndLoans(
 
   logSuccess(`Created ${loansToInsert.length} loans`);
 
+  if (friendshipsToInsert.length > 0) {
+    for (let i = 0; i < friendshipsToInsert.length; i += batchSize) {
+      const batch = friendshipsToInsert.slice(i, i + batchSize);
+      await db.insert(friendships).values(batch);
+    }
+    logSuccess(`Created ${friendshipsToInsert.length} friendships`);
+  }
+
+  if (loanTokensToInsert.length > 0) {
+    for (let i = 0; i < loanTokensToInsert.length; i += batchSize) {
+      const batch = loanTokensToInsert.slice(i, i + batchSize);
+      await db.insert(loanTokens).values(batch);
+    }
+    logSuccess(`Created ${loanTokensToInsert.length} loan tokens`);
+  }
+
   for (let i = 0; i < notificationsToInsert.length; i += batchSize) {
     const batch = notificationsToInsert.slice(i, i + batchSize);
     await db.insert(notifications).values(batch);
@@ -389,6 +457,7 @@ function parseCount(args: string[]): number {
 async function seedTestUsers() {
   const args = process.argv.slice(2);
   const includeItems = args.includes('--items');
+  const createRealLoans = args.includes('--real-loans');
   const count = parseCount(args);
 
   if (args.includes('--help')) {
@@ -400,17 +469,30 @@ Usage:
   bun run db:seed-test-users [options]
 
 Options:
-  --count N  Number of test users to create (1-10, default: 10)
-  --items    Create items and loans for test users (uploads real images to R2)
-  --help     Show this help message
+  --count N      Number of test users to create (1-10, default: 10)
+  --items        Create items and loans for test users (uploads real images to R2)
+  --real-loans   Create confirmed loans with friendships (requires --items)
+  --help         Show this help message
 
 Examples:
-  bun run db:seed-test-users                    # Create 10 test users
-  bun run db:seed-test-users --count 3          # Create 3 test users
-  bun run db:seed-test-users --items            # Create users with items, loans and R2 images
-  bun run db:seed-test-users --count 5 --items  # 5 users with items/loans + R2 images
+  bun run db:seed-test-users                              # Create 10 test users
+  bun run db:seed-test-users --count 3                    # Create 3 test users
+  bun run db:seed-test-users --items                      # Create users with items, loans and R2 images
+  bun run db:seed-test-users --count 5 --items            # 5 users with items/loans + R2 images
+  bun run db:seed-test-users --items --real-loans         # Create users with confirmed loans and friendships
+  bun run db:seed-test-users --count 2 --items --real-loans  # 2 users with real loans
     `);
     process.exit(0);
+  }
+
+  if (createRealLoans && !includeItems) {
+    logError('--real-loans requires --items to be set');
+    process.exit(1);
+  }
+
+  if (createRealLoans && count < 2) {
+    logError('--real-loans requires at least 2 users (--count 2 or more)');
+    process.exit(1);
   }
 
   try {
@@ -453,7 +535,7 @@ Examples:
 
     if (includeItems) {
       const allUsers = await db.select().from(users);
-      await createTestItemsAndLoans(createdUsers, allUsers);
+      await createTestItemsAndLoans(createdUsers, allUsers, createRealLoans);
     }
 
     await saveCredentialsFile(createdUsers);

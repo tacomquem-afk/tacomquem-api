@@ -2,6 +2,7 @@ import { and, count, desc, eq, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans, notifications } from '../../db/schema.js';
 import { decrypt } from '../crypto/index.js';
+import { getFriendsByUser } from '../friendships/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 
 export interface DashboardStats {
@@ -111,7 +112,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       })),
     activeLoans: await Promise.all(
       activeLoans
-        .filter((l) => l.item && (l.lenderId === userId || l.lender))
+        .filter((l) => l.status === 'confirmed' && l.item && (l.lenderId === userId || l.lender))
         .map(async (l) => {
           const isLender = l.lenderId === userId;
           const otherParty = isLender
@@ -137,57 +138,12 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
 export interface Friend {
   id: string;
   name: string;
+  email: string;
   avatarUrl: string | null;
   lentCount: number;
   borrowedCount: number;
 }
 
 export async function getFriends(userId: string): Promise<Friend[]> {
-  const lentLoans = await db.query.loans.findMany({
-    where: and(eq(loans.lenderId, userId), eq(loans.status, 'confirmed')),
-    with: { borrower: true },
-  });
-
-  const borrowedLoans = await db.query.loans.findMany({
-    where: and(eq(loans.borrowerId, userId), eq(loans.status, 'confirmed')),
-    with: { lender: true },
-  });
-
-  const friendsMap = new Map<string, Friend>();
-
-  for (const loan of lentLoans) {
-    if (!loan.borrower) continue;
-
-    const existing = friendsMap.get(loan.borrower.id);
-    if (existing) {
-      existing.lentCount++;
-    } else {
-      friendsMap.set(loan.borrower.id, {
-        id: loan.borrower.id,
-        name: decrypt(loan.borrower.nameEncrypted),
-        avatarUrl: loan.borrower.avatarUrl,
-        lentCount: 1,
-        borrowedCount: 0,
-      });
-    }
-  }
-
-  for (const loan of borrowedLoans) {
-    const existing = friendsMap.get(loan.lender.id);
-    if (existing) {
-      existing.borrowedCount++;
-    } else {
-      friendsMap.set(loan.lender.id, {
-        id: loan.lender.id,
-        name: decrypt(loan.lender.nameEncrypted),
-        avatarUrl: loan.lender.avatarUrl,
-        lentCount: 0,
-        borrowedCount: 1,
-      });
-    }
-  }
-
-  return Array.from(friendsMap.values()).sort(
-    (a, b) => b.lentCount + b.borrowedCount - (a.lentCount + a.borrowedCount)
-  );
+  return getFriendsByUser(userId);
 }

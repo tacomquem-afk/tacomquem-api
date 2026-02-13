@@ -11,6 +11,7 @@ import {
   buildLoanReminderEmail,
   sendEmail,
 } from '../email/index.js';
+import { createFriendshipIfNotExists } from '../friendships/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 
 const TOKEN_EXPIRY_DAYS = 7;
@@ -415,43 +416,59 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
     );
   }
 
-  await db
-    .update(loans)
-    .set({
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(loans)
+        .set({
+          borrowerId,
+          status: 'confirmed',
+          confirmedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(loans.id, loanToken.loanId));
+
+      await tx
+        .update(loanTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(loanTokens.id, loanToken.id));
+
+      const borrower = await tx.query.users.findFirst({
+        where: eq(users.id, borrowerId),
+      });
+
+      if (borrower) {
+        const borrowerName = decrypt(borrower.nameEncrypted);
+        const lenderName = decrypt(loanToken.loan.lender.nameEncrypted);
+
+        await tx.insert(notifications).values({
+          userId: loanToken.loan.lenderId,
+          loanId: loanToken.loanId,
+          type: 'loan_confirmed',
+          title: 'Empréstimo confirmado',
+          message: `${borrowerName} confirmou o empréstimo de "${loanToken.loan.item.name}".`,
+          sentAt: new Date(),
+        });
+
+        await tx.insert(notifications).values({
+          userId: borrowerId,
+          loanId: loanToken.loanId,
+          type: 'loan_confirmed',
+          title: 'Empréstimo confirmado',
+          message: `Você confirmou o empréstimo de "${loanToken.loan.item.name}" de ${lenderName}.`,
+          sentAt: new Date(),
+        });
+      }
+
+      await createFriendshipIfNotExists(loanToken.loan.lenderId, borrowerId, loanToken.loanId, tx);
+    });
+  } catch (error) {
+    console.error('[loans] failed to confirm loan transaction', {
+      loanId: loanToken.loanId,
       borrowerId,
-      status: 'confirmed',
-      confirmedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(loans.id, loanToken.loanId));
-
-  await db.update(loanTokens).set({ usedAt: new Date() }).where(eq(loanTokens.id, loanToken.id));
-
-  const borrower = await db.query.users.findFirst({
-    where: eq(users.id, borrowerId),
-  });
-
-  if (borrower) {
-    const borrowerName = decrypt(borrower.nameEncrypted);
-    const lenderName = decrypt(loanToken.loan.lender.nameEncrypted);
-
-    await db.insert(notifications).values({
-      userId: loanToken.loan.lenderId,
-      loanId: loanToken.loanId,
-      type: 'loan_confirmed',
-      title: 'Empréstimo confirmado',
-      message: `${borrowerName} confirmou o empréstimo de "${loanToken.loan.item.name}".`,
-      sentAt: new Date(),
+      error,
     });
-
-    await db.insert(notifications).values({
-      userId: borrowerId,
-      loanId: loanToken.loanId,
-      type: 'loan_confirmed',
-      title: 'Empréstimo confirmado',
-      message: `Você confirmou o empréstimo de "${loanToken.loan.item.name}" de ${lenderName}.`,
-      sentAt: new Date(),
-    });
+    throw error;
   }
 
   const loan = await getLoanById(loanToken.loanId, borrowerId);
