@@ -49,6 +49,7 @@ export async function buildApp() {
   await app.register(cors, {
     origin: env.FRONTEND_URL,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(rateLimit, {
