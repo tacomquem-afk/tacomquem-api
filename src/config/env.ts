@@ -21,6 +21,7 @@ const envSchema = z.object({
   GOOGLE_TOKEN_URL: z.url().default('https://oauth2.googleapis.com/token'),
   GOOGLE_USERINFO_URL: z.url().default('https://www.googleapis.com/oauth2/v2/userinfo'),
 
+  RESEND_API_URL: z.url().default('https://api.resend.com/emails'),
   RESEND_API_KEY: z.string(),
   EMAIL_FROM: z.string().email(),
 
