@@ -161,6 +161,7 @@ DELETE /api/items/:id              # Soft delete item
 
 POST   /api/loans                  # Create loan + generate link
 GET    /api/loans                  # List loans (filters: lent/borrowed/status)
+GET    /api/loans/history          # Completed loans history (direction: all/lent/borrowed + counts)
 GET    /api/loans/:id              # Loan details
 PATCH  /api/loans/:id/return       # Mark as returned
 PATCH  /api/loans/:id/cancel       # Cancel loan

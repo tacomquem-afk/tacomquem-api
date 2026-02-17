@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
@@ -350,6 +350,93 @@ export async function sendReminder(loanId: string, lenderId: string): Promise<bo
   }
 
   return true;
+}
+
+export type HistoryDirection = 'all' | 'lent' | 'borrowed';
+
+export interface HistoryCounts {
+  all: number;
+  lent: number;
+  borrowed: number;
+}
+
+export interface LoansHistoryResult {
+  loans: LoanResponse[];
+  counts: HistoryCounts;
+}
+
+const COMPLETED_STATUSES = ['returned', 'cancelled'] as const;
+
+export async function getLoansHistory(
+  userId: string,
+  direction: HistoryDirection = 'all'
+): Promise<LoansHistoryResult> {
+  const baseCondition = and(
+    or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId)),
+    inArray(loans.status, [...COMPLETED_STATUSES])
+  );
+
+  const result = await db.query.loans.findMany({
+    where: baseCondition,
+    with: {
+      item: true,
+      lender: true,
+      borrower: true,
+    },
+    orderBy: [desc(loans.updatedAt)],
+  });
+
+  let lentCount = 0;
+  let borrowedCount = 0;
+
+  for (const loan of result) {
+    if (loan.lenderId === userId) lentCount++;
+    if (loan.borrowerId === userId) borrowedCount++;
+  }
+
+  const counts: HistoryCounts = {
+    all: result.length,
+    lent: lentCount,
+    borrowed: borrowedCount,
+  };
+
+  const filtered =
+    direction === 'lent'
+      ? result.filter((l) => l.lenderId === userId)
+      : direction === 'borrowed'
+        ? result.filter((l) => l.borrowerId === userId)
+        : result;
+
+  const mappedLoans = await Promise.all(
+    filtered.map(async (loan) => ({
+      id: loan.id,
+      item: {
+        id: loan.item.id,
+        name: loan.item.name,
+        images: await resolveImageKeys(loan.item.images),
+      },
+      lender: {
+        id: loan.lender.id,
+        name: decrypt(loan.lender.nameEncrypted),
+      },
+      borrower: loan.borrower
+        ? {
+            id: loan.borrower.id,
+            name: decrypt(loan.borrower.nameEncrypted),
+          }
+        : null,
+      borrowerEmail: loan.borrowerEmail,
+      status: loan.status,
+      expectedReturnDate: loan.expectedReturnDate?.toISOString() ?? null,
+      lenderNotes: loan.lenderNotes,
+      borrowerNotes: loan.borrowerNotes,
+      confirmedAt: loan.confirmedAt?.toISOString() ?? null,
+      returnedAt: loan.returnedAt?.toISOString() ?? null,
+      createdAt: loan.createdAt.toISOString(),
+    }))
+  );
+
+  return { loans: mappedLoans, counts };
 }
 
 export async function getPublicLoanInfo(token: string): Promise<PublicLoanInfo | null> {

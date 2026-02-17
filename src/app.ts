@@ -28,6 +28,7 @@ import { dashboardRoutes } from './routes/dashboard/index.js';
 import itemsRoutes from './routes/items/index.js';
 import { linksRoutes } from './routes/links/index.js';
 import { loansRoutes } from './routes/loans/index.js';
+import { notificationsRoutes } from './routes/notifications/index.js';
 import { uploadRoutes } from './routes/upload/index.js';
 
 export async function buildApp() {
@@ -111,6 +112,7 @@ export async function buildApp() {
         { name: 'Loans', description: 'Loan management endpoints' },
         { name: 'Links', description: 'Public loan link endpoints' },
         { name: 'Dashboard', description: 'User dashboard endpoints' },
+        { name: 'Notifications', description: 'User notification endpoints' },
         { name: 'Admin - Analytics', description: 'Admin analytics endpoints' },
         { name: 'Admin - Users', description: 'Admin user management endpoints' },
         { name: 'Admin - Moderation', description: 'Admin content moderation endpoints' },
@@ -242,6 +244,7 @@ export async function buildApp() {
   await app.register(loansRoutes, { prefix: '/api/loans' });
   await app.register(linksRoutes, { prefix: '/api/links' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(notificationsRoutes, { prefix: '/api/notifications' });
 
   await app.register(analyticsRoutes, { prefix: '/api/admin/analytics' });
   await app.register(usersRoutes, { prefix: '/api/admin/users' });

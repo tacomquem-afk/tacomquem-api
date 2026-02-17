@@ -21,6 +21,7 @@ import {
   createLoan,
   getLoanById,
   getLoansByUser,
+  getLoansHistory,
   getPublicLoanInfo,
   markLoanAsReturned,
   sendReminder,
@@ -482,6 +483,114 @@ describe('loans service', () => {
         expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_NO_RECEIVER);
       }
       expect(errorThrown).toBe(true);
+    });
+  });
+
+  describe('getLoansHistory', () => {
+    const returnedLoanAsLender = {
+      ...mockLoanData,
+      id: 'loan-returned-lent',
+      lenderId: 'user-123',
+      borrowerId: 'borrower-123',
+      status: 'returned' as const,
+      returnedAt: new Date('2026-02-10'),
+      updatedAt: new Date('2026-02-10'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'user-123' },
+      borrower: mockBorrowerData,
+    };
+
+    const cancelledLoanAsLender = {
+      ...mockLoanData,
+      id: 'loan-cancelled-lent',
+      lenderId: 'user-123',
+      borrowerId: null,
+      status: 'cancelled' as const,
+      updatedAt: new Date('2026-02-08'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'user-123' },
+      borrower: null,
+    };
+
+    const returnedLoanAsBorrower = {
+      ...mockLoanData,
+      id: 'loan-returned-borrowed',
+      lenderId: 'other-user',
+      borrowerId: 'user-123',
+      status: 'returned' as const,
+      returnedAt: new Date('2026-02-09'),
+      updatedAt: new Date('2026-02-09'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'other-user' },
+      borrower: { ...mockBorrowerData, id: 'user-123' },
+    };
+
+    it('should return all completed loans with counts (direction=all)', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'all');
+
+      expect(result.loans).toHaveLength(3);
+      expect(result.counts.all).toBe(3);
+      expect(result.counts.lent).toBe(2);
+      expect(result.counts.borrowed).toBe(1);
+    });
+
+    it('should filter by direction=lent and keep correct counts', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'lent');
+
+      expect(result.loans).toHaveLength(2);
+      expect(result.loans[0]?.id).toBe('loan-returned-lent');
+      expect(result.loans[1]?.id).toBe('loan-cancelled-lent');
+      expect(result.counts.all).toBe(3);
+      expect(result.counts.lent).toBe(2);
+      expect(result.counts.borrowed).toBe(1);
+    });
+
+    it('should filter by direction=borrowed and keep correct counts', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'borrowed');
+
+      expect(result.loans).toHaveLength(1);
+      expect(result.loans[0]?.id).toBe('loan-returned-borrowed');
+      expect(result.counts.all).toBe(3);
+    });
+
+    it('should return empty results when no completed loans', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([]);
+
+      const result = await getLoansHistory('user-123');
+
+      expect(result.loans).toHaveLength(0);
+      expect(result.counts).toEqual({ all: 0, lent: 0, borrowed: 0 });
+    });
+
+    it('should default direction to all', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([returnedLoanAsLender] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123');
+
+      expect(result.loans).toHaveLength(1);
+      expect(result.counts.all).toBe(1);
     });
   });
 

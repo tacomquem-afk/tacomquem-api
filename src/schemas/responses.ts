@@ -141,6 +141,17 @@ export const dashboardDataSchema = z.object({
   loans: z.array(dashboardLoanSchema),
 });
 
+export const historyCountsSchema = z.object({
+  all: z.number(),
+  lent: z.number(),
+  borrowed: z.number(),
+});
+
+export const historyResponseSchema = z.object({
+  loans: z.array(loanResponseSchema),
+  counts: historyCountsSchema,
+});
+
 export const uploadResultSchema = z.object({
   key: z.string(),
   url: z.string().url(),
@@ -165,6 +176,31 @@ export const paginationSchema = z.object({
   limit: z.number(),
   total: z.number(),
   totalPages: z.number(),
+});
+
+export const notificationResponseSchema = z.object({
+  id: uuidSchema.describe('Unique notification ID'),
+  loanId: uuidSchema.nullable().describe('Associated loan ID, null if not linked to a loan'),
+  type: z
+    .enum(['loan_created', 'loan_confirmed', 'loan_returned', 'loan_reminder'])
+    .describe('Notification event type'),
+  title: z.string().describe('Short heading displayed in the notification card'),
+  message: z.string().describe('Full notification body text'),
+  read: z.boolean().describe('Whether the user has read this notification'),
+  createdAt: dateSchema.describe('ISO 8601 timestamp when the notification was created'),
+  sentAt: dateSchema
+    .nullable()
+    .describe('ISO 8601 timestamp when the push/email was dispatched, null if not yet sent'),
+});
+
+export const notificationsListResponseSchema = z.object({
+  notifications: z
+    .array(notificationResponseSchema)
+    .describe('Ordered list of notifications, newest first'),
+  pagination: paginationSchema.describe('Pagination metadata'),
+  unreadCount: z
+    .number()
+    .describe('Total unread notifications for this user (ignores active read filter)'),
 });
 
 export const adminUserSchema = z.object({
