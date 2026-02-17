@@ -141,7 +141,7 @@ describe('items service', () => {
 
   describe('getItemsByOwner', () => {
     it('should return all active items for owner', async () => {
-      const items = [mockItemData, { ...mockItemData, id: 'item-124' }];
+      const items = [mockItemData, { ...mockItemData, id: '550e8400-e29b-41d4-a716-446655440002' }];
       const findManySpy = spyOn(db.query.items, 'findMany').mockResolvedValueOnce(items as any);
       mocks.push(findManySpy);
 

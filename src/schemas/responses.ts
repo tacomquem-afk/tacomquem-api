@@ -111,6 +111,24 @@ export const friendResponseSchema = z.object({
   borrowedCount: z.number(),
 });
 
+export const dashboardSearchItemSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  description: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+});
+
+export const dashboardSearchResponseSchema = z.object({
+  query: z.string(),
+  items: z.array(dashboardSearchItemSchema),
+  friends: z.array(friendResponseSchema),
+  meta: z.object({
+    itemCount: z.number(),
+    friendCount: z.number(),
+    limit: z.number(),
+  }),
+});
+
 export const dashboardStatsSchema = z.object({
   itemsCount: z.number(),
   activeLentCount: z.number(),

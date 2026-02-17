@@ -4,7 +4,7 @@ import { resetAllDbMocks } from '../../../__tests__/helpers/db-mock-reset.js';
 import { db } from '../../../db/index.js';
 import * as cryptoService from '../../crypto/index.js';
 import * as friendshipsService from '../../friendships/index.js';
-import { getDashboardData, getFriends } from '../index.js';
+import { getDashboardData, getFriends, searchDashboard } from '../index.js';
 
 const mocks: Array<{ mockRestore: () => void }> = [];
 
@@ -264,6 +264,85 @@ describe('dashboard service', () => {
       const friends = await getFriends('user-123');
 
       expect(friends).toHaveLength(0);
+    });
+  });
+
+  describe('searchDashboard', () => {
+    it('should return matched items and friends respecting limit', async () => {
+      const userId = 'user-123';
+      const now = new Date();
+
+      mocks.push(
+        spyOn(db.query.items, 'findMany').mockResolvedValueOnce([
+          {
+            id: 'item-1',
+            ownerId: userId,
+            name: 'Camera Sony',
+            description: 'Camera principal',
+            images: '[]',
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ] as any)
+      );
+
+      mocks.push(
+        spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce([
+          {
+            id: 'friend-1',
+            name: 'Ana Souza',
+            email: 'ana@example.com',
+            avatarUrl: null,
+            lentCount: 1,
+            borrowedCount: 0,
+          },
+          {
+            id: 'friend-2',
+            name: 'Bruno Lima',
+            email: 'bruno@example.com',
+            avatarUrl: null,
+            lentCount: 0,
+            borrowedCount: 1,
+          },
+        ])
+      );
+
+      const result = await searchDashboard(userId, 'ana', 1);
+
+      expect(result.query).toBe('ana');
+      expect(result.items).toHaveLength(1);
+      expect(result.friends).toHaveLength(1);
+      expect(result.friends[0]?.id).toBe('friend-1');
+      expect(result.meta.itemCount).toBe(1);
+      expect(result.meta.friendCount).toBe(1);
+      expect(result.meta.limit).toBe(1);
+    });
+
+    it('should trim query before searching friends', async () => {
+      const userId = 'user-123';
+
+      mocks.push(spyOn(db.query.items, 'findMany').mockResolvedValueOnce([] as any));
+
+      mocks.push(
+        spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce([
+          {
+            id: 'friend-1',
+            name: 'Carlos Silva',
+            email: 'carlos@example.com',
+            avatarUrl: null,
+            lentCount: 0,
+            borrowedCount: 0,
+          },
+        ])
+      );
+
+      const result = await searchDashboard(userId, '  carlos  ', 10);
+
+      expect(result.query).toBe('carlos');
+      expect(result.items).toHaveLength(0);
+      expect(result.friends).toHaveLength(1);
+      expect(result.friends[0]?.email).toBe('carlos@example.com');
     });
   });
 });
