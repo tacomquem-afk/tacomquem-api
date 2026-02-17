@@ -11,9 +11,6 @@ Content-Type: application/json
 @accessToken = {{login.response.body.accessToken}}
 
 
-
-
-
 ###
 GET {{$dotenv BASE_URL}}/items
 Content-Type: application/json

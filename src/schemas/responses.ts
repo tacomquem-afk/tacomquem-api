@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 const uuidSchema = z.string().uuid();
-const urlSchema = z.string().url();
 const dateSchema = z.string().datetime();
 
 export const fieldErrorSchema = z.object({
@@ -27,6 +26,7 @@ export const errorResponse409 = problemDetailsSchema;
 export const errorResponse410 = problemDetailsSchema;
 export const errorResponse413 = problemDetailsSchema;
 export const errorResponse422 = problemDetailsSchema;
+export const errorResponse500 = problemDetailsSchema;
 
 export const messageResponseSchema = z.object({
   message: z.string(),
@@ -57,8 +57,11 @@ export const itemResponseSchema = z.object({
   id: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
-  images: z.array(urlSchema),
+  images: z.array(z.string()),
   isActive: z.boolean(),
+  isLoaned: z.boolean(),
+  currentLoanId: uuidSchema.nullable(),
+  borrowedTo: z.string().nullable(),
   createdAt: dateSchema,
   updatedAt: dateSchema,
 });
@@ -68,7 +71,7 @@ export const loanResponseSchema = z.object({
   item: z.object({
     id: uuidSchema,
     name: z.string(),
-    images: z.array(urlSchema),
+    images: z.array(z.string()),
   }),
   lender: z.object({
     id: uuidSchema,
@@ -92,8 +95,11 @@ export const loanResponseSchema = z.object({
 
 export const publicLoanInfoSchema = z.object({
   itemName: z.string(),
-  itemImages: z.array(urlSchema),
+  itemImages: z.array(z.string()),
   lenderName: z.string(),
+  itemDescription: z.string().nullable(),
+  expectedReturnDate: dateSchema.nullable(),
+  lenderNotes: z.string().nullable(),
 });
 
 export const friendResponseSchema = z.object({
@@ -103,6 +109,24 @@ export const friendResponseSchema = z.object({
   avatarUrl: z.string().nullable(),
   lentCount: z.number(),
   borrowedCount: z.number(),
+});
+
+export const dashboardSearchItemSchema = z.object({
+  id: uuidSchema,
+  name: z.string(),
+  description: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+});
+
+export const dashboardSearchResponseSchema = z.object({
+  query: z.string(),
+  items: z.array(dashboardSearchItemSchema),
+  friends: z.array(friendResponseSchema),
+  meta: z.object({
+    itemCount: z.number(),
+    friendCount: z.number(),
+    limit: z.number(),
+  }),
 });
 
 export const dashboardStatsSchema = z.object({
@@ -120,32 +144,39 @@ export const recentActivitySchema = z.object({
   read: z.boolean(),
 });
 
+export const dashboardLoanSchema = z.object({
+  id: uuidSchema,
+  itemName: z.string(),
+  itemImages: z.array(z.string()),
+  status: z.enum(['pending', 'confirmed']),
+  otherParty: z.string().nullable(),
+  role: z.enum(['lender', 'borrower']),
+  expectedReturnDate: dateSchema.nullable(),
+  createdAt: dateSchema,
+  confirmedAt: dateSchema.nullable(),
+});
+
 export const dashboardDataSchema = z.object({
   stats: dashboardStatsSchema,
   recentActivity: z.array(recentActivitySchema),
-  pendingLoans: z.array(
-    z.object({
-      id: uuidSchema,
-      itemName: z.string(),
-      borrowerEmail: z.string().email().nullable(),
-      createdAt: dateSchema,
-    })
-  ),
-  activeLoans: z.array(
-    z.object({
-      id: uuidSchema,
-      itemName: z.string(),
-      itemImages: z.array(urlSchema),
-      otherParty: z.string(),
-      role: z.enum(['lender', 'borrower']),
-      expectedReturnDate: dateSchema.nullable(),
-      confirmedAt: dateSchema,
-    })
-  ),
+  loans: z.array(dashboardLoanSchema),
+});
+
+export const historyCountsSchema = z.object({
+  all: z.number(),
+  lent: z.number(),
+  borrowed: z.number(),
+});
+
+export const historyResponseSchema = z.object({
+  loans: z.array(loanResponseSchema),
+  counts: historyCountsSchema,
 });
 
 export const uploadResultSchema = z.object({
-  url: urlSchema,
+  key: z.string(),
+  url: z.string().url(),
+  expiresAt: z.string().datetime(),
   sizeBytes: z.number(),
 });
 
@@ -166,6 +197,31 @@ export const paginationSchema = z.object({
   limit: z.number(),
   total: z.number(),
   totalPages: z.number(),
+});
+
+export const notificationResponseSchema = z.object({
+  id: uuidSchema.describe('Unique notification ID'),
+  loanId: uuidSchema.nullable().describe('Associated loan ID, null if not linked to a loan'),
+  type: z
+    .enum(['loan_created', 'loan_confirmed', 'loan_returned', 'loan_reminder'])
+    .describe('Notification event type'),
+  title: z.string().describe('Short heading displayed in the notification card'),
+  message: z.string().describe('Full notification body text'),
+  read: z.boolean().describe('Whether the user has read this notification'),
+  createdAt: dateSchema.describe('ISO 8601 timestamp when the notification was created'),
+  sentAt: dateSchema
+    .nullable()
+    .describe('ISO 8601 timestamp when the push/email was dispatched, null if not yet sent'),
+});
+
+export const notificationsListResponseSchema = z.object({
+  notifications: z
+    .array(notificationResponseSchema)
+    .describe('Ordered list of notifications, newest first'),
+  pagination: paginationSchema.describe('Pagination metadata'),
+  unreadCount: z
+    .number()
+    .describe('Total unread notifications for this user (ignores active read filter)'),
 });
 
 export const adminUserSchema = z.object({
@@ -265,7 +321,7 @@ export const adminItemDetailsSchema = z.object({
   id: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
-  images: z.array(urlSchema),
+  images: z.array(z.string()),
   isActive: z.boolean(),
   owner: z.object({
     id: uuidSchema,
@@ -282,7 +338,7 @@ export const adminLoanDetailsSchema = z.object({
   item: z.object({
     id: uuidSchema,
     name: z.string(),
-    images: z.array(urlSchema),
+    images: z.array(z.string()),
   }),
   lender: z.object({
     id: uuidSchema,

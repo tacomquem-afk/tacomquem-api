@@ -1,8 +1,10 @@
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import type { SwaggerTransform } from '@fastify/swagger';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { sql } from 'drizzle-orm';
+import type { FastifySchema } from 'fastify';
 import Fastify from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
@@ -26,21 +28,30 @@ import { dashboardRoutes } from './routes/dashboard/index.js';
 import itemsRoutes from './routes/items/index.js';
 import { linksRoutes } from './routes/links/index.js';
 import { loansRoutes } from './routes/loans/index.js';
+import { notificationsRoutes } from './routes/notifications/index.js';
 import { uploadRoutes } from './routes/upload/index.js';
 
 export async function buildApp() {
   const app = Fastify({
+    trustProxy: true,
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
     },
   });
 
-  app.setValidatorCompiler(validatorCompiler);
+  // biome-ignore lint/suspicious/noExplicitAny: wrapper handles both Zod and raw JSON schemas (e.g. multipart)
+  app.setValidatorCompiler(((opts: any) => {
+    if (typeof opts.schema?.safeParse !== 'function') {
+      return (data: unknown) => ({ value: data });
+    }
+    return validatorCompiler(opts);
+  }) as typeof validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(cors, {
     origin: env.FRONTEND_URL,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(rateLimit, {
@@ -55,6 +66,17 @@ export async function buildApp() {
       instance: request.url,
     }),
   });
+
+  const multipartAwareTransform: SwaggerTransform<FastifySchema> = (input) => {
+    const { schema } = input;
+    if (schema?.body && typeof schema.body === 'object' && !('_zod' in schema.body)) {
+      const { body, ...restSchema } = schema;
+      const result = jsonSchemaTransform({ ...input, schema: restSchema });
+      result.schema.body = body;
+      return result;
+    }
+    return jsonSchemaTransform(input);
+  };
 
   await app.register(swagger, {
     openapi: {
@@ -91,6 +113,7 @@ export async function buildApp() {
         { name: 'Loans', description: 'Loan management endpoints' },
         { name: 'Links', description: 'Public loan link endpoints' },
         { name: 'Dashboard', description: 'User dashboard endpoints' },
+        { name: 'Notifications', description: 'User notification endpoints' },
         { name: 'Admin - Analytics', description: 'Admin analytics endpoints' },
         { name: 'Admin - Users', description: 'Admin user management endpoints' },
         { name: 'Admin - Moderation', description: 'Admin content moderation endpoints' },
@@ -98,7 +121,7 @@ export async function buildApp() {
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
-    transform: jsonSchemaTransform,
+    transform: multipartAwareTransform,
   });
 
   await app.register(swaggerUi, {
@@ -222,6 +245,7 @@ export async function buildApp() {
   await app.register(loansRoutes, { prefix: '/api/loans' });
   await app.register(linksRoutes, { prefix: '/api/links' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(notificationsRoutes, { prefix: '/api/notifications' });
 
   await app.register(analyticsRoutes, { prefix: '/api/admin/analytics' });
   await app.register(usersRoutes, { prefix: '/api/admin/users' });

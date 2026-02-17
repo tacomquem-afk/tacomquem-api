@@ -202,7 +202,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 
 # Email (Resend)
 RESEND_API_KEY=your-resend-api-key
-EMAIL_FROM=noreply@tacomquem.com
+EMAIL_FROM=noreply@tacomquem.app
 
 # Frontend
 FRONTEND_URL=http://localhost:5173

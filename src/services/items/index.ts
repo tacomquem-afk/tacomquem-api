@@ -1,8 +1,10 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { items, uploads } from '../../db/schema.js';
+import { items, loans, uploads } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
+import { decrypt } from '../crypto/index.js';
+import { deleteUploadsFromR2, resolveImageKeys } from '../storage/index.js';
 
 export interface ItemResponse {
   id: string;
@@ -10,28 +12,46 @@ export interface ItemResponse {
   description: string | null;
   images: string[];
   isActive: boolean;
+  isLoaned: boolean;
+  currentLoanId: string | null;
+  borrowedTo: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-function parseImages(imagesJson: string): string[] {
-  try {
-    return JSON.parse(imagesJson);
-  } catch {
-    return [];
+async function toItemResponse(
+  item: typeof items.$inferSelect,
+  activeLoan?: {
+    id: string;
+    borrowerId: string | null;
+    borrower?: { nameEncrypted: string } | null;
+  } | null
+): Promise<ItemResponse> {
+  let borrowedTo: string | null = null;
+  if (activeLoan?.borrower) {
+    borrowedTo = decrypt(activeLoan.borrower.nameEncrypted);
   }
-}
 
-function toItemResponse(item: typeof items.$inferSelect): ItemResponse {
   return {
     id: item.id,
     name: item.name,
     description: item.description,
-    images: parseImages(item.images),
+    images: await resolveImageKeys(item.images),
     isActive: item.isActive,
+    isLoaned: !!activeLoan,
+    currentLoanId: activeLoan?.id ?? null,
+    borrowedTo,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
+}
+
+async function getActiveLoanForItem(itemId: string) {
+  const result = await db.query.loans.findFirst({
+    where: and(eq(loans.itemId, itemId), eq(loans.status, 'confirmed')),
+    with: { borrower: true },
+  });
+  return result ?? null;
 }
 
 export async function createItem(ownerId: string, input: CreateItemInput): Promise<ItemResponse> {
@@ -53,7 +73,7 @@ export async function createItem(ownerId: string, input: CreateItemInput): Promi
     await db
       .update(uploads)
       .set({ confirmedAt: new Date() })
-      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.key, input.images)));
   }
 
   return toItemResponse(result[0]);
@@ -65,7 +85,16 @@ export async function getItemsByOwner(ownerId: string): Promise<ItemResponse[]> 
     orderBy: (items, { desc }) => [desc(items.createdAt)],
   });
 
-  return result.map(toItemResponse);
+  const itemsWithLoans = await Promise.all(
+    result.map(async (item) => ({
+      item,
+      activeLoan: await getActiveLoanForItem(item.id),
+    }))
+  );
+
+  return Promise.all(
+    itemsWithLoans.map(({ item, activeLoan }) => toItemResponse(item, activeLoan))
+  );
 }
 
 export async function getItemById(itemId: string, ownerId: string): Promise<ItemResponse | null> {
@@ -77,7 +106,8 @@ export async function getItemById(itemId: string, ownerId: string): Promise<Item
     return null;
   }
 
-  return toItemResponse(item);
+  const activeLoan = await getActiveLoanForItem(item.id);
+  return toItemResponse(item, activeLoan);
 }
 
 export async function updateItem(
@@ -111,10 +141,11 @@ export async function updateItem(
     await db
       .update(uploads)
       .set({ confirmedAt: new Date() })
-      .where(and(eq(uploads.userId, ownerId), inArray(uploads.url, input.images)));
+      .where(and(eq(uploads.userId, ownerId), inArray(uploads.key, input.images)));
   }
 
-  return toItemResponse(result[0]);
+  const activeLoan = await getActiveLoanForItem(itemId);
+  return toItemResponse(result[0], activeLoan);
 }
 
 export async function deleteItem(itemId: string, ownerId: string): Promise<boolean> {
@@ -131,6 +162,18 @@ export async function deleteItem(itemId: string, ownerId: string): Promise<boole
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(items.id, itemId));
 
+  let imageKeys: string[] = [];
+  try {
+    imageKeys = JSON.parse(existing.images);
+  } catch {}
+
+  if (imageKeys.length > 0) {
+    const { failed } = await deleteUploadsFromR2(imageKeys);
+    if (failed.length > 0) {
+      console.warn(`Failed to delete ${failed.length} images from R2`, { failed });
+    }
+  }
+
   return true;
 }
 
@@ -143,5 +186,6 @@ export async function getItemByIdPublic(itemId: string): Promise<ItemResponse | 
     return null;
   }
 
-  return toItemResponse(item);
+  const activeLoan = await getActiveLoanForItem(item.id);
+  return toItemResponse(item, activeLoan);
 }

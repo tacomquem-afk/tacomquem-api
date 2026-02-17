@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans } from '../../db/schema.js';
 import { decrypt } from '../crypto/index.js';
+import { deleteUploadsFromR2, resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 import { logAdminAction } from './index.js';
 
@@ -29,7 +30,7 @@ export async function getItemDetails(itemId: string) {
     id: item.id,
     name: item.name,
     description: item.description,
-    images: typeof item.images === 'string' ? JSON.parse(item.images) : item.images,
+    images: await resolveImageKeys(item.images),
     isActive: item.isActive,
     owner: {
       id: item.owner.id,
@@ -48,7 +49,25 @@ export async function removeItem(
   reason: string,
   ipAddress?: string
 ) {
-  await db.update(items).set({ isActive: false }).where(eq(items.id, itemId));
+  const item = await db.query.items.findFirst({
+    where: eq(items.id, itemId),
+  });
+
+  if (item) {
+    await db.update(items).set({ isActive: false }).where(eq(items.id, itemId));
+
+    let imageKeys: string[] = [];
+    try {
+      imageKeys = JSON.parse(item.images);
+    } catch {}
+
+    if (imageKeys.length > 0) {
+      const { failed } = await deleteUploadsFromR2(imageKeys);
+      if (failed.length > 0) {
+        console.warn(`Admin removal: Failed to delete ${failed.length} images from R2`, { failed });
+      }
+    }
+  }
 
   await logAdminAction({
     adminId,
@@ -80,8 +99,7 @@ export async function getLoanDetails(loanId: string) {
     item: {
       id: loan.item.id,
       name: loan.item.name,
-      images:
-        typeof loan.item.images === 'string' ? JSON.parse(loan.item.images) : loan.item.images,
+      images: await resolveImageKeys(loan.item.images),
     },
     lender: {
       id: loan.lender.id,

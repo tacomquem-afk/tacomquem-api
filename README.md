@@ -18,6 +18,7 @@ API for managing personal item loans between friends. Eliminates the social disc
 - **Items Management:** Create, read, update, and soft delete items with multiple images
 - **Loan Management:** Create loans with public confirmation links, track loan status
 - **Dashboard:** Overview of items, loans, and recent activity
+- **Persistent Friendships:** Created on loan confirmation and stored in `friendships`
 - **LGPD Compliance:** All PII encrypted at rest using AES-256
 - **Email Notifications:** Loan confirmations and reminders via Resend
 
@@ -102,6 +103,7 @@ src/
 │   ├── email/             # Email service
 │   ├── items/             # Items operations
 │   ├── loans/             # Loans operations
+│   ├── friendships/       # Friendship operations
 │   ├── password/          # Password hashing
 │   └── dashboard/         # Dashboard data
 ├── schemas/               # Zod validation schemas
@@ -145,8 +147,8 @@ src/
 - `POST /api/links/:token/confirm` - Confirm loan (requires auth)
 
 ### Dashboard
-- `GET /api/dashboard` - Get dashboard data
-- `GET /api/dashboard/friends` - Get friends list
+- `GET /api/dashboard` - Get dashboard data (only active loans, status `confirmed`)
+- `GET /api/dashboard/friends` - Get friends list from persisted friendships
 
 ### Upload
 - `POST /api/upload` - Upload image
@@ -179,7 +181,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 
 # Email
 RESEND_API_KEY=your-resend-api-key
-EMAIL_FROM=noreply@tacomquem.com
+EMAIL_FROM=noreply@tacomquem.app
 
 # Frontend
 FRONTEND_URL=http://localhost:5173

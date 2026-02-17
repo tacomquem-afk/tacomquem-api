@@ -1,7 +1,9 @@
-import { and, count, desc, eq, or } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans, notifications } from '../../db/schema.js';
 import { decrypt } from '../crypto/index.js';
+import { getFriendsByUser } from '../friendships/index.js';
+import { resolveImageKeys } from '../storage/index.js';
 
 export interface DashboardStats {
   itemsCount: number;
@@ -18,32 +20,22 @@ export interface RecentActivity {
   read: boolean;
 }
 
+export interface DashboardLoan {
+  id: string;
+  itemName: string;
+  itemImages: string[];
+  status: 'pending' | 'confirmed';
+  otherParty: string | null;
+  role: 'lender' | 'borrower';
+  expectedReturnDate: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
   recentActivity: RecentActivity[];
-  pendingLoans: Array<{
-    id: string;
-    itemName: string;
-    borrowerEmail: string | null;
-    createdAt: string;
-  }>;
-  activeLoans: Array<{
-    id: string;
-    itemName: string;
-    itemImages: string[];
-    otherParty: string;
-    role: 'lender' | 'borrower';
-    expectedReturnDate: string | null;
-    confirmedAt: string;
-  }>;
-}
-
-function parseImages(imagesJson: string): string[] {
-  try {
-    return JSON.parse(imagesJson);
-  } catch {
-    return [];
-  }
+  loans: DashboardLoan[];
 }
 
 export async function getDashboardData(userId: string): Promise<DashboardData> {
@@ -73,25 +65,17 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
     limit: 10,
   });
 
-  const pendingLoans = await db.query.loans.findMany({
-    where: and(eq(loans.lenderId, userId), eq(loans.status, 'pending')),
-    with: { item: true },
-    orderBy: [desc(loans.createdAt)],
-    limit: 5,
-  });
-
-  const activeLoans = await db.query.loans.findMany({
+  const allLoans = await db.query.loans.findMany({
     where: and(
       or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId)),
-      eq(loans.status, 'confirmed')
+      or(eq(loans.status, 'pending'), eq(loans.status, 'confirmed'))
     ),
     with: {
       item: true,
       lender: true,
       borrower: true,
     },
-    orderBy: [desc(loans.confirmedAt)],
-    limit: 10,
+    orderBy: [desc(loans.createdAt)],
   });
 
   return {
@@ -108,91 +92,110 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
       createdAt: n.createdAt.toISOString(),
       read: n.read,
     })),
-    pendingLoans: pendingLoans
-      .filter((l) => l.item)
-      .map((l) => ({
-        id: l.id,
-        itemName: l.item.name,
-        borrowerEmail: l.borrowerEmail,
-        createdAt: l.createdAt.toISOString(),
-      })),
-    activeLoans: activeLoans
-      .filter((l) => l.item && (l.lenderId === userId || l.lender))
-      .map((l) => {
-        const isLender = l.lenderId === userId;
-        const otherParty = isLender
-          ? l.borrower
-            ? decrypt(l.borrower.nameEncrypted)
-            : 'Pendente'
-          : decrypt(l.lender.nameEncrypted);
+    loans: await Promise.all(
+      allLoans
+        .filter((l) => l.item && (l.lenderId === userId || l.borrowerId === userId))
+        .map(async (l) => {
+          const isLender = l.lenderId === userId;
+          const otherParty = isLender
+            ? l.borrower
+              ? decrypt(l.borrower.nameEncrypted)
+              : (l.borrowerEmail ?? 'Pendente')
+            : decrypt(l.lender.nameEncrypted);
 
-        return {
-          id: l.id,
-          itemName: l.item.name,
-          itemImages: parseImages(l.item.images),
-          otherParty,
-          role: isLender ? 'lender' : 'borrower',
-          expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
-          confirmedAt: (l.confirmedAt ?? new Date()).toISOString(),
-        };
-      }),
+          return {
+            id: l.id,
+            itemName: l.item.name,
+            itemImages: await resolveImageKeys(l.item.images),
+            status: l.status as 'pending' | 'confirmed',
+            otherParty,
+            role: isLender ? ('lender' as const) : ('borrower' as const),
+            expectedReturnDate: l.expectedReturnDate?.toISOString() ?? null,
+            createdAt: l.createdAt.toISOString(),
+            confirmedAt: l.confirmedAt?.toISOString() ?? null,
+          };
+        })
+    ),
   };
 }
 
 export interface Friend {
   id: string;
   name: string;
+  email: string;
   avatarUrl: string | null;
   lentCount: number;
   borrowedCount: number;
 }
 
 export async function getFriends(userId: string): Promise<Friend[]> {
-  const lentLoans = await db.query.loans.findMany({
-    where: and(eq(loans.lenderId, userId), eq(loans.status, 'confirmed')),
-    with: { borrower: true },
-  });
+  return getFriendsByUser(userId);
+}
 
-  const borrowedLoans = await db.query.loans.findMany({
-    where: and(eq(loans.borrowerId, userId), eq(loans.status, 'confirmed')),
-    with: { lender: true },
-  });
+export interface DashboardSearchItem {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+}
 
-  const friendsMap = new Map<string, Friend>();
+export interface DashboardSearchResult {
+  query: string;
+  items: DashboardSearchItem[];
+  friends: Friend[];
+  meta: {
+    itemCount: number;
+    friendCount: number;
+    limit: number;
+  };
+}
 
-  for (const loan of lentLoans) {
-    if (!loan.borrower) continue;
+export async function searchDashboard(
+  userId: string,
+  query: string,
+  limit: number
+): Promise<DashboardSearchResult> {
+  const normalizedQuery = query.trim().toLowerCase();
+  const likeQuery = `%${normalizedQuery}%`;
 
-    const existing = friendsMap.get(loan.borrower.id);
-    if (existing) {
-      existing.lentCount++;
-    } else {
-      friendsMap.set(loan.borrower.id, {
-        id: loan.borrower.id,
-        name: decrypt(loan.borrower.nameEncrypted),
-        avatarUrl: loan.borrower.avatarUrl,
-        lentCount: 1,
-        borrowedCount: 0,
-      });
-    }
-  }
+  const [matchedItems, friends] = await Promise.all([
+    db.query.items.findMany({
+      where: and(
+        eq(items.ownerId, userId),
+        eq(items.isActive, true),
+        or(ilike(items.name, likeQuery), ilike(items.description, likeQuery))
+      ),
+      orderBy: [desc(items.updatedAt)],
+      limit,
+    }),
+    getFriendsByUser(userId),
+  ]);
 
-  for (const loan of borrowedLoans) {
-    const existing = friendsMap.get(loan.lender.id);
-    if (existing) {
-      existing.borrowedCount++;
-    } else {
-      friendsMap.set(loan.lender.id, {
-        id: loan.lender.id,
-        name: decrypt(loan.lender.nameEncrypted),
-        avatarUrl: loan.lender.avatarUrl,
-        lentCount: 0,
-        borrowedCount: 1,
-      });
-    }
-  }
+  const matchedFriends = friends
+    .filter((friend) => {
+      const name = friend.name.toLowerCase();
+      const email = friend.email.toLowerCase();
+      return name.includes(normalizedQuery) || email.includes(normalizedQuery);
+    })
+    .slice(0, limit);
 
-  return Array.from(friendsMap.values()).sort(
-    (a, b) => b.lentCount + b.borrowedCount - (a.lentCount + a.borrowedCount)
+  const itemResults = await Promise.all(
+    matchedItems.map(async (item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      imageUrl: (await resolveImageKeys(item.images))[0] ?? null,
+    }))
   );
+
+  return {
+    query: query.trim(),
+    items: itemResults,
+    friends: matchedFriends,
+    meta: {
+      itemCount: itemResults.length,
+      friendCount: matchedFriends.length,
+      limit,
+    },
+  };
 }

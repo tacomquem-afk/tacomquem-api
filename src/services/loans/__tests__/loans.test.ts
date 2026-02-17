@@ -1,15 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
+mock.module('../../storage/index.js', () => ({
+  resolveImageKeys: async (json: string) => {
+    try {
+      return JSON.parse(json);
+    } catch {
+      return [];
+    }
+  },
+}));
+
 import { db } from '../../../db/index.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../../errors/index.js';
 import * as cryptoModule from '../../crypto/index.js';
 import * as emailModule from '../../email/index.js';
+import * as friendshipsModule from '../../friendships/index.js';
 import {
   cancelLoan,
   confirmLoan,
   createLoan,
   getLoanById,
   getLoansByUser,
+  getLoansHistory,
   getPublicLoanInfo,
   markLoanAsReturned,
   sendReminder,
@@ -75,13 +87,17 @@ beforeEach(() => {
   spyOn(db.query.items, 'findFirst').mockClear();
   spyOn(db.query.users, 'findFirst').mockClear();
   spyOn(db.query.loanTokens, 'findFirst').mockClear();
+  spyOn(db, 'transaction').mockClear();
   spyOn(cryptoModule, 'decrypt').mockClear();
   spyOn(emailModule, 'sendEmail').mockClear();
+  spyOn(friendshipsModule, 'createFriendshipIfNotExists').mockClear();
 });
 
 afterEach(() => {
   spyOn(cryptoModule, 'decrypt').mockRestore();
   spyOn(emailModule, 'sendEmail').mockRestore();
+  spyOn(friendshipsModule, 'createFriendshipIfNotExists').mockRestore();
+  spyOn(db, 'transaction').mockRestore();
 });
 
 describe('loans service', () => {
@@ -470,6 +486,114 @@ describe('loans service', () => {
     });
   });
 
+  describe('getLoansHistory', () => {
+    const returnedLoanAsLender = {
+      ...mockLoanData,
+      id: 'loan-returned-lent',
+      lenderId: 'user-123',
+      borrowerId: 'borrower-123',
+      status: 'returned' as const,
+      returnedAt: new Date('2026-02-10'),
+      updatedAt: new Date('2026-02-10'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'user-123' },
+      borrower: mockBorrowerData,
+    };
+
+    const cancelledLoanAsLender = {
+      ...mockLoanData,
+      id: 'loan-cancelled-lent',
+      lenderId: 'user-123',
+      borrowerId: null,
+      status: 'cancelled' as const,
+      updatedAt: new Date('2026-02-08'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'user-123' },
+      borrower: null,
+    };
+
+    const returnedLoanAsBorrower = {
+      ...mockLoanData,
+      id: 'loan-returned-borrowed',
+      lenderId: 'other-user',
+      borrowerId: 'user-123',
+      status: 'returned' as const,
+      returnedAt: new Date('2026-02-09'),
+      updatedAt: new Date('2026-02-09'),
+      item: mockItemData,
+      lender: { ...mockLenderData, id: 'other-user' },
+      borrower: { ...mockBorrowerData, id: 'user-123' },
+    };
+
+    it('should return all completed loans with counts (direction=all)', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'all');
+
+      expect(result.loans).toHaveLength(3);
+      expect(result.counts.all).toBe(3);
+      expect(result.counts.lent).toBe(2);
+      expect(result.counts.borrowed).toBe(1);
+    });
+
+    it('should filter by direction=lent and keep correct counts', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'lent');
+
+      expect(result.loans).toHaveLength(2);
+      expect(result.loans[0]?.id).toBe('loan-returned-lent');
+      expect(result.loans[1]?.id).toBe('loan-cancelled-lent');
+      expect(result.counts.all).toBe(3);
+      expect(result.counts.lent).toBe(2);
+      expect(result.counts.borrowed).toBe(1);
+    });
+
+    it('should filter by direction=borrowed and keep correct counts', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([
+        returnedLoanAsLender,
+        returnedLoanAsBorrower,
+        cancelledLoanAsLender,
+      ] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123', 'borrowed');
+
+      expect(result.loans).toHaveLength(1);
+      expect(result.loans[0]?.id).toBe('loan-returned-borrowed');
+      expect(result.counts.all).toBe(3);
+    });
+
+    it('should return empty results when no completed loans', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([]);
+
+      const result = await getLoansHistory('user-123');
+
+      expect(result.loans).toHaveLength(0);
+      expect(result.counts).toEqual({ all: 0, lent: 0, borrowed: 0 });
+    });
+
+    it('should default direction to all', async () => {
+      spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([returnedLoanAsLender] as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
+
+      const result = await getLoansHistory('user-123');
+
+      expect(result.loans).toHaveLength(1);
+      expect(result.counts.all).toBe(1);
+    });
+  });
+
   describe('getPublicLoanInfo', () => {
     it('should return public loan info for valid token', async () => {
       const publicLoanToken = {
@@ -533,6 +657,60 @@ describe('loans service', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should return public loan info with all optional fields populated', async () => {
+      const publicLoanToken = {
+        ...mockLoanTokenData,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        usedAt: null,
+        loan: {
+          ...mockLoanData,
+          item: { ...mockItemData, description: 'Test item description' },
+          lender: mockLenderData,
+          expectedReturnDate: new Date('2026-02-28'),
+          lenderNotes: 'Please return with batteries',
+        },
+      };
+
+      spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(publicLoanToken as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const result = await getPublicLoanInfo('token-with-fields');
+
+      expect(result?.itemName).toBe('Test Item');
+      expect(result?.lenderName).toBe('Lender Name');
+      expect(result?.itemImages).toEqual(['https://example.com/image1.jpg']);
+      expect(result?.itemDescription).toBe('Test item description');
+      expect(result?.expectedReturnDate).toBe(new Date('2026-02-28').toISOString());
+      expect(result?.lenderNotes).toBe('Please return with batteries');
+    });
+
+    it('should return public loan info with null optional fields when not provided', async () => {
+      const publicLoanToken = {
+        ...mockLoanTokenData,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        usedAt: null,
+        loan: {
+          ...mockLoanData,
+          item: { ...mockItemData, description: null },
+          lender: mockLenderData,
+          expectedReturnDate: null,
+          lenderNotes: null,
+        },
+      };
+
+      spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(publicLoanToken as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const result = await getPublicLoanInfo('token-no-fields');
+
+      expect(result?.itemName).toBe('Test Item');
+      expect(result?.lenderName).toBe('Lender Name');
+      expect(result?.itemImages).toEqual(['https://example.com/image1.jpg']);
+      expect(result?.itemDescription).toBeNull();
+      expect(result?.expectedReturnDate).toBeNull();
+      expect(result?.lenderNotes).toBeNull();
+    });
   });
 
   describe('confirmLoan', () => {
@@ -570,9 +748,16 @@ describe('loans service', () => {
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
       spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      spyOn(db, 'transaction').mockImplementation(async (callback: any) => callback(db as any));
 
       const valuesMock = mock(() => Promise.resolve());
       spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      const createFriendshipSpy = spyOn(
+        friendshipsModule,
+        'createFriendshipIfNotExists'
+      ).mockResolvedValue({
+        created: true,
+      });
 
       spyOn(cryptoModule, 'decrypt').mockReturnValue('Test Name');
 
@@ -580,6 +765,12 @@ describe('loans service', () => {
 
       expect(result).not.toBeNull();
       expect(result.status).toBe('confirmed');
+      expect(createFriendshipSpy).toHaveBeenCalledWith(
+        'lender-123',
+        'borrower-123',
+        'loan-123',
+        db
+      );
     });
 
     it('should throw error if token not found', async () => {

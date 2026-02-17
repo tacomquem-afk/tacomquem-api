@@ -33,7 +33,7 @@ describe('Moderation Service', () => {
   describe('getItemDetails', () => {
     it('should return item with loans history and owner info', async () => {
       const mockItem = {
-        id: 'item-1',
+        id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Test Item',
         isActive: true,
         owner: {
@@ -52,7 +52,7 @@ describe('Moderation Service', () => {
 
       mocks.push(spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItem as any));
 
-      const result = await getItemDetails('item-1');
+      const result = await getItemDetails('550e8400-e29b-41d4-a716-446655440000');
 
       expect(result).toBeDefined();
       expect(result?.owner.email).toBeDefined();
@@ -71,6 +71,17 @@ describe('Moderation Service', () => {
 
   describe('removeItem', () => {
     it('should soft delete item and log action', async () => {
+      const mockItem = {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        name: 'Test Item',
+        images: '[]',
+      };
+
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItem as any
+      );
+      mocks.push(findFirstSpy);
+
       const updateSpy = spyOn(db, 'update').mockReturnValue({
         set: mock(() => ({ where: mock(() => Promise.resolve()) })),
       } as any);
@@ -81,7 +92,12 @@ describe('Moderation Service', () => {
       } as any);
       mocks.push(insertSpy);
 
-      await removeItem('item-1', 'admin-1', 'Inappropriate content', '192.168.1.1');
+      await removeItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440002',
+        'Inappropriate content',
+        '192.168.1.1'
+      );
 
       expect(updateSpy).toHaveBeenCalled();
       expect(insertSpy).toHaveBeenCalled();

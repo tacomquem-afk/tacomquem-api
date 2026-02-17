@@ -8,6 +8,7 @@ import {
   errorResponse401,
   errorResponse404,
   errorResponse422,
+  historyResponseSchema,
   loanResponseSchema,
   messageResponseSchema,
 } from '../../schemas/responses.js';
@@ -16,6 +17,8 @@ import {
   createLoan,
   getLoanById,
   getLoansByUser,
+  getLoansHistory,
+  type HistoryDirection,
   markLoanAsReturned,
   sendReminder,
 } from '../../services/loans/index.js';
@@ -24,6 +27,10 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 
 const loanFilterSchema = z.object({
   filter: z.enum(['lent', 'borrowed', 'pending', 'confirmed', 'returned']).optional(),
+});
+
+const historyFilterSchema = z.object({
+  direction: z.enum(['all', 'lent', 'borrowed']).optional().default('all'),
 });
 
 export async function loansRoutes(app: FastifyInstance) {
@@ -72,6 +79,28 @@ export async function loansRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const loans = await getLoansByUser(request.user.userId, request.query.filter);
       return reply.send({ loans });
+    }
+  );
+
+  typed.get(
+    '/history',
+    {
+      schema: {
+        tags: ['Loans'],
+        description:
+          'List completed loans (returned/cancelled) with direction filter and tab counts',
+        security: [{ BearerAuth: [] }],
+        querystring: historyFilterSchema,
+        response: {
+          200: historyResponseSchema,
+          401: errorResponse401,
+        },
+      },
+    },
+    async (request, reply) => {
+      const direction = request.query.direction as HistoryDirection;
+      const result = await getLoansHistory(request.user.userId, direction);
+      return reply.send(result);
     }
   );
 
