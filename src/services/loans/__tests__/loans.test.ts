@@ -657,6 +657,60 @@ describe('loans service', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should return public loan info with all optional fields populated', async () => {
+      const publicLoanToken = {
+        ...mockLoanTokenData,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        usedAt: null,
+        loan: {
+          ...mockLoanData,
+          item: { ...mockItemData, description: 'Test item description' },
+          lender: mockLenderData,
+          expectedReturnDate: new Date('2026-02-28'),
+          lenderNotes: 'Please return with batteries',
+        },
+      };
+
+      spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(publicLoanToken as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const result = await getPublicLoanInfo('token-with-fields');
+
+      expect(result?.itemName).toBe('Test Item');
+      expect(result?.lenderName).toBe('Lender Name');
+      expect(result?.itemImages).toEqual(['https://example.com/image1.jpg']);
+      expect(result?.itemDescription).toBe('Test item description');
+      expect(result?.expectedReturnDate).toBe(new Date('2026-02-28').toISOString());
+      expect(result?.lenderNotes).toBe('Please return with batteries');
+    });
+
+    it('should return public loan info with null optional fields when not provided', async () => {
+      const publicLoanToken = {
+        ...mockLoanTokenData,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        usedAt: null,
+        loan: {
+          ...mockLoanData,
+          item: { ...mockItemData, description: null },
+          lender: mockLenderData,
+          expectedReturnDate: null,
+          lenderNotes: null,
+        },
+      };
+
+      spyOn(db.query.loanTokens, 'findFirst').mockResolvedValueOnce(publicLoanToken as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const result = await getPublicLoanInfo('token-no-fields');
+
+      expect(result?.itemName).toBe('Test Item');
+      expect(result?.lenderName).toBe('Lender Name');
+      expect(result?.itemImages).toEqual(['https://example.com/image1.jpg']);
+      expect(result?.itemDescription).toBeNull();
+      expect(result?.expectedReturnDate).toBeNull();
+      expect(result?.lenderNotes).toBeNull();
+    });
   });
 
   describe('confirmLoan', () => {

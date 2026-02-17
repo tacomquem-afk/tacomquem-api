@@ -97,6 +97,9 @@ export const publicLoanInfoSchema = z.object({
   itemName: z.string(),
   itemImages: z.array(z.string()),
   lenderName: z.string(),
+  itemDescription: z.string().nullable(),
+  expectedReturnDate: dateSchema.nullable(),
+  lenderNotes: z.string().nullable(),
 });
 
 export const friendResponseSchema = z.object({

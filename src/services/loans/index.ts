@@ -45,6 +45,9 @@ export interface PublicLoanInfo {
   itemName: string;
   itemImages: string[];
   lenderName: string;
+  itemDescription: string | null;
+  expectedReturnDate: string | null;
+  lenderNotes: string | null;
 }
 
 export async function createLoan(
@@ -468,6 +471,9 @@ export async function getPublicLoanInfo(token: string): Promise<PublicLoanInfo |
     itemName: loanToken.loan.item.name,
     itemImages: await resolveImageKeys(loanToken.loan.item.images),
     lenderName: decrypt(loanToken.loan.lender.nameEncrypted),
+    itemDescription: loanToken.loan.item.description ?? null,
+    expectedReturnDate: loanToken.loan.expectedReturnDate?.toISOString() ?? null,
+    lenderNotes: loanToken.loan.lenderNotes ?? null,
   };
 }
 
