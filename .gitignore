@@ -35,3 +35,4 @@ bun.lock
 
 # Test credentials (local use only)
 test-users.json
+Deploy.md
