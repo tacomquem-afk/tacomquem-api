@@ -3,7 +3,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'b
 import { resetAllDbMocks } from '../../../__tests__/helpers/db-mock-reset.js';
 import { db } from '../../../db/index.js';
 import * as cryptoService from '../../crypto/index.js';
-import { getDashboardData, getFriends } from '../index.js';
+import * as friendshipsService from '../../friendships/index.js';
+import { getDashboardData, getFriends, searchDashboard } from '../index.js';
 
 const mocks: Array<{ mockRestore: () => void }> = [];
 
@@ -146,204 +147,202 @@ describe('dashboard service', () => {
         expect(activity.type).toBe('loan_created');
       }
 
-      expect(data.pendingLoans).toHaveLength(1);
-      const pendingLoan = data.pendingLoans[0];
-      if (pendingLoan) {
-        expect(pendingLoan.itemName).toBe('Laptop');
-      }
-
-      expect(data.activeLoans).toHaveLength(1);
-      const activeLoan = data.activeLoans[0];
+      expect(data.loans).toHaveLength(1);
+      const activeLoan = data.loans[0];
       if (activeLoan) {
         expect(activeLoan.otherParty).toBe('Jane Smith');
         expect(activeLoan.role).toBe('lender');
       }
     });
+
+    it('should not include returned loans in activeLoans', async () => {
+      const userId = 'user-123';
+      const now = new Date();
+
+      const mockItem = {
+        id: 'item-1',
+        name: 'Laptop',
+        description: 'My laptop',
+        images: '[]',
+        isActive: true,
+        ownerId: userId,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const mockLender = {
+        id: userId,
+        emailEncrypted: 'encrypted-email',
+        nameEncrypted: 'encrypted-name',
+        emailHash: 'hash',
+        passwordHash: 'hash',
+        avatarUrl: null,
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const mockBorrower = {
+        id: 'user-456',
+        emailEncrypted: 'encrypted-email2',
+        nameEncrypted: 'encrypted-name2',
+        emailHash: 'hash2',
+        passwordHash: 'hash2',
+        avatarUrl: null,
+        emailVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const mockConfirmedLoan = {
+        id: 'loan-confirmed',
+        itemId: 'item-1',
+        lenderId: userId,
+        borrowerId: 'user-456',
+        borrowerEmail: 'borrower@example.com',
+        status: 'confirmed' as const,
+        expectedReturnDate: null,
+        lenderNotes: null,
+        borrowerNotes: null,
+        confirmedAt: now,
+        returnedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        item: mockItem,
+        lender: mockLender,
+        borrower: mockBorrower,
+      };
+
+      mocks.push(
+        spyOn(db, 'select').mockImplementation(
+          () =>
+            ({
+              from: () => ({
+                where: () => [{ count: 1 }],
+              }),
+            }) as any
+        )
+      );
+
+      mocks.push(spyOn(db.query.notifications, 'findMany').mockResolvedValue([]));
+      mocks.push(
+        spyOn(db.query.loans, 'findMany').mockResolvedValueOnce([mockConfirmedLoan] as any)
+      );
+      mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Nome'));
+
+      const data = await getDashboardData(userId);
+
+      expect(data.loans).toHaveLength(1);
+      expect(data.loans[0]?.id).toBe('loan-confirmed');
+    });
   });
 
   describe('getFriends', () => {
-    it('should return friends list with lent and borrowed counts', async () => {
+    it('should return friends list from friendships service', async () => {
       const userId = 'user-123';
-      const friendId = 'user-456';
-      const now = new Date();
+      const expected = [
+        {
+          id: 'friend-1',
+          name: 'Friend Name',
+          email: 'friend@example.com',
+          avatarUrl: 'https://example.com/avatar.jpg',
+          lentCount: 2,
+          borrowedCount: 1,
+        },
+      ];
 
-      const mockFriend = {
-        id: friendId,
-        emailEncrypted: 'encrypted',
-        nameEncrypted: 'encrypted',
-        emailHash: 'hash2',
-        passwordHash: 'hash2',
-        avatarUrl: 'https://example.com/avatar.jpg',
-        emailVerified: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const mockLentLoan = {
-        id: 'loan-1',
-        itemId: 'item-1',
-        lenderId: userId,
-        borrowerId: friendId,
-        borrowerEmail: 'friend@example.com',
-        status: 'confirmed' as const,
-        expectedReturnDate: null,
-        lenderNotes: null,
-        borrowerNotes: null,
-        confirmedAt: now,
-        returnedAt: null,
-        createdAt: now,
-        updatedAt: now,
-        borrower: mockFriend,
-      };
-
-      const mockBorrowedLoan = {
-        id: 'loan-2',
-        itemId: 'item-2',
-        lenderId: friendId,
-        borrowerId: userId,
-        borrowerEmail: 'user@example.com',
-        status: 'confirmed' as const,
-        expectedReturnDate: null,
-        lenderNotes: null,
-        borrowerNotes: null,
-        confirmedAt: now,
-        returnedAt: null,
-        createdAt: now,
-        updatedAt: now,
-        lender: mockFriend,
-      };
-
-      mocks.push(
-        spyOn(db.query.loans, 'findMany')
-          .mockResolvedValueOnce([mockLentLoan]) // lentLoans
-          .mockResolvedValueOnce([mockBorrowedLoan])
-      ); // borrowedLoans
-
-      mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Friend Name'));
+      mocks.push(spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce(expected));
 
       const friends = await getFriends(userId);
 
-      expect(friends).toHaveLength(1);
-      const friend = friends[0];
-      if (friend) {
-        expect(friend.id).toBe(friendId);
-        expect(friend.name).toBe('Friend Name');
-        expect(friend.lentCount).toBe(1);
-        expect(friend.borrowedCount).toBe(1);
-        expect(friend.avatarUrl).toBe('https://example.com/avatar.jpg');
-      }
+      expect(friends).toEqual(expected);
     });
 
     it('should return empty array when user has no friends', async () => {
-      const userId = 'user-123';
+      mocks.push(spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce([]));
 
-      mocks.push(
-        spyOn(db.query.loans, 'findMany')
-          .mockResolvedValueOnce([]) // lentLoans
-          .mockResolvedValueOnce([])
-      ); // borrowedLoans
-
-      const friends = await getFriends(userId);
+      const friends = await getFriends('user-123');
 
       expect(friends).toHaveLength(0);
     });
+  });
 
-    it('should sort friends by total interaction count', async () => {
+  describe('searchDashboard', () => {
+    it('should return matched items and friends respecting limit', async () => {
       const userId = 'user-123';
       const now = new Date();
 
-      const friend1 = {
-        id: 'friend-1',
-        emailEncrypted: 'encrypted',
-        nameEncrypted: 'encrypted',
-        emailHash: 'hash1',
-        passwordHash: 'hash1',
-        avatarUrl: null,
-        emailVerified: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const friend2 = {
-        id: 'friend-2',
-        emailEncrypted: 'encrypted',
-        nameEncrypted: 'encrypted',
-        emailHash: 'hash2',
-        passwordHash: 'hash2',
-        avatarUrl: null,
-        emailVerified: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const mockLoan1 = {
-        id: 'loan-1',
-        itemId: 'item-1',
-        lenderId: userId,
-        borrowerId: 'friend-1',
-        borrowerEmail: 'friend1@example.com',
-        status: 'confirmed' as const,
-        expectedReturnDate: null,
-        lenderNotes: null,
-        borrowerNotes: null,
-        confirmedAt: now,
-        returnedAt: null,
-        createdAt: now,
-        updatedAt: now,
-        borrower: friend1,
-      };
-
-      const mockLoan2a = {
-        id: 'loan-2a',
-        itemId: 'item-2a',
-        lenderId: userId,
-        borrowerId: 'friend-2',
-        borrowerEmail: 'friend2@example.com',
-        status: 'confirmed' as const,
-        expectedReturnDate: null,
-        lenderNotes: null,
-        borrowerNotes: null,
-        confirmedAt: now,
-        returnedAt: null,
-        createdAt: now,
-        updatedAt: now,
-        borrower: friend2,
-      };
-
-      const mockLoan2b = {
-        id: 'loan-2b',
-        itemId: 'item-2b',
-        lenderId: userId,
-        borrowerId: 'friend-2',
-        borrowerEmail: 'friend2@example.com',
-        status: 'confirmed' as const,
-        expectedReturnDate: null,
-        lenderNotes: null,
-        borrowerNotes: null,
-        confirmedAt: now,
-        returnedAt: null,
-        createdAt: now,
-        updatedAt: now,
-        borrower: friend2,
-      };
+      mocks.push(
+        spyOn(db.query.items, 'findMany').mockResolvedValueOnce([
+          {
+            id: 'item-1',
+            ownerId: userId,
+            name: 'Camera Sony',
+            description: 'Camera principal',
+            images: '[]',
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ] as any)
+      );
 
       mocks.push(
-        spyOn(db.query.loans, 'findMany')
-          .mockResolvedValueOnce([mockLoan1, mockLoan2a, mockLoan2b]) // lentLoans
-          .mockResolvedValueOnce([])
-      ); // borrowedLoans
+        spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce([
+          {
+            id: 'friend-1',
+            name: 'Ana Souza',
+            email: 'ana@example.com',
+            avatarUrl: null,
+            lentCount: 1,
+            borrowedCount: 0,
+          },
+          {
+            id: 'friend-2',
+            name: 'Bruno Lima',
+            email: 'bruno@example.com',
+            avatarUrl: null,
+            lentCount: 0,
+            borrowedCount: 1,
+          },
+        ])
+      );
 
-      mocks.push(spyOn(cryptoService, 'decrypt').mockReturnValue('Friend'));
+      const result = await searchDashboard(userId, 'ana', 1);
 
-      const friends = await getFriends(userId);
+      expect(result.query).toBe('ana');
+      expect(result.items).toHaveLength(1);
+      expect(result.friends).toHaveLength(1);
+      expect(result.friends[0]?.id).toBe('friend-1');
+      expect(result.meta.itemCount).toBe(1);
+      expect(result.meta.friendCount).toBe(1);
+      expect(result.meta.limit).toBe(1);
+    });
 
-      expect(friends).toHaveLength(2);
-      const resultFriend1 = friends[0];
-      const resultFriend2 = friends[1];
-      if (resultFriend1 && resultFriend2) {
-        expect(resultFriend1.id).toBe('friend-2'); // 2 loans
-        expect(resultFriend2.id).toBe('friend-1'); // 1 loan
-      }
+    it('should trim query before searching friends', async () => {
+      const userId = 'user-123';
+
+      mocks.push(spyOn(db.query.items, 'findMany').mockResolvedValueOnce([] as any));
+
+      mocks.push(
+        spyOn(friendshipsService, 'getFriendsByUser').mockResolvedValueOnce([
+          {
+            id: 'friend-1',
+            name: 'Carlos Silva',
+            email: 'carlos@example.com',
+            avatarUrl: null,
+            lentCount: 0,
+            borrowedCount: 0,
+          },
+        ])
+      );
+
+      const result = await searchDashboard(userId, '  carlos  ', 10);
+
+      expect(result.query).toBe('carlos');
+      expect(result.items).toHaveLength(0);
+      expect(result.friends).toHaveLength(1);
+      expect(result.friends[0]?.email).toBe('carlos@example.com');
     });
   });
 });

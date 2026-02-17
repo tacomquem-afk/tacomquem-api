@@ -1,11 +1,13 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   integer,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -105,6 +107,29 @@ export const loans = pgTable('loans', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const friendships = pgTable(
+  'friendships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userAId: uuid('user_a_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userBId: uuid('user_b_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    originLoanId: uuid('origin_loan_id').references(() => loans.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    check('friendships_distinct_users_check', sql`${table.userAId} <> ${table.userBId}`),
+    uniqueIndex('friendships_user_pair_unique').on(
+      sql`LEAST(${table.userAId}, ${table.userBId})`,
+      sql`GREATEST(${table.userAId}, ${table.userBId})`
+    ),
+  ]
+);
+
 export const loanTokens = pgTable('loan_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   loanId: uuid('loan_id')
@@ -175,6 +200,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   items: many(items),
   lentLoans: many(loans, { relationName: 'lender' }),
   borrowedLoans: many(loans, { relationName: 'borrower' }),
+  friendshipsAsUserA: many(friendships, { relationName: 'userA' }),
+  friendshipsAsUserB: many(friendships, { relationName: 'userB' }),
   notifications: many(notifications),
   verificationTokens: many(verificationTokens),
   uploads: many(uploads),
@@ -211,8 +238,26 @@ export const loansRelations = relations(loans, ({ one, many }) => ({
     references: [users.id],
     relationName: 'borrower',
   }),
+  friendships: many(friendships),
   tokens: many(loanTokens),
   notifications: many(notifications),
+}));
+
+export const friendshipsRelations = relations(friendships, ({ one }) => ({
+  userA: one(users, {
+    fields: [friendships.userAId],
+    references: [users.id],
+    relationName: 'userA',
+  }),
+  userB: one(users, {
+    fields: [friendships.userBId],
+    references: [users.id],
+    relationName: 'userB',
+  }),
+  originLoan: one(loans, {
+    fields: [friendships.originLoanId],
+    references: [loans.id],
+  }),
 }));
 
 export const loanTokensRelations = relations(loanTokens, ({ one }) => ({

@@ -1,0 +1,40 @@
+# @name login
+POST {{$dotenv BASE_URL}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{$dotenv DEFAULT_EMAIL}}",
+  "password": "{{$dotenv DEFAULT_PASSWORD}}"
+}
+
+###
+@accessToken = {{login.response.body.accessToken}}
+
+###
+# @name upload
+POST {{$dotenv BASE_URL}}/upload/images
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="images"; filename="ai-photo-1769178095804.png"
+Content-Type: image/png
+
+< /Users/fernando/Downloads/ai-photo-1769178095804.png
+--boundary--
+
+###
+# Use o key do upload para criar item
+@imageKey = {{upload.response.body.images[0].key}}
+@imageUrl = {{upload.response.body.images[0].url}}
+
+###
+POST {{$dotenv BASE_URL}}/items
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Item de Teste",
+  "description": "Item criado com imagem do upload",
+  "images": ["{{imageKey}}"]
+}
