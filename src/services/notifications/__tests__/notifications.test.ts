@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '../../../db/index.js';
-import { getNotifications } from '../index.js';
+import {
+  deleteNotification,
+  getNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from '../index.js';
 
 const mockNotifications = [
   {
@@ -362,6 +367,217 @@ describe('notifications service', () => {
       });
 
       expect(result.notifications[0]?.loanId).toBeNull();
+    });
+  });
+
+  describe('markNotificationAsRead', () => {
+    it('marks a notification as read successfully', async () => {
+      const notification = {
+        id: 'notif-uuid-1',
+        userId: 'user-uuid-1',
+        loanId: 'loan-uuid-1',
+        type: 'loan_confirmed' as const,
+        title: 'Empréstimo confirmado',
+        message: 'João confirmou o empréstimo de "Livro".',
+        read: false,
+        sentAt: new Date('2026-02-17T10:00:00Z'),
+        createdAt: new Date('2026-02-17T10:00:00Z'),
+      };
+
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(notification);
+      spyOn(db, 'update').mockReturnValue({
+        set: () => ({
+          where: () => Promise.resolve([]),
+        }),
+      } as any);
+
+      const result = await markNotificationAsRead({
+        userId: 'user-uuid-1',
+        notificationId: 'notif-uuid-1',
+      });
+
+      expect(result).toEqual({
+        id: 'notif-uuid-1',
+        read: true,
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('returns not_found error when notification does not exist', async () => {
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(null as any);
+
+      const result = await markNotificationAsRead({
+        userId: 'user-uuid-1',
+        notificationId: 'nonexistent-id',
+      });
+
+      expect(result).toEqual({
+        kind: 'not_found',
+        message: 'Notification not found',
+      });
+    });
+
+    it('returns access_denied when user tries to mark another users notification', async () => {
+      const notification = {
+        id: 'notif-uuid-1',
+        userId: 'different-user-id',
+        loanId: 'loan-uuid-1',
+        type: 'loan_confirmed' as const,
+        title: 'Empréstimo confirmado',
+        message: 'João confirmou o empréstimo de "Livro".',
+        read: false,
+        sentAt: new Date('2026-02-17T10:00:00Z'),
+        createdAt: new Date('2026-02-17T10:00:00Z'),
+      };
+
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(notification);
+
+      const result = await markNotificationAsRead({
+        userId: 'user-uuid-1',
+        notificationId: 'notif-uuid-1',
+      });
+
+      expect(result).toEqual({
+        kind: 'access_denied',
+        message: 'You do not have permission to access this notification',
+      });
+    });
+
+    it('is idempotent - returns success if already read', async () => {
+      const notification = {
+        id: 'notif-uuid-1',
+        userId: 'user-uuid-1',
+        loanId: 'loan-uuid-1',
+        type: 'loan_confirmed' as const,
+        title: 'Empréstimo confirmado',
+        message: 'João confirmou o empréstimo de "Livro".',
+        read: true,
+        sentAt: new Date('2026-02-17T10:00:00Z'),
+        createdAt: new Date('2026-02-17T10:00:00Z'),
+      };
+
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(notification);
+
+      const result = await markNotificationAsRead({
+        userId: 'user-uuid-1',
+        notificationId: 'notif-uuid-1',
+      });
+
+      expect(result).toEqual({
+        id: 'notif-uuid-1',
+        read: true,
+        updatedAt: notification.createdAt.toISOString(),
+      });
+    });
+  });
+
+  describe('markAllNotificationsAsRead', () => {
+    it('marks all unread notifications as read', async () => {
+      spyOn(db, 'update').mockReturnValue({
+        set: () => ({
+          where: () => ({
+            returning: () =>
+              Promise.resolve([{ id: 'notif-1' }, { id: 'notif-2' }, { id: 'notif-3' }]),
+          }),
+        }),
+      } as any);
+
+      const result = await markAllNotificationsAsRead({
+        userId: 'user-uuid-1',
+      });
+
+      expect(result).toEqual({
+        markedCount: 3,
+      });
+    });
+
+    it('returns zero when no unread notifications exist', async () => {
+      spyOn(db, 'update').mockReturnValue({
+        set: () => ({
+          where: () => ({
+            returning: () => Promise.resolve([]),
+          }),
+        }),
+      } as any);
+
+      const result = await markAllNotificationsAsRead({
+        userId: 'user-uuid-1',
+      });
+
+      expect(result).toEqual({
+        markedCount: 0,
+      });
+    });
+  });
+
+  describe('deleteNotification', () => {
+    it('deletes a notification successfully', async () => {
+      const notification = {
+        id: 'notif-uuid-1',
+        userId: 'user-uuid-1',
+        loanId: 'loan-uuid-1',
+        type: 'loan_confirmed' as const,
+        title: 'Empréstimo confirmado',
+        message: 'João confirmou o empréstimo de "Livro".',
+        read: false,
+        sentAt: new Date('2026-02-17T10:00:00Z'),
+        createdAt: new Date('2026-02-17T10:00:00Z'),
+      };
+
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(notification);
+      spyOn(db, 'delete').mockReturnValue({
+        where: () => Promise.resolve(undefined),
+      } as any);
+
+      const result = await deleteNotification({
+        userId: 'user-uuid-1',
+        notificationId: 'notif-uuid-1',
+      });
+
+      expect(result).toEqual({
+        id: 'notif-uuid-1',
+        deleted: true,
+      });
+    });
+
+    it('returns not_found error when notification does not exist', async () => {
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(null as any);
+
+      const result = await deleteNotification({
+        userId: 'user-uuid-1',
+        notificationId: 'nonexistent-id',
+      });
+
+      expect(result).toEqual({
+        kind: 'not_found',
+        message: 'Notification not found',
+      });
+    });
+
+    it('returns access_denied when user tries to delete another users notification', async () => {
+      const notification = {
+        id: 'notif-uuid-1',
+        userId: 'different-user-id',
+        loanId: 'loan-uuid-1',
+        type: 'loan_confirmed' as const,
+        title: 'Empréstimo confirmado',
+        message: 'João confirmou o empréstimo de "Livro".',
+        read: false,
+        sentAt: new Date('2026-02-17T10:00:00Z'),
+        createdAt: new Date('2026-02-17T10:00:00Z'),
+      };
+
+      spyOn(db.query.notifications, 'findFirst').mockResolvedValue(notification);
+
+      const result = await deleteNotification({
+        userId: 'user-uuid-1',
+        notificationId: 'notif-uuid-1',
+      });
+
+      expect(result).toEqual({
+        kind: 'access_denied',
+        message: 'You do not have permission to delete this notification',
+      });
     });
   });
 });

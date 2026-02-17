@@ -2,6 +2,18 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { notifications } from '../../db/schema.js';
 
+export interface NotificationNotFoundError {
+  kind: 'not_found';
+  message: string;
+}
+
+export interface NotificationAccessDeniedError {
+  kind: 'access_denied';
+  message: string;
+}
+
+export type NotificationError = NotificationNotFoundError | NotificationAccessDeniedError;
+
 export interface GetNotificationsParams {
   userId: string;
   read?: boolean;
@@ -83,5 +95,121 @@ export async function getNotifications(
       totalPages: Math.ceil(total / limit),
     },
     unreadCount,
+  };
+}
+
+export interface MarkAsReadParams {
+  userId: string;
+  notificationId: string;
+}
+
+export interface MarkAsReadResult {
+  id: string;
+  read: boolean;
+  updatedAt: string;
+}
+
+export async function markNotificationAsRead(
+  params: MarkAsReadParams
+): Promise<MarkAsReadResult | NotificationError> {
+  const { userId, notificationId } = params;
+
+  const notification = await db.query.notifications.findFirst({
+    where: eq(notifications.id, notificationId),
+  });
+
+  if (!notification) {
+    return {
+      kind: 'not_found',
+      message: 'Notification not found',
+    };
+  }
+
+  if (notification.userId !== userId) {
+    return {
+      kind: 'access_denied',
+      message: 'You do not have permission to access this notification',
+    };
+  }
+
+  if (notification.read) {
+    return {
+      id: notification.id,
+      read: true,
+      updatedAt: notification.createdAt.toISOString(),
+    };
+  }
+
+  await db.update(notifications).set({ read: true }).where(eq(notifications.id, notificationId));
+
+  return {
+    id: notificationId,
+    read: true,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export interface MarkAllAsReadParams {
+  userId: string;
+}
+
+export interface MarkAllAsReadResult {
+  markedCount: number;
+}
+
+export async function markAllNotificationsAsRead(
+  params: MarkAllAsReadParams
+): Promise<MarkAllAsReadResult> {
+  const { userId } = params;
+
+  const result = await db
+    .update(notifications)
+    .set({ read: true })
+    .where(and(eq(notifications.userId, userId), eq(notifications.read, false)))
+    .returning({ id: notifications.id });
+
+  return {
+    markedCount: result.length,
+  };
+}
+
+export interface DeleteNotificationParams {
+  userId: string;
+  notificationId: string;
+}
+
+export interface DeleteNotificationResult {
+  id: string;
+  deleted: boolean;
+}
+
+export async function deleteNotification(
+  params: DeleteNotificationParams
+): Promise<DeleteNotificationResult | NotificationError> {
+  const { userId, notificationId } = params;
+
+  const notification = await db.query.notifications.findFirst({
+    where: eq(notifications.id, notificationId),
+  });
+
+  if (!notification) {
+    return {
+      kind: 'not_found',
+      message: 'Notification not found',
+    };
+  }
+
+  if (notification.userId !== userId) {
+    return {
+      kind: 'access_denied',
+      message: 'You do not have permission to delete this notification',
+    };
+  }
+
+  await db.delete(notifications).where(eq(notifications.id, notificationId));
+
+  return {
+    id: notificationId,
+    deleted: true,
   };
 }

@@ -77,7 +77,9 @@ describe('Moderation Service', () => {
         images: '[]',
       };
 
-      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItem as any);
+      const findFirstSpy = spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(
+        mockItem as any
+      );
       mocks.push(findFirstSpy);
 
       const updateSpy = spyOn(db, 'update').mockReturnValue({
@@ -90,7 +92,12 @@ describe('Moderation Service', () => {
       } as any);
       mocks.push(insertSpy);
 
-      await removeItem('550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440002', 'Inappropriate content', '192.168.1.1');
+      await removeItem(
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440002',
+        'Inappropriate content',
+        '192.168.1.1'
+      );
 
       expect(updateSpy).toHaveBeenCalled();
       expect(insertSpy).toHaveBeenCalled();
