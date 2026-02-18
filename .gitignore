@@ -26,9 +26,6 @@ Thumbs.db
 # Test
 coverage/
 
-# Drizzle
-drizzle/meta/
-
 # Bun
 bun.lock
 .history
