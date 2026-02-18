@@ -10,7 +10,7 @@ const argsSchema = z.object({
   adminEmail: z.string().email('admin email inválido'),
 });
 
-async function readStdin(): Promise<string> {
+export async function readStdin(): Promise<string> {
   // Read piped input (CSV or newline-separated emails)
   try {
     const text = await new Response(process.stdin).text();
@@ -20,7 +20,7 @@ async function readStdin(): Promise<string> {
   }
 }
 
-function parseEmails(raw: string): string[] {
+export function parseEmails(raw: string): string[] {
   const lines = raw
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -40,10 +40,26 @@ function parseEmails(raw: string): string[] {
   return Array.from(new Set(emails)); // dedupe
 }
 
-async function findAdminByEmail(email: string) {
+export async function findAdminByEmail(email: string) {
   const emailHash = hash(email);
   const admin = await db.query.users.findFirst({ where: eq(users.emailHash, emailHash) });
   return admin;
+}
+
+export async function processEmailBatch(adminId: string, emails: string[]) {
+  const results: { email: string; status: string; reason?: string }[] = [];
+
+  for (const email of emails) {
+    try {
+      await addBetaUser({ email, adminId });
+      results.push({ email, status: 'added' });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      results.push({ email, status: 'failed', reason });
+    }
+  }
+
+  return results;
 }
 
 async function main() {
@@ -85,17 +101,7 @@ async function main() {
     process.exit(2);
   }
 
-  const results: { email: string; status: string; reason?: string }[] = [];
-
-  for (const email of emails) {
-    try {
-      await addBetaUser({ email, adminId: admin.id });
-      results.push({ email, status: 'added' });
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      results.push({ email, status: 'failed', reason });
-    }
-  }
+  const results = await processEmailBatch(admin.id, emails);
 
   const added = results.filter((r) => r.status === 'added').length;
   const failed = results.filter((r) => r.status === 'failed');

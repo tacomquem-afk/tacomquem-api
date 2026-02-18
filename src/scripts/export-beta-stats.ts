@@ -3,12 +3,12 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { decrypt } from '../services/crypto/index.js';
 
-async function main() {
+export async function generateBetaCsv(): Promise<string> {
   const betaUsers = await db.query.users.findMany({ where: eq(users.accessTier, 'BETA') });
 
   // CSV header
   // email,name,betaAddedAt
-  process.stdout.write('email,name,betaAddedAt\n');
+  const rows: string[] = ['email,name,betaAddedAt'];
 
   for (const u of betaUsers) {
     const email = decrypt(u.emailEncrypted);
@@ -16,9 +16,15 @@ async function main() {
     const addedAt = u.betaAddedAt ? u.betaAddedAt.toISOString() : '';
     // Escape quotes and commas in fields
     const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
-    process.stdout.write(`${esc(email)},${esc(name)},${addedAt}\n`);
+    rows.push(`${esc(email)},${esc(name)},${addedAt}`);
   }
 
+  return `${rows.join('\n')}\n`;
+}
+
+async function main() {
+  const csv = await generateBetaCsv();
+  process.stdout.write(csv);
   process.exit(0);
 }
 

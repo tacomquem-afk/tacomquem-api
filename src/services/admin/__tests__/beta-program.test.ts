@@ -1,5 +1,20 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { db } from '../../../db/index.js';
+import { BadRequestError, NotFoundError } from '../../../errors/index.js';
+import * as cryptoService from '../../crypto/index.js';
+
+beforeEach(() => {
+  // Prevent actual crypto operations during unit tests — return readable values
+  spyOn(cryptoService, 'decrypt').mockImplementation((text: string) => {
+    if (typeof text !== 'string') return text;
+    return String(text)
+      .replace(/^.*:/, '')
+      .replace(/^encrypted_/, '');
+  });
+  spyOn(cryptoService, 'hash').mockImplementation(
+    (text: string) => `hash_${String(text).toLowerCase()}`
+  );
+});
 
 describe('Beta Program Service', () => {
   describe('listBetaUsers', () => {
@@ -100,7 +115,7 @@ describe('Beta Program Service', () => {
       expect(result.betaAddedAt).toBeTruthy();
     });
 
-    it('should throw error when user not found', async () => {
+    it('should throw NotFoundError when user not found', async () => {
       const { addBetaUser } = await import('../beta-program.js');
 
       spyOn(db.query.users, 'findFirst').mockResolvedValue(undefined);
@@ -110,10 +125,10 @@ describe('Beta Program Service', () => {
           email: 'nonexistent@example.com',
           adminId: 'admin-1',
         })
-      ).rejects.toThrow('User not found');
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
-    it('should throw error when user is blocked', async () => {
+    it('should throw BadRequestError when user is blocked', async () => {
       const { addBetaUser } = await import('../beta-program.js');
 
       const mockUser = {
@@ -134,10 +149,10 @@ describe('Beta Program Service', () => {
           email: 'test@example.com',
           adminId: 'admin-1',
         })
-      ).rejects.toThrow('Cannot add blocked user to beta program');
+      ).rejects.toBeInstanceOf(BadRequestError);
     });
 
-    it('should throw error when user is already in beta', async () => {
+    it('should throw BadRequestError when user is already in beta', async () => {
       const { addBetaUser } = await import('../beta-program.js');
 
       const mockUser = {
@@ -158,7 +173,7 @@ describe('Beta Program Service', () => {
           email: 'test@example.com',
           adminId: 'admin-1',
         })
-      ).rejects.toThrow('User is already in beta program');
+      ).rejects.toBeInstanceOf(BadRequestError);
     });
   });
 
@@ -205,7 +220,7 @@ describe('Beta Program Service', () => {
       expect(result.betaAddedAt).toBeNull();
     });
 
-    it('should throw error when user not found', async () => {
+    it('should throw NotFoundError when user not found', async () => {
       const { removeBetaUser } = await import('../beta-program.js');
 
       spyOn(db.query.users, 'findFirst').mockResolvedValue(undefined);
@@ -215,10 +230,10 @@ describe('Beta Program Service', () => {
           userId: 'nonexistent-user',
           adminId: 'admin-1',
         })
-      ).rejects.toThrow('User not found');
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
-    it('should throw error when user is not in beta program', async () => {
+    it('should throw BadRequestError when user is not in beta program', async () => {
       const { removeBetaUser } = await import('../beta-program.js');
 
       const mockUser = {
@@ -239,7 +254,7 @@ describe('Beta Program Service', () => {
           userId: 'user-1',
           adminId: 'admin-1',
         })
-      ).rejects.toThrow('User is not in beta program');
+      ).rejects.toBeInstanceOf(BadRequestError);
     });
   });
 });

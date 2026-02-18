@@ -183,8 +183,21 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=noreply@tacomquem.app
 
+# Feature toggles
+BETA_MODE_ENABLED=false  # When true, only users with accessTier=BETA can login
+
 # Frontend
 FRONTEND_URL=http://localhost:5173
+```
+
+Beta program management scripts (run as SUPER_ADMIN):
+
+```bash
+# Bulk add beta users from CSV (pass --admin-email of SUPER_ADMIN)
+bun run beta:add-batch --admin-email=admin@you.app < users.csv
+
+# Export beta users as CSV
+bun run beta:export-stats > beta-users.csv
 ```
 
 ## Testing
