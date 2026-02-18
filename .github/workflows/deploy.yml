@@ -9,6 +9,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verify secrets are set
+        run: |
+          if [ -z "${{ secrets.VM_HOST }}" ]; then
+            echo "❌ VM_HOST secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VM_USER }}" ]; then
+            echo "❌ VM_USER secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VM_SSH_KEY }}" ]; then
+            echo "❌ VM_SSH_KEY secret is not set"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
