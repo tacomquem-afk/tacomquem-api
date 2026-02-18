@@ -20,6 +20,7 @@ import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
 import adminsRoutes from './routes/admin/admins.js';
 import analyticsRoutes from './routes/admin/analytics.js';
+import betaProgramRoutes from './routes/admin/beta-program.js';
 import moderationRoutes from './routes/admin/moderation.js';
 import usersRoutes from './routes/admin/users.js';
 import googleAuthRoutes from './routes/auth/google.js';
@@ -118,6 +119,7 @@ export async function buildApp() {
         { name: 'Admin - Users', description: 'Admin user management endpoints' },
         { name: 'Admin - Moderation', description: 'Admin content moderation endpoints' },
         { name: 'Admin - Admins', description: 'Admin role management endpoints' },
+        { name: 'Admin - Beta Program', description: 'Beta program management endpoints' },
         { name: 'Health', description: 'Health check endpoints' },
       ],
     },
@@ -251,6 +253,7 @@ export async function buildApp() {
   await app.register(usersRoutes, { prefix: '/api/admin/users' });
   await app.register(moderationRoutes, { prefix: '/api/admin/moderation' });
   await app.register(adminsRoutes, { prefix: '/api/admin/admins' });
+  await app.register(betaProgramRoutes, { prefix: '/api/admin/beta-program' });
 
   return app;
 }

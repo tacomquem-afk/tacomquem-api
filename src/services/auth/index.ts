@@ -7,6 +7,7 @@ import {
   BadRequestError,
   ConflictError,
   ErrorCodes,
+  ForbiddenError,
   GoneError,
   UnauthorizedError,
 } from '../../errors/index.js';
@@ -141,6 +142,10 @@ export async function login(email: string, password: string): Promise<UserRespon
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
     throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
+  }
+
+  if (env.BETA_MODE_ENABLED && user.accessTier !== 'BETA') {
+    throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
 
   return {

@@ -38,6 +38,9 @@ const envSchema = z.object({
   API_DESCRIPTION: z.string().default('API para gestão de empréstimos pessoais entre amigos'),
   API_VERSION: z.string().default('1.0.0'),
   API_ENVIRONMENT_LABEL: z.string().default('Development'),
+
+  // Beta Program
+  BETA_MODE_ENABLED: z.coerce.boolean().default(false),
 });
 
 const parsed = envSchema.safeParse(Bun.env);
