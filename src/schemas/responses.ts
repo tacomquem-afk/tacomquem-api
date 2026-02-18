@@ -361,3 +361,26 @@ export const adminLoanDetailsSchema = z.object({
   returnedAt: dateSchema.nullable(),
   createdAt: dateSchema,
 });
+
+export const accessTierSchema = z.enum(['PUBLIC', 'BETA', 'ARCHIVED']);
+
+export const betaUserSchema = z.object({
+  id: uuidSchema,
+  email: z.string().email(),
+  name: z.string(),
+  accessTier: accessTierSchema,
+  betaAddedAt: dateSchema.nullable(),
+  emailVerified: z.boolean(),
+  createdAt: dateSchema,
+});
+
+export const betaUserListResponseSchema = z.object({
+  users: z.array(betaUserSchema),
+  pagination: paginationSchema,
+});
+
+export const addBetaUserSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  user: betaUserSchema,
+});
