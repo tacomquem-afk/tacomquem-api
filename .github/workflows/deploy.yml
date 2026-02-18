@@ -39,6 +39,5 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             /home/deploy/.bun/bin/bun install
-            /home/deploy/.bun/bin/bun run build || true
             sudo systemctl restart api
             sudo systemctl --no-pager --full status api | sed -n '1,25p'
