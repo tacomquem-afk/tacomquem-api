@@ -44,6 +44,10 @@ export const adminActionEnum = pgEnum('admin_action', [
   'content_flagged',
 ]);
 
+export const accessTierEnum = pgEnum('access_tier', ['PUBLIC', 'BETA', 'ARCHIVED']);
+
+export const betaAuditActionEnum = pgEnum('beta_audit_action', ['added', 'removed']);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   emailEncrypted: text('email_encrypted').notNull(),
@@ -53,6 +57,8 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   emailVerified: boolean('email_verified').default(false).notNull(),
   role: roleEnum('role').default('USER').notNull(),
+  accessTier: accessTierEnum('access_tier').default('PUBLIC').notNull(),
+  betaAddedAt: timestamp('beta_added_at'),
   isActive: boolean('is_active').default(true).notNull(),
   blockedAt: timestamp('blocked_at'),
   blockedReason: text('blocked_reason'),
@@ -195,6 +201,20 @@ export const adminAuditLog = pgTable('admin_audit_log', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const betaProgramAudit = pgTable('beta_program_audit', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  adminId: uuid('admin_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  action: betaAuditActionEnum('action').notNull(),
+  reason: text('reason'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),
@@ -206,6 +226,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   verificationTokens: many(verificationTokens),
   uploads: many(uploads),
   adminActions: many(adminAuditLog),
+  betaAuditEntriesAsAdmin: many(betaProgramAudit, { relationName: 'betaAdmin' }),
+  betaAuditEntriesAsUser: many(betaProgramAudit, { relationName: 'betaUser' }),
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
@@ -296,5 +318,18 @@ export const adminAuditLogRelations = relations(adminAuditLog, ({ one }) => ({
   admin: one(users, {
     fields: [adminAuditLog.adminId],
     references: [users.id],
+  }),
+}));
+
+export const betaProgramAuditRelations = relations(betaProgramAudit, ({ one }) => ({
+  admin: one(users, {
+    fields: [betaProgramAudit.adminId],
+    references: [users.id],
+    relationName: 'betaAdmin',
+  }),
+  user: one(users, {
+    fields: [betaProgramAudit.userId],
+    references: [users.id],
+    relationName: 'betaUser',
   }),
 }));

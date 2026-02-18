@@ -276,3 +276,16 @@ export async function logAdminAction(params: {
     userAgent: params.userAgent || undefined,
   });
 }
+
+export {
+  type AccessTier,
+  type AddBetaUserParams,
+  addBetaUser,
+  type BetaAuditAction,
+  type BetaUser,
+  isBetaUserAllowed,
+  type ListBetaUsersParams,
+  listBetaUsers,
+  type RemoveBetaUserParams,
+  removeBetaUser,
+} from './beta-program.js';
