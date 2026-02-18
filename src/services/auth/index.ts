@@ -238,6 +238,11 @@ export async function findOrCreateGoogleUser(
 
   if (existingOauth?.user) {
     const user = existingOauth.user;
+
+    if (env.BETA_MODE_ENABLED && user.accessTier !== 'BETA') {
+      throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
+    }
+
     return {
       id: user.id,
       name: decrypt(user.nameEncrypted),
@@ -254,6 +259,10 @@ export async function findOrCreateGoogleUser(
   });
 
   if (existingUser) {
+    if (env.BETA_MODE_ENABLED && existingUser.accessTier !== 'BETA') {
+      throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
+    }
+
     await db.insert(oauthAccounts).values({
       userId: existingUser.id,
       provider: 'google',
@@ -277,6 +286,10 @@ export async function findOrCreateGoogleUser(
       emailVerified: true,
       role: existingUser.role,
     };
+  }
+
+  if (env.BETA_MODE_ENABLED) {
+    throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
 
   const [user] = await db

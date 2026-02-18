@@ -1,6 +1,7 @@
 import { asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { betaProgramAudit, users } from '../../db/schema.js';
+import { BadRequestError, ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { decrypt, hash } from '../crypto/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
@@ -91,15 +92,18 @@ export async function addBetaUser(params: AddBetaUserParams): Promise<BetaUser> 
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User not found');
   }
 
   if (!user.isActive) {
-    throw new Error('Cannot add blocked user to beta program');
+    throw new BadRequestError(
+      ErrorCodes.ADMIN_TARGET_NOT_FOUND,
+      'Cannot add blocked user to beta program'
+    );
   }
 
   if (user.accessTier === 'BETA') {
-    throw new Error('User is already in beta program');
+    throw new BadRequestError(ErrorCodes.ADMIN_INVALID_ROLE, 'User is already in beta program');
   }
 
   const now = new Date();
@@ -115,7 +119,7 @@ export async function addBetaUser(params: AddBetaUserParams): Promise<BetaUser> 
     .returning();
 
   if (!updated) {
-    throw new Error('Failed to update user');
+    throw new BadRequestError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'Failed to update user');
   }
 
   await db.insert(betaProgramAudit).values({
@@ -148,11 +152,11 @@ export async function removeBetaUser(params: RemoveBetaUserParams): Promise<Beta
   });
 
   if (!user) {
-    throw new Error('User not found');
+    throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User not found');
   }
 
   if (user.accessTier !== 'BETA') {
-    throw new Error('User is not in beta program');
+    throw new BadRequestError(ErrorCodes.ADMIN_INVALID_ROLE, 'User is not in beta program');
   }
 
   const now = new Date();
@@ -168,12 +172,12 @@ export async function removeBetaUser(params: RemoveBetaUserParams): Promise<Beta
     .returning();
 
   if (!updated) {
-    throw new Error('Failed to update user');
+    throw new BadRequestError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'Failed to update user');
   }
 
   await db.insert(betaProgramAudit).values({
     adminId,
-    userId: userId,
+    userId,
     action: 'removed',
     reason: reason || null,
     ipAddress: ipAddress || null,
