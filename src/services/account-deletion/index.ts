@@ -1,4 +1,4 @@
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, lte, or } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   accessLogs,
@@ -189,7 +189,7 @@ export async function getDeletionStatus(userId: string): Promise<DeletionStatus>
 
   const canCancel =
     user.deletionStatus === 'pending' &&
-    user.deletionScheduledFor &&
+    user.deletionScheduledFor !== null &&
     new Date() < user.deletionScheduledFor;
 
   return {
@@ -257,10 +257,7 @@ async function anonymizeUserData(userId: string) {
   // Remove friendships
   await db
     .delete(friendships)
-    .where((table) => [
-      eq(table.userAId, userId),
-      eq(table.userBId, userId),
-    ]);
+    .where(or(eq(friendships.userAId, userId), eq(friendships.userBId, userId)));
 
   // Delete notifications
   await db.delete(notifications).where(eq(notifications.userId, userId));

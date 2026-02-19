@@ -18,6 +18,7 @@ import { db } from './db/index.js';
 import { AppError, errorStatusMap, formatProblemDetails } from './errors/index.js';
 import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
+import accountRoutes from './routes/account/index.js';
 import adminsRoutes from './routes/admin/admins.js';
 import analyticsRoutes from './routes/admin/analytics.js';
 import betaProgramRoutes from './routes/admin/beta-program.js';
@@ -109,6 +110,7 @@ export async function buildApp() {
       tags: [
         { name: 'Authentication', description: 'Authentication endpoints' },
         { name: 'OAuth', description: 'OAuth authentication providers' },
+        { name: 'Users', description: 'User account endpoints' },
         { name: 'Items', description: 'Items management endpoints' },
         { name: 'Upload', description: 'Image upload endpoints' },
         { name: 'Loans', description: 'Loan management endpoints' },
@@ -242,6 +244,7 @@ export async function buildApp() {
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
+  await app.register(accountRoutes, { prefix: '/api' });
   await app.register(itemsRoutes, { prefix: '/api/items' });
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(loansRoutes, { prefix: '/api/loans' });
