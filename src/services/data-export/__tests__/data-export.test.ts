@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { buildJSONExport } from '../index.js';
+import JSZip from 'jszip';
+import { buildJSONExport, buildCSVExport } from '../index.js';
 
 describe('Data Export - JSON', () => {
   it('should build valid JSON export structure', async () => {
@@ -94,5 +95,33 @@ describe('Data Export - JSON', () => {
     expect(result.loans.as_borrower).toHaveLength(1);
     expect(result.loans.as_lender[0].id).toBe('loan-1');
     expect(result.loans.as_borrower[0].id).toBe('loan-2');
+  });
+
+  it('should build CSV export as zip', async () => {
+    const userData = { id: 'user-123', emailEncrypted: 'test@example.com', nameEncrypted: 'John', emailVerified: true, createdAt: new Date(), updatedAt: new Date() };
+    const itemsData = [{ id: 'item-1', name: 'Book', description: 'A book', images: '["https://example.com/book.jpg"]', createdAt: new Date() }];
+    const loansData: any[] = [];
+    const friendshipsData: any[] = [];
+    const notificationsData: any[] = [];
+
+    const zipBuffer = await buildCSVExport({
+      user: userData,
+      items: itemsData,
+      loans: loansData,
+      friendships: friendshipsData,
+      notifications: notificationsData,
+    });
+
+    expect(zipBuffer).toBeInstanceOf(ArrayBuffer);
+
+    const zip = await JSZip.loadAsync(zipBuffer);
+    expect(zip.file('user.csv')).toBeDefined();
+    expect(zip.file('items.csv')).toBeDefined();
+    expect(zip.file('loans_lent.csv')).toBeDefined();
+    expect(zip.file('loans_borrowed.csv')).toBeDefined();
+    expect(zip.file('friendships.csv')).toBeDefined();
+
+    const userCsv = await zip.file('user.csv')?.async('string');
+    expect(userCsv).toContain('id,email,name');
   });
 });

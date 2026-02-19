@@ -1,3 +1,5 @@
+import JSZip from 'jszip';
+
 export interface UserExportData {
   id: string;
   emailEncrypted: string;
@@ -17,9 +19,9 @@ export interface ItemExportData {
 
 export interface LoanExportData {
   id: string;
-  itemId: UUID;
-  lenderId: UUID;
-  borrowerId: UUID | null;
+  itemId: string;
+  lenderId: string;
+  borrowerId: string | null;
   status: string;
   confirmedAt: Date | null;
   returnedAt: Date | null;
@@ -27,14 +29,14 @@ export interface LoanExportData {
 
 export interface FriendshipExportData {
   id: string;
-  userAId: UUID;
-  userBId: UUID;
+  userAId: string;
+  userBId: string;
   createdAt: Date;
 }
 
 export interface NotificationExportData {
   id: string;
-  userId: UUID;
+  userId: string;
   type: string;
   title: string;
   message: string;
@@ -172,4 +174,84 @@ export function buildJSONExport(data: ExportDataInput): JSONExport {
       created_at: notif.createdAt.toISOString(),
     })),
   };
+}
+
+function toCSV(headers: string[], rows: (string | number | boolean | null | undefined)[][]): string {
+  const headerLine = headers.join(',');
+  const dataLines = rows.map((row) =>
+    row
+      .map((cell) => {
+        if (cell === null || cell === undefined) return '';
+        const str = String(cell);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      })
+      .join(',')
+  );
+  return [headerLine, ...dataLines].join('\n');
+}
+
+export async function buildCSVExport(data: ExportDataInput): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+
+  // user.csv
+  const userCsv = toCSV(
+    ['id', 'email', 'name', 'email_verified', 'created_at', 'updated_at'],
+    [
+      [
+        data.user.id,
+        data.user.emailEncrypted,
+        data.user.nameEncrypted,
+        data.user.emailVerified ? 'true' : 'false',
+        data.user.createdAt.toISOString(),
+        data.user.updatedAt.toISOString(),
+      ],
+    ]
+  );
+  zip.file('user.csv', userCsv);
+
+  // items.csv
+  const itemsCsv = toCSV(
+    ['id', 'name', 'description', 'images_count', 'created_at'],
+    data.items.map((item) => {
+      const images = JSON.parse(item.images);
+      return [item.id, item.name, item.description || '', images.length, item.createdAt.toISOString()];
+    })
+  );
+  zip.file('items.csv', itemsCsv);
+
+  // loans_lent.csv
+  const loansLentCsv = toCSV(
+    ['loan_id', 'item_id', 'borrower_id', 'status', 'confirmed_at', 'returned_at'],
+    data.loans
+      .filter((loan) => loan.lenderId === data.user.id)
+      .map((loan) => [loan.id, loan.itemId, loan.borrowerId || '', loan.status, loan.confirmedAt?.toISOString() || '', loan.returnedAt?.toISOString() || ''])
+  );
+  zip.file('loans_lent.csv', loansLentCsv);
+
+  // loans_borrowed.csv
+  const loansBorrowedCsv = toCSV(
+    ['loan_id', 'item_id', 'lender_id', 'status', 'confirmed_at', 'returned_at'],
+    data.loans
+      .filter((loan) => loan.borrowerId === data.user.id)
+      .map((loan) => [loan.id, loan.itemId, loan.lenderId, loan.status, loan.confirmedAt?.toISOString() || '', loan.returnedAt?.toISOString() || ''])
+  );
+  zip.file('loans_borrowed.csv', loansBorrowedCsv);
+
+  // friendships.csv
+  const friendshipsCsv = toCSV(
+    ['friendship_id', 'friend_id', 'created_at'],
+    data.friendships
+      .filter((f) => f.userAId === data.user.id || f.userBId === data.user.id)
+      .map((friendship) => [
+        friendship.id,
+        friendship.userAId === data.user.id ? friendship.userBId : friendship.userAId,
+        friendship.createdAt.toISOString(),
+      ])
+  );
+  zip.file('friendships.csv', friendshipsCsv);
+
+  return zip.generateAsync({ type: 'arraybuffer' });
 }
