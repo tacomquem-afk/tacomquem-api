@@ -27,7 +27,19 @@ export default async function itemsRoutes(app: FastifyInstance) {
     '/',
     {
       schema: {
-        description: 'Create a new item',
+        description: `**Create a new item**
+
+Registers a new loanable item owned by the authenticated user. Items can have multiple images (uploaded via \`POST /api/upload/images\`) and an optional description.
+
+**Image handling:**
+- Upload images first via \`POST /api/upload/images\`, then include the returned \`key\` values in the \`images\` array
+- Up to 5 images per item are supported
+- Images are stored as an ordered array; the first image is used as the primary thumbnail
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`422\` | \`VALIDATION_INVALID_REQUEST\` | Request body failed validation |`,
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         body: createItemSchema,
@@ -48,7 +60,17 @@ export default async function itemsRoutes(app: FastifyInstance) {
     '/',
     {
       schema: {
-        description: 'List all items owned by the current user',
+        description: `**List items owned by the current user**
+
+Returns all items (active and soft-deleted) that belong to the authenticated user. Use the \`isActive\` and \`isLoaned\` fields in the response to filter in the UI.
+
+**Response fields of note:**
+| Field | Type | Description |
+|-------|------|-------------|
+| \`isActive\` | boolean | \`false\` means the item was soft-deleted |
+| \`isLoaned\` | boolean | \`true\` means the item is currently in an active loan |
+| \`currentLoanId\` | UUID \\| null | ID of the active loan, if any |
+| \`borrowedTo\` | string \\| null | Name of the current borrower, if any |`,
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         response: {
@@ -67,7 +89,14 @@ export default async function itemsRoutes(app: FastifyInstance) {
     '/:id',
     {
       schema: {
-        description: 'Get a specific item by ID',
+        description: `**Get item details**
+
+Returns full details for a specific item. Only the owner of the item can retrieve it.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ITEMS_NOT_FOUND\` | Item does not exist or does not belong to the authenticated user |`,
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
@@ -93,7 +122,18 @@ export default async function itemsRoutes(app: FastifyInstance) {
     '/:id',
     {
       schema: {
-        description: 'Update an item',
+        description: `**Update item details**
+
+Updates one or more fields on an existing item. Only the owner can update their items. All fields are optional — only send the fields you want to change.
+
+**Constraints:**
+- Cannot update an item that has been soft-deleted (\`isActive: false\`)
+- Updating \`images\` replaces the entire image array; send the full desired array
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ITEMS_NOT_FOUND\` | Item does not exist or does not belong to the authenticated user |`,
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
@@ -121,7 +161,19 @@ export default async function itemsRoutes(app: FastifyInstance) {
     '/:id',
     {
       schema: {
-        description: 'Delete an item (soft delete)',
+        description: `**Delete an item (soft delete)**
+
+Marks an item as inactive (\`isActive: false\`). The item is not permanently removed from the database — existing loan history is preserved.
+
+**Constraints:**
+- Cannot delete an item that currently has an active loan (\`isLoaned: true\`) — cancel or complete the loan first
+
+Returns \`204 No Content\` on success.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ITEMS_NOT_FOUND\` | Item does not exist or does not belong to the authenticated user |`,
         tags: ['Items'],
         security: [{ BearerAuth: [] }],
         params: idParamSchema,

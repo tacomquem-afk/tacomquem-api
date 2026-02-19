@@ -76,51 +76,54 @@ window.location.href = '/api/auth/google';
     '/google/callback',
     {
       schema: {
-        description: `**Google OAuth Callback Endpoint (Internal)**
+        description: `**Google OAuth callback (internal use only)**
 
-This endpoint receives the callback from Google OAuth after user authorization.
-The backend exchanges the authorization code for tokens, fetches user info,
-creates/updates the user, and redirects to the frontend with JWT tokens.
+Receives the redirect from Google after user authorization. Exchanges the authorization code for tokens, creates or retrieves the user record, and redirects to the frontend with JWT tokens.
 
-**Important:** This endpoint is called by Google, not directly by the frontend.
+**Important:** This endpoint is called by Google's OAuth server, not directly by the frontend. Do not call it manually.
 
-**Query Parameters:**
-- \`code\`: Authorization code from Google (on success)
-- \`error\`: Error code from Google (on user denial or error)
+**Successful redirect:**
+\`FRONTEND_URL/auth/callback?accessToken=xxx&refreshToken=xxx&termsAccepted=true|false\`
 
-**Frontend Redirect Behavior:**
+**Error redirect:**
+\`FRONTEND_URL/login?error=ERROR_CODE\`
 
-On success, redirects to: \`FRONTEND_URL/auth/callback?accessToken=xxx&refreshToken=xxx\`
-On error, redirects to: \`FRONTEND_URL/login?error=ERROR_CODE\`
+**Success redirect query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`accessToken\` | string | JWT access token (expires in 7 days) |
+| \`refreshToken\` | string | JWT refresh token (expires in 30 days) |
+| \`termsAccepted\` | \`"true"\` \\| \`"false"\` | Whether the user has already accepted the current terms version |
 
-**Error Codes:**
+**Error codes in the redirect URL:**
 | Code | Description |
 |------|-------------|
-| \`oauth_denied\` | User denied authorization |
-| \`no_code\` | No authorization code received |
-| \`oauth_failed\` | Generic OAuth failure |
-| \`beta_not_available\` | Beta mode enabled, user not in beta program |
+| \`oauth_denied\` | User denied authorization on the Google consent screen |
+| \`no_code\` | No authorization code was received from Google |
+| \`oauth_failed\` | Generic failure during the OAuth exchange |
+| \`beta_not_available\` | Beta mode is active — the user is not on the access list |
 
-**Frontend Implementation:**
-Your frontend should handle the callback at \`/auth/callback\`:
-
+**Frontend implementation (page \`/auth/callback\`):**
 \`\`\`javascript
-// pages/AuthCallback.tsx
 useEffect(() => {
   const params = new URLSearchParams(window.location.search);
   const accessToken = params.get('accessToken');
   const refreshToken = params.get('refreshToken');
+  const termsAccepted = params.get('termsAccepted') === 'true';
 
-  if (accessToken && refreshToken) {
-    // Save tokens to localStorage
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-
-    // Fetch user data and redirect to dashboard
-    fetchUserData().then(() => navigate('/dashboard'));
-  } else {
-    // Handle error redirect
+  if (!accessToken || !refreshToken) {
     navigate('/login?error=missing_tokens');
+    return;
+  }
+
+  localStorage.setItem('accessToken', accessToken);
+  localStorage.setItem('refreshToken', refreshToken);
+
+  // LGPD: new OAuth users must accept the terms before using the app
+  if (!termsAccepted) {
+    navigate('/accept-terms');
+  } else {
+    navigate('/dashboard');
   }
 }, []);
 \`\`\``,

@@ -46,7 +46,52 @@ async function authRoutes(app: FastifyInstance) {
     '/register',
     {
       schema: {
-        description: 'Register a new user with email and password',
+        description: `**Register a new user with email and password**
+
+Creates a new account using email/password credentials. The \`acceptTerms: true\` field is **required** — it records the user's explicit consent to the Terms of Service and Privacy Policy (LGPD Art. 8).
+
+**Rate limit:** 5 requests per hour per IP.
+
+**Response varies based on declared age:**
+
+| Status | Situation | \`canUseApp\` |
+|--------|-----------|--------------|
+| \`201\` | Adult registered successfully | \`true\` |
+| \`200\` | User is under 12 — awaiting guardian authorization | \`false\` |
+
+**After successful registration (201):**
+- \`user.termsAccepted\` always returns \`true\` (terms were accepted at registration time)
+- A verification email is sent — the user can access the app but should verify their email
+- Call \`GET /api/auth/me\` to keep local user data in sync
+
+**Minor accounts (200):**
+- An email is sent to the guardian with a confirmation link
+- The minor **cannot log in** until the guardian confirms via \`GET /api/auth/parental-consent/confirm\`
+
+**Frontend implementation:**
+\`\`\`javascript
+const response = await fetch('/api/auth/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    name: 'Jane Doe',
+    email: 'jane@example.com',
+    password: 'SecurePass123',
+    acceptTerms: true, // required — must be explicitly checked by the user
+  }),
+});
+
+const data = await response.json();
+
+if (data.status === 'pending_parental_consent') {
+  // Minor under 12: redirect to awaiting-consent screen
+  navigate('/register/awaiting-parental-consent', { email: data.emailSentTo });
+} else {
+  // Adult: store tokens and redirect to app
+  localStorage.setItem('accessToken', data.accessToken);
+  navigate('/dashboard');
+}
+\`\`\``,
         tags: ['Authentication'],
         body: registerSchema,
         response: {
@@ -108,7 +153,32 @@ async function authRoutes(app: FastifyInstance) {
     '/login',
     {
       schema: {
-        description: 'Authenticate with email and password',
+        description: `**Authenticate with email and password**
+
+Authenticates the user and returns JWT access and refresh tokens.
+
+**Important — \`user.termsAccepted\` field:**
+
+This field indicates whether the user has accepted the current version of the Terms of Service. If \`false\`, the frontend must redirect the user to the terms acceptance screen before granting access to the app.
+
+| \`termsAccepted\` | Situation | Recommended action |
+|-----------------|-----------|-------------------|
+| \`true\` | Terms accepted and up to date | Redirect to dashboard |
+| \`false\` | Never accepted or terms were updated | Redirect to terms acceptance screen |
+
+**Recommended implementation:**
+\`\`\`javascript
+const { user, accessToken, refreshToken } = await login(email, password);
+
+localStorage.setItem('accessToken', accessToken);
+localStorage.setItem('refreshToken', refreshToken);
+
+if (!user.termsAccepted) {
+  navigate('/accept-terms'); // Call POST /api/auth/accept-terms after user accepts
+} else {
+  navigate('/dashboard');
+}
+\`\`\``,
         tags: ['Authentication'],
         body: loginSchema,
         response: {
@@ -131,7 +201,17 @@ async function authRoutes(app: FastifyInstance) {
     '/verify-email',
     {
       schema: {
-        description: 'Verify email address with token sent via email',
+        description: `**Verify email address**
+
+Confirms the user's email using the token received by email after registration. The token expires in 24 hours and can only be used once.
+
+**Important:** Users can still use the app before verifying their email, but certain features may be restricted until verification is complete. Always display a verification reminder banner until \`user.emailVerified\` is \`true\`.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`VALIDATION_INVALID_REQUEST\` | Token is malformed or missing |
+| \`410\` | \`AUTH_TOKEN_EXPIRED\` | Token has expired or was already used |`,
         tags: ['Authentication'],
         body: verifyEmailSchema,
         response: {
@@ -151,7 +231,16 @@ async function authRoutes(app: FastifyInstance) {
     '/forgot-password',
     {
       schema: {
-        description: 'Request password reset email',
+        description: `**Request a password reset email**
+
+Sends a password reset link to the provided email address. The response is always identical regardless of whether the email exists — this prevents user enumeration attacks.
+
+**Rate limit:** 3 requests per hour per IP.
+
+**Token behavior:**
+- Reset tokens expire in 24 hours
+- Each new request invalidates any previously issued token for that email
+- The token can only be used once`,
         tags: ['Authentication'],
         body: forgotPasswordSchema,
         response: {
@@ -182,7 +271,15 @@ async function authRoutes(app: FastifyInstance) {
     '/reset-password',
     {
       schema: {
-        description: 'Reset password with token from email',
+        description: `**Reset password using a recovery token**
+
+Sets a new password for the account associated with the reset token received by email (via \`POST /api/auth/forgot-password\`). The token expires in 24 hours and can only be used once.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`VALIDATION_INVALID_REQUEST\` | Token is malformed or the new password doesn't meet requirements |
+| \`410\` | \`AUTH_TOKEN_EXPIRED\` | Token has expired or was already used |`,
         tags: ['Authentication'],
         body: resetPasswordSchema,
         response: {
@@ -258,47 +355,51 @@ localStorage.setItem('accessToken', accessToken);
     '/me',
     {
       schema: {
-        description: `**Get Current Authenticated User**
+        description: `**Get authenticated user profile**
 
-Returns the profile information of the currently authenticated user.
+Returns the profile of the currently authenticated user. Use this endpoint to keep local user data in sync with the server.
 
-**Important for Frontend Developers:**
+**When to call:**
+- After login (email/password or OAuth)
+- After a token refresh
+- On app mount to verify session state and check user flags
 
-Call this endpoint after:
-- Successful login (email/password or OAuth)
-- Token refresh to get updated user data
+**Response fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| \`id\` | UUID | Unique user identifier |
+| \`name\` | string | Full name |
+| \`email\` | string | Email address |
+| \`avatarUrl\` | string \\| null | Profile photo URL (\`null\` if not set) |
+| \`emailVerified\` | boolean | Whether the email was confirmed via the verification link |
+| \`role\` | string | User role: \`USER\`, \`ANALYST\`, \`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\` |
+| \`termsAccepted\` | boolean | Whether the user has accepted the current Terms of Service version (LGPD) |
 
-**Response includes:**
-- \`id\`: User UUID
-- \`name\`: User's full name
-- \`email\`: User's email address
-- \`avatarUrl\`: Profile picture URL (or null)
-- \`emailVerified\`: Boolean indicating if email is verified
-- \`role\`: User role (USER, ANALYST, SUPPORT, MODERATOR, SUPER_ADMIN)
-
-**Implementation Example:**
+**User state checklist:**
 \`\`\`javascript
-// Fetch user data after login
+const { user } = await getMe();
+
+if (!user.termsAccepted) {
+  navigate('/accept-terms'); // always check before showing the dashboard
+}
+if (!user.emailVerified) {
+  showBanner('Please verify your email to continue');
+}
+\`\`\`
+
+**Error handling:**
+\`\`\`javascript
 const response = await fetch('/api/auth/me', {
-  headers: {
-    'Authorization': \`Bearer \${accessToken}\`
-  }
+  headers: { 'Authorization': \`Bearer \${accessToken}\` }
 });
 
-if (!response.ok) {
-  if (response.status === 401) {
-    // Token expired, try to refresh
-    await refreshAccessToken();
-    // Retry the request
-  }
-  throw new Error('Failed to fetch user');
+if (response.status === 401) {
+  // Token expired — attempt refresh or redirect to login
+  await refreshToken();
 }
-
-const { user } = await response.json();
-console.log('Logged in as:', user.name);
 \`\`\``,
         tags: ['Authentication'],
-        summary: 'Get current user',
+        summary: 'Get authenticated user profile',
         security: [{ BearerAuth: [] }],
         response: {
           200: z.object({ user: userResponseSchema }),
@@ -324,7 +425,17 @@ console.log('Logged in as:', user.name);
     '/password',
     {
       schema: {
-        description: 'Set a password for accounts created via social login',
+        description: `**Set password for OAuth-only accounts**
+
+Sets a password for accounts created via Google OAuth that don't have a local password yet. This allows users to also log in with email/password in addition to their OAuth provider.
+
+Returns an error if the account already has a password set — in that case, use the forgot password flow (\`POST /api/auth/forgot-password\`) to change it.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`AUTH_PASSWORD_ALREADY_SET\` | Account already has a password — use the reset flow instead |
+| \`401\` | \`AUTH_UNAUTHORIZED\` | Missing or invalid access token |`,
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
         body: setPasswordSchema,
@@ -348,7 +459,21 @@ console.log('Logged in as:', user.name);
     '/parental-consent/confirm',
     {
       schema: {
-        description: 'Confirm parental consent via email token',
+        description: `**Confirm parental consent via email token**
+
+Called by a parent or legal guardian to authorize a minor's account (under 12 years old). The confirmation link is sent to the guardian's email at registration time and contains a one-time token.
+
+Once confirmed, the child's account becomes active and the minor can log in normally.
+
+**Token behavior:**
+- Expires in 48 hours from the time of registration
+- Single-use — becomes invalid after confirmation
+
+**Error codes:**
+| Status | Meaning |
+|--------|---------|
+| \`404\` | Token not found — invalid or already used |
+| \`410\` | Token has expired — a new registration is required |`,
         tags: ['Authentication'],
         querystring: z.object({
           token: z.string(),
@@ -401,8 +526,25 @@ console.log('Logged in as:', user.name);
     '/me',
     {
       schema: {
-        description:
-          'Delete own account. All personal data is anonymized for LGPD compliance. Deletion is blocked if there are active loans.',
+        description: `**Delete account (immediate)**
+
+Permanently deletes the authenticated user's account. All personal data is anonymized in compliance with LGPD Art. 18 (right to erasure).
+
+**Preconditions — deletion is blocked if:**
+- The user has active loans as a lender (loans must be returned or cancelled first)
+- The user has pending loans as a borrower
+
+**Password confirmation:**
+- Accounts with a password set: must provide \`password\` in the request body for verification
+- OAuth-only accounts (no password): the \`password\` field can be omitted
+
+**Alternative:** Use \`POST /api/me/account/schedule-deletion\` for a 15-day grace period with cancellation support instead of immediate deletion.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`AUTH_INVALID_PASSWORD\` | Password confirmation failed |
+| \`409\` | \`LOANS_ACTIVE_EXIST\` | User has active loans — resolve them before deleting |`,
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
         body: deleteAccountSchema,
@@ -427,8 +569,24 @@ console.log('Logged in as:', user.name);
     '/terms',
     {
       schema: {
-        description:
-          'Returns the current Terms of Service and Privacy Policy version. Use this to check if the user needs to re-accept after an update (LGPD Art. 8).',
+        description: `**Get current Terms of Service and Privacy Policy version**
+
+Public endpoint (no authentication required) that returns the current version of the legal documents and their URLs.
+
+**Use this endpoint to:**
+- Display links to the documents on the terms acceptance screen
+- Verify whether the version the user accepted is still current
+
+**When terms are updated**, the version changes and all users will have \`user.termsAccepted: false\` on their next login — they will need to re-accept via \`POST /api/auth/accept-terms\`.
+
+**Frontend implementation:**
+\`\`\`javascript
+const { version, termsUrl, privacyUrl } = await fetch('/api/auth/terms').then(r => r.json());
+
+// Display on the acceptance screen:
+// "By continuing, you agree to our Terms of Service and Privacy Policy"
+// with clickable links to termsUrl and privacyUrl
+\`\`\``,
         tags: ['Authentication'],
         response: {
           200: z.object({
@@ -452,8 +610,49 @@ console.log('Logged in as:', user.name);
     '/accept-terms',
     {
       schema: {
-        description:
-          'Accept the current Terms of Service and Privacy Policy (LGPD Art. 7/8). Required for users who signed up via OAuth and have not yet accepted, or when terms are updated.',
+        description: `**Accept Terms of Service and Privacy Policy (LGPD Art. 7/8)**
+
+Records the user's explicit consent to the current version of the terms. The IP address and timestamp of the acceptance are saved for the audit trail.
+
+**When to use:**
+
+| Situation | \`user.termsAccepted\` | Action |
+|-----------|----------------------|--------|
+| New user via Google OAuth | \`false\` | Call this endpoint after displaying the terms |
+| Terms updated (new version released) | \`false\` | Request re-acceptance from the user |
+| User registered via email/password | \`true\` | Not needed — already accepted at registration |
+
+**Complete flow for OAuth users:**
+\`\`\`javascript
+// 1. User returns from Google at /auth/callback
+const params = new URLSearchParams(window.location.search);
+const accessToken = params.get('accessToken');
+const termsAccepted = params.get('termsAccepted') === 'true';
+
+localStorage.setItem('accessToken', accessToken);
+
+// 2. If terms not accepted, redirect to terms acceptance screen
+if (!termsAccepted) {
+  navigate('/accept-terms');
+  return;
+}
+navigate('/dashboard');
+
+// 3. On the acceptance screen: fetch version/URLs and display to the user
+const terms = await fetch('/api/auth/terms').then(r => r.json());
+// Display: "By continuing, you agree to our Terms of Service and Privacy Policy"
+
+// 4. User confirms — record the acceptance
+const response = await fetch('/api/auth/accept-terms', {
+  method: 'POST',
+  headers: { 'Authorization': \`Bearer \${accessToken}\` },
+});
+const { user } = await response.json();
+// user.termsAccepted === true now
+navigate('/dashboard');
+\`\`\`
+
+**Note:** There is no request body — consent is recorded by the act of calling this authenticated endpoint, equivalent to the user clicking "I Agree".`,
         tags: ['Authentication'],
         security: [{ BearerAuth: [] }],
         response: {
@@ -478,7 +677,7 @@ console.log('Logged in as:', user.name);
       }
 
       return reply.send({
-        message: 'Termos de Uso e Política de Privacidade aceitos com sucesso.',
+        message: 'Terms of Service and Privacy Policy accepted successfully.',
         termsVersion: CURRENT_TERMS_VERSION,
         user,
       });

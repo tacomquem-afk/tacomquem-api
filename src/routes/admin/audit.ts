@@ -14,7 +14,23 @@ export default async function auditRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Audit'],
-        description: 'Get access logs (requires SUPPORT role or higher)',
+        description: `**Get API access logs**
+
+Returns raw HTTP access logs for the platform. Used by support agents to investigate user-reported issues (e.g., "I didn't perform that action") and detect suspicious activity patterns.
+
+**Required role:** \`SUPPORT\` or higher (\`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Query parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| \`userId\` | UUID | Filter logs for a specific user |
+| \`from\` | ISO 8601 datetime | Start of date range (inclusive) |
+| \`to\` | ISO 8601 datetime | End of date range (inclusive) |
+| \`method\` | string | Filter by HTTP method (e.g., \`GET\`, \`POST\`) |
+| \`limit\` | integer | Max records to return (default 100) |
+| \`offset\` | integer | Records to skip for pagination (default 0) |
+
+**Each log entry includes:** timestamp, user identity, HTTP method, path, status code, response time, and IP address. Logs are ordered newest first.`,
         security: [{ BearerAuth: [] }],
         querystring: z.object({
           userId: z.string().uuid().optional(),

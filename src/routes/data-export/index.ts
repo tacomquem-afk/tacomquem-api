@@ -19,7 +19,23 @@ async function dataExportRoutes(app: FastifyInstance) {
     '/me/data/export',
     {
       schema: {
-        description: 'Request data export in JSON or CSV format',
+        description: `**Request a personal data export (LGPD right of portability)**
+
+Initiates a full export of the authenticated user's personal data in the requested format. Fulfills the LGPD right of data portability (Art. 18, V).
+
+**Export process:**
+1. Call this endpoint to create an export job (status: \`processing\`)
+2. A background job packages all user data (profile, items, loans, notifications)
+3. A download link is emailed once the export is ready (typically within a few minutes)
+4. Download the file via \`GET /api/users/me/data/export/:id/download\`
+
+**Format options:**
+| \`format\` | Description |
+|-----------|-------------|
+| \`json\` _(default)_ | Structured JSON — best for programmatic use |
+| \`csv\` | Flat CSV — best for spreadsheet viewing |
+
+**Expiry:** Both the export file and the download link expire after 7 days.`,
         tags: ['Data Export'],
         security: [{ BearerAuth: [] }],
         body: z.object({
@@ -89,7 +105,21 @@ async function dataExportRoutes(app: FastifyInstance) {
     '/me/data/export/status',
     {
       schema: {
-        description: 'Get data export history',
+        description: `**Get data export history**
+
+Returns a list of all previous data export requests made by the authenticated user. Use this to show export history and check the status of pending exports.
+
+**Export statuses:**
+| \`status\` | Meaning |
+|-----------|---------|
+| \`pending\` | Export job queued, not yet started |
+| \`processing\` | Export is being generated |
+| \`completed\` | Export is ready for download |
+| \`failed\` | Export generation failed — retry by creating a new export |
+
+**Fields of note:**
+- \`downloaded\`: \`true\` if the download link was already used
+- \`expires_at\`: ISO 8601 datetime when the export file will be deleted`,
         tags: ['Data Export'],
         security: [{ BearerAuth: [] }],
         response: {
@@ -137,7 +167,21 @@ async function dataExportRoutes(app: FastifyInstance) {
     '/me/data/export/:id/download',
     {
       schema: {
-        description: 'Download exported data file',
+        description: `**Download an exported data file**
+
+Downloads the generated export file identified by its ID and a one-time download token. The token is included in the download link sent by email.
+
+**This endpoint does not require authentication** — the \`token\` query parameter acts as the access credential for the file.
+
+**Behavior:**
+- The download token is single-use — subsequent requests with the same token will still succeed (the \`downloaded\` flag is set on first use)
+- Returns the file as an attachment with the appropriate \`Content-Disposition\` header
+
+**Error codes:**
+| Status | Meaning |
+|--------|---------|
+| \`404\` | Export not found, token invalid, or export not yet ready |
+| \`410\` | Download link has expired (7-day window) |`,
         tags: ['Data Export'],
         params: z.object({
           id: z.string().uuid(),

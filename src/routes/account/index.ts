@@ -26,7 +26,21 @@ async function usersRoutes(app: FastifyInstance) {
     '/me/account/schedule-deletion',
     {
       schema: {
-        description: 'Schedule account deletion (15-day grace period)',
+        description: `**Schedule account deletion (15-day grace period)**
+
+Initiates a soft account deletion with a 15-day grace period before permanent removal. During the grace period, the user can cancel via \`POST /api/me/account/cancel-deletion\` or the one-click link sent by email.
+
+**Difference from immediate deletion (\`DELETE /api/auth/me\`):**
+- The account remains active and accessible during the grace period
+- After 15 days, a background job permanently anonymizes all personal data (LGPD Art. 17/18)
+- A cancellation link is emailed immediately after scheduling
+
+**Response fields:**
+| Field | Description |
+|-------|-------------|
+| \`scheduledFor\` | ISO 8601 datetime when the account will be permanently deleted |
+| \`canCancelUntil\` | Cancellation deadline (same as \`scheduledFor\`) |
+| \`cancelLink\` | One-click cancellation URL that was also emailed to the user |`,
         tags: ['Users'],
         security: [{ BearerAuth: [] }],
         body: z.object({
@@ -73,7 +87,19 @@ async function usersRoutes(app: FastifyInstance) {
     '/me/account/deletion-status',
     {
       schema: {
-        description: 'Check account deletion status',
+        description: `**Check account deletion status**
+
+Returns the current deletion state of the authenticated user's account.
+
+**Status values:**
+| \`status\` | Meaning |
+|-----------|---------|
+| \`active\` | No deletion scheduled — account is in normal state |
+| \`pending\` | Deletion requested but not yet scheduled (rare transitional state) |
+| \`scheduled\` | Deletion is scheduled — \`scheduledFor\` field is populated |
+| \`completed\` | Account has been permanently deleted (this state should not be reachable via authentication) |
+
+Use \`canCancel: true\` to determine whether to show the "Cancel deletion" UI.`,
         tags: ['Users'],
         security: [{ BearerAuth: [] }],
         response: {
@@ -102,7 +128,18 @@ async function usersRoutes(app: FastifyInstance) {
     '/me/account/cancel-deletion',
     {
       schema: {
-        description: 'Cancel scheduled account deletion',
+        description: `**Cancel a scheduled account deletion**
+
+Cancels a pending account deletion within the grace period, restoring the account to normal \`active\` status.
+
+**Requirements:**
+- The account must have a deletion scheduled (status \`scheduled\`)
+- Must be called before the \`scheduledFor\` deadline
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`ACCOUNT_NO_DELETION_SCHEDULED\` | No deletion is currently scheduled for this account |`,
         tags: ['Users'],
         security: [{ BearerAuth: [] }],
         body: z.object({}).optional(),
@@ -127,7 +164,19 @@ async function usersRoutes(app: FastifyInstance) {
     '/account/cancel-deletion',
     {
       schema: {
-        description: 'Cancel deletion via email token',
+        description: `**Cancel deletion via email token (public)**
+
+Cancels a scheduled account deletion using the one-click token sent by email when deletion was scheduled. This endpoint is **public** (no authentication required) — it is meant to be linked directly from the cancellation email.
+
+**Token behavior:**
+- Tokens expire when the scheduled deletion date is reached
+- Each scheduled deletion generates a unique token
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`ACCOUNT_TOKEN_INVALID\` | Token is malformed or already used |
+| \`404\` | \`ACCOUNT_NOT_FOUND\` | No account found matching this token |`,
         tags: ['Users'],
         querystring: z.object({
           token: z.string(),
@@ -149,7 +198,18 @@ async function usersRoutes(app: FastifyInstance) {
     '/me/parental-consent',
     {
       schema: {
-        description: 'Get parental consent status (LGPD compliance)',
+        description: `**Get parental consent status**
+
+Returns the parental consent information for the authenticated user's account. Relevant for accounts where a date of birth was provided during registration (LGPD compliance for minors).
+
+**Status values:**
+| \`status\` | Meaning |
+|-----------|---------|
+| \`not_applicable\` | No date of birth was provided — user is treated as an adult |
+| \`pending\` | Consent email sent to guardian but not yet confirmed |
+| \`confirmed\` | Guardian has confirmed — account is fully active |
+
+**Note:** A \`pending\` status means the user cannot log in. Show appropriate messaging and a resend option if needed.`,
         tags: ['Users'],
         security: [{ BearerAuth: [] }],
         response: {
@@ -189,7 +249,21 @@ async function usersRoutes(app: FastifyInstance) {
     '/me/activity',
     {
       schema: {
-        description: 'Get user activity logs (LGPD right to access)',
+        description: `**Get user activity logs (LGPD right of access)**
+
+Returns the authenticated user's API access logs. This endpoint fulfills the LGPD right of access (Art. 18, III) — users can inspect what actions were performed under their account.
+
+**Pagination:** Use \`limit\` and \`offset\` for cursor-based pagination through large log histories. Logs are ordered newest first.
+
+**Date filtering:** Use \`from\` and \`to\` (ISO 8601 datetime strings) to scope the query to a specific time range.
+
+**Query parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| \`from\` | ISO 8601 datetime | — | Start of the date range (inclusive) |
+| \`to\` | ISO 8601 datetime | — | End of the date range (inclusive) |
+| \`limit\` | integer | 50 | Maximum number of records to return |
+| \`offset\` | integer | 0 | Number of records to skip (for pagination) |`,
         tags: ['Users'],
         security: [{ BearerAuth: [] }],
         querystring: z.object({

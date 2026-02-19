@@ -24,7 +24,15 @@ export default async function userRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Users'],
-        description: 'List all users (requires ANALYST role or higher)',
+        description: `**List all users**
+
+Returns a paginated list of all registered users. User emails and names are masked for privacy — only enough data to identify users for support and moderation purposes is returned.
+
+**Required role:** \`ANALYST\` or higher (\`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Query parameters:** Use the \`listUsersSchema\` query params for pagination, search, and filtering by status or role.
+
+**Privacy note:** Fields like \`email\` and \`name\` are returned masked (e.g., \`j***e@example.com\`). Use \`GET /api/admin/users/:id\` with \`SUPPORT\` role to see fuller details.`,
         security: [{ BearerAuth: [] }],
         querystring: listUsersSchema,
         response: {
@@ -48,7 +56,16 @@ export default async function userRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Users'],
-        description: 'Get user details (requires SUPPORT role or higher)',
+        description: `**Get detailed user profile**
+
+Returns full details for a specific user including their loan history (as lender and borrower) and owned items. Used by support agents to investigate user reports or account issues.
+
+**Required role:** \`SUPPORT\` or higher (\`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ADMIN_TARGET_NOT_FOUND\` | No user found with the given ID |`,
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
@@ -79,7 +96,20 @@ export default async function userRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Users'],
-        description: 'Block a user (requires SUPER_ADMIN role)',
+        description: `**Block a user**
+
+Blocks a user account, preventing them from logging in or using the application. The action is logged in the audit trail.
+
+**Required role:** \`SUPER_ADMIN\` only
+
+**Request body:** Must include a \`reason\` explaining why the user is being blocked — this is recorded in the audit log and can be viewed in the user's block history.
+
+**Effect:** Blocked users receive a \`403 Forbidden\` response on all authenticated endpoints. Existing JWT tokens are invalidated on the next request.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ADMIN_TARGET_NOT_FOUND\` | No user found with the given ID |`,
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: blockUserSchema,
@@ -107,7 +137,18 @@ export default async function userRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Users'],
-        description: 'Unblock a user (requires SUPER_ADMIN role)',
+        description: `**Unblock a user**
+
+Restores access for a previously blocked user account. The action is logged in the audit trail.
+
+**Required role:** \`SUPER_ADMIN\` only
+
+**Effect:** The user can log in again immediately after being unblocked.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ADMIN_TARGET_NOT_FOUND\` | No user found with the given ID |`,
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         response: {
