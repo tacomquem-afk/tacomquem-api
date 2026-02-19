@@ -1662,6 +1662,34 @@ export async function unblockUser(
   });
 }
 
+export async function deleteUser(
+  userId: string,
+  adminId: string,
+  reason: string,
+  ipAddress?: string
+) {
+  const now = new Date();
+
+  await db
+    .update(users)
+    .set({
+      deletedAt: now,
+      deletionStatus: 'completed',
+      deletionReason: reason,
+      isActive: false
+    })
+    .where(eq(users.id, userId));
+
+  await logAdminAction({
+    adminId,
+    action: 'user_deleted',
+    targetType: 'user',
+    targetId: userId,
+    metadata: { reason },
+    ipAddress
+  });
+}
+
 export async function logAdminAction(params: {
   adminId: string;
   action: string;
@@ -2286,6 +2314,10 @@ export const blockUserSchema = z.object({
   reason: z.string().min(10, 'Motivo deve ter no mínimo 10 caracteres')
 });
 
+export const deleteUserSchema = z.object({
+  reason: z.string().min(10, 'Motivo deve ter no mínimo 10 caracteres')
+});
+
 export const removeContentSchema = z.object({
   reason: z.string().min(10, 'Motivo deve ter no mínimo 10 caracteres')
 });
@@ -2452,7 +2484,7 @@ Create: `src/routes/admin/users.ts`
 
 ```typescript
 import type { FastifyInstance } from 'fastify';
-import { listUsersSchema, blockUserSchema } from '../../schemas/admin.js';
+import { listUsersSchema, blockUserSchema, deleteUserSchema } from '../../schemas/admin.js';
 import {
   listUsers,
   getUserDetails,
@@ -2521,6 +2553,23 @@ export default async function userRoutes(fastify: FastifyInstance) {
     await unblockUser(id, adminId, ipAddress);
 
     return { success: true, message: 'User unblocked successfully' };
+  });
+
+  // DELETE /api/admin/users/:id
+  fastify.delete('/:id', {
+    preHandler: [
+      fastify.authenticate,
+      fastify.requireRole('SUPER_ADMIN')
+    ]
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { reason } = deleteUserSchema.parse(request.body);
+    const adminId = request.user!.userId;
+    const ipAddress = getClientIp(request);
+
+    await deleteUser(id, adminId, reason, ipAddress);
+
+    return { success: true, message: 'User deleted successfully' };
   });
 }
 ```

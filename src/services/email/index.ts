@@ -91,3 +91,42 @@ export function buildLoanConfirmationRequestEmail(
     <a href="${confirmUrl}">Confirmar Empréstimo</a>
   `;
 }
+
+export function buildParentalConsentRequestEmail(
+  childName: string,
+  parentalName: string,
+  confirmUrl: string
+): string {
+  return `
+    <h1>Solicitação de Consentimento Parental</h1>
+    <p>Olá ${parentalName},</p>
+    <p>${childName} (${childName.toLowerCase()}@example.com) está tentando criar uma conta no TáComQuem.</p>
+    <p>Para continuar, precisamos do seu consentimento como responsável legal.</p>
+    <p>Clique no link abaixo para confirmar:</p>
+    <a href="${confirmUrl}">Confirmar Cadastro</a>
+    <p>Este link expira em 48 horas.</p>
+    <p>O TáComQuem é um aplicativo para controle de empréstimos entre amigos. Seu filho(a) poderá gerenciar empréstimos de itens pessoais apenas com sua autorização.</p>
+  `;
+}
+
+export function buildDataExportReadyEmail(
+  downloadUrl: string,
+  expiresIn: string,
+  format: string
+): string {
+  return `
+    <h1>Seu Dado de Exportação está Pronto</h1>
+    <p>Suas dados do TáComQuem foram exportados com sucesso no formato ${format.toUpperCase()}.</p>
+    <p>Clique no link abaixo para baixar seus dados:</p>
+    <a href="${downloadUrl}">Baixar Meus Dados</a>
+    <p>⚠️ Importante: Este link expira em ${expiresIn}.</p>
+    <p>Os dados incluem:</p>
+    <ul>
+      <li>Informações do seu perfil</li>
+      <li>Seus itens cadastrados</li>
+      <li>Histórico de empréstimos</li>
+      <li>Notificações recebidas</li>
+    </ul>
+    <p>Esta exportação está em conformidade com a LGPD (Lei Geral de Proteção de Dados).</p>
+  `;
+}

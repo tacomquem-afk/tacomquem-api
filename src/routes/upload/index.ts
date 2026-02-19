@@ -28,8 +28,34 @@ export async function uploadRoutes(app: FastifyInstance) {
     {
       schema: {
         summary: 'Upload images',
-        description:
-          'Upload up to 5 images (max 10MB each). Images are auto-compressed to WebP. Accepted formats: JPEG, PNG, WebP, HEIC, TIFF.',
+        description: `**Upload item images**
+
+Accepts a multipart/form-data request with one or more image files and stores them in cloud storage. Images are automatically compressed and converted to WebP format for optimal delivery.
+
+**Limits:**
+- Maximum **5 files** per request
+- Maximum **10 MB** per file
+- Accepted formats: JPEG, PNG, WebP, HEIC, TIFF
+
+**Workflow:**
+1. Upload images here — get back an array of \`key\` and pre-signed \`url\` values
+2. Use the returned \`key\` values in item create/update requests (\`POST /api/items\`, \`PATCH /api/items/:id\`)
+3. Use the returned \`url\` to display images immediately — URLs expire after 7 days (new pre-signed URLs are served by the items endpoints)
+
+**Response per image:**
+| Field | Description |
+|-------|-------------|
+| \`key\` | Stable storage key — store this, not the URL |
+| \`url\` | Pre-signed URL for immediate display (expires in 7 days) |
+| \`expiresAt\` | ISO 8601 datetime when the pre-signed URL expires |
+| \`sizeBytes\` | Final file size after compression |
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`400\` | \`STORAGE_MAX_FILES\` | More than 5 files sent in a single request |
+| \`400\` | \`STORAGE_NO_FILE\` | Request contained no valid image files |
+| \`413\` | \`STORAGE_FILE_TOO_LARGE\` | One or more files exceed the 10 MB limit |`,
         tags: ['Upload'],
         security: [{ BearerAuth: [] }],
         consumes: ['multipart/form-data'],

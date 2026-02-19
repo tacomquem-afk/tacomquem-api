@@ -46,3 +46,7 @@ export function decrypt(encryptedText: string): string {
 export function hash(text: string): string {
   return createHash('sha256').update(text.toLowerCase()).digest('hex');
 }
+
+export function generateToken(lengthBytes: number = 32): string {
+  return randomBytes(lengthBytes).toString('hex');
+}

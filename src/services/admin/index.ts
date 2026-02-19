@@ -1,14 +1,26 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { adminAuditLog, loans, users } from '../../db/schema.js';
+import {
+  adminAuditLog,
+  deletionTokens,
+  friendships,
+  items,
+  loans,
+  notifications,
+  oauthAccounts,
+  users,
+  verificationTokens,
+} from '../../db/schema.js';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
-import { decrypt } from '../crypto/index.js';
+import { decrypt, encrypt, hash } from '../crypto/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
 type AdminAction =
   | 'user_blocked'
   | 'user_unblocked'
+  | 'user_deleted'
   | 'item_removed'
   | 'loan_cancelled'
   | 'admin_created'
@@ -41,10 +53,14 @@ export interface MaskedUser {
 }
 
 export async function listUsers(params: ListUsersParams) {
-  const { page, limit, role, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = params;
+  const { page, limit, search, role, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = params;
   const offset = (page - 1) * limit;
 
   const conditions = [];
+  if (search) {
+    const searchHash = hash(search.trim().toLowerCase());
+    conditions.push(eq(users.emailHash, searchHash));
+  }
   if (role) conditions.push(eq(users.role, role));
   if (isActive !== undefined) conditions.push(eq(users.isActive, isActive));
 
@@ -253,6 +269,76 @@ export async function unblockUser(userId: string, adminId: string, ipAddress?: s
     action: 'user_unblocked',
     targetType: 'user',
     targetId: userId,
+    ipAddress,
+  });
+}
+
+export async function deleteUser(
+  userId: string,
+  adminId: string,
+  reason: string,
+  ipAddress?: string
+) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user) {
+    throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User not found');
+  }
+
+  if (user.deletedAt) {
+    throw new NotFoundError(ErrorCodes.ADMIN_TARGET_NOT_FOUND, 'User is already deleted');
+  }
+
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        emailEncrypted: null,
+        emailHash: null,
+        nameEncrypted: encrypt('Usuário Deletado'),
+        avatarUrl: null,
+        passwordHash: null,
+        dateOfBirth: null,
+        parentalEmail: null,
+        parentalName: null,
+        parentalConsentStatus: 'not_applicable',
+        parentalConsentToken: null,
+        parentalConsentTokenExpiresAt: null,
+        parentalConsentConfirmedAt: null,
+        parentalConsentIpAddress: null,
+        parentalConsentUserAgent: null,
+        deletedAt: now,
+        deletionRequestedAt: now,
+        deletionStatus: 'completed',
+        deletionReason: reason,
+        isActive: false,
+        updatedAt: now,
+      })
+      .where(eq(users.id, userId));
+
+    await tx.delete(oauthAccounts).where(eq(oauthAccounts.userId, userId));
+    await tx.delete(verificationTokens).where(eq(verificationTokens.userId, userId));
+    await tx.delete(deletionTokens).where(eq(deletionTokens.userId, userId));
+    await tx.delete(notifications).where(eq(notifications.userId, userId));
+    await tx
+      .delete(friendships)
+      .where(or(eq(friendships.userAId, userId), eq(friendships.userBId, userId)));
+    await tx
+      .update(items)
+      .set({ isActive: false, updatedAt: now })
+      .where(and(eq(items.ownerId, userId), eq(items.isActive, true)));
+  });
+
+  await logAdminAction({
+    adminId,
+    action: 'user_deleted',
+    targetType: 'user',
+    targetId: userId,
+    metadata: { reason },
     ipAddress,
   });
 }

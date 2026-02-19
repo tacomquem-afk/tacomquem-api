@@ -1,6 +1,7 @@
 import { and, eq, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
+import { CURRENT_TERMS_VERSION } from '../../config/terms.js';
 import { db } from '../../db/index.js';
 import {
   friendships,
@@ -20,16 +21,62 @@ import {
   UnauthorizedError,
 } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
+import { checkBetaInvite, markBetaInviteAsUsed } from '../admin/beta-invites.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
-import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
+import {
+  buildParentalConsentRequestEmail,
+  buildPasswordResetEmail,
+  buildVerificationEmail,
+  sendEmail,
+} from '../email/index.js';
+import {
+  calculateAgeFromBirthDate,
+  generateParentalConsentToken,
+  getParentalTokenExpiryDate,
+  isChildUnder12,
+} from '../parental-consent/index.js';
 import { hashPassword, verifyPassword } from '../password/index.js';
+
+function isDuplicateKeyError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const err = error as Error & Record<string, unknown>;
+
+  const code = err.code;
+  if (code === '23505') return true;
+
+  const message = error.message.toLowerCase();
+  return message.includes('duplicate key') || message.includes('unique constraint');
+}
 
 const TOKEN_EXPIRY_HOURS = 24;
 
-export interface CreateUserInput {
+export interface RegisterAdultInput {
   name: string;
   email: string;
   password: string;
+}
+
+export interface RegisterChildInput {
+  name: string;
+  email: string;
+  password: string;
+  dateOfBirth: Date;
+  parentalEmail: string;
+  parentalName: string;
+}
+
+export type CreateUserInput = RegisterAdultInput | RegisterChildInput;
+
+export interface RegisterResponse {
+  status: 'success' | 'pending_parental_consent';
+  user?: UserResponse;
+  accessToken?: string;
+  refreshToken?: string;
+  message?: string;
+  emailSentTo?: string;
+  canUseApp?: boolean;
+  userId?: string;
 }
 
 export interface UserResponse {
@@ -39,16 +86,20 @@ export interface UserResponse {
   avatarUrl: string | null;
   emailVerified: boolean;
   role: UserRole;
+  termsAccepted: boolean;
 }
 
-export async function createUser(input: CreateUserInput): Promise<UserResponse> {
+export async function createUser(
+  input: CreateUserInput,
+  clientIp: string
+): Promise<RegisterResponse> {
   const emailHash = hash(input.email);
 
   const existing = await db.query.users.findFirst({
     where: eq(users.emailHash, emailHash),
   });
 
-  if (existing) {
+  if (existing && !existing.deletedAt) {
     if (!existing.passwordHash) {
       throw new ConflictError(
         ErrorCodes.AUTH_SOCIAL_ACCOUNT,
@@ -62,45 +113,136 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
   const emailEncrypted = encrypt(input.email);
   const nameEncrypted = encrypt(input.name);
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      emailEncrypted,
-      nameEncrypted,
-      emailHash,
-      passwordHash: passwordHashed,
-    })
-    .returning();
-
-  if (!user) {
-    throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
-  }
-
-  const token = nanoid(32);
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  await db.insert(verificationTokens).values({
-    userId: user.id,
-    token,
-    type: 'email_verification',
-    expiresAt,
-  });
-
-  const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
-  await sendEmail({
-    to: input.email,
-    subject: 'Verifique seu email - TáComQuem',
-    html: buildVerificationEmail(input.name, verificationUrl),
-  });
-
-  return {
-    id: user.id,
-    name: input.name,
-    email: input.email,
-    avatarUrl: user.avatarUrl ?? null,
-    emailVerified: user.emailVerified,
-    role: user.role,
+  // Terms accepted at registration time (LGPD Art. 8: explicit, informed, documented consent)
+  const termsData = {
+    termsVersion: CURRENT_TERMS_VERSION,
+    termsAcceptedAt: new Date(),
+    termsAcceptedIp: clientIp,
   };
+
+  // Check if this is a child registration
+  const isChild = 'dateOfBirth' in input && isChildUnder12(input.dateOfBirth);
+
+  if (isChild) {
+    // Child registration - requires parental consent
+    const tokenPlain = generateParentalConsentToken();
+    const tokenHash = hash(tokenPlain);
+    const tokenExpires = getParentalTokenExpiryDate();
+
+    // biome-ignore lint/suspicious/noExplicitAny: Type is inferred from Drizzle ORM returning
+    let user: any;
+    try {
+      [user] = await db
+        .insert(users)
+        .values({
+          emailEncrypted,
+          nameEncrypted,
+          emailHash,
+          passwordHash: passwordHashed,
+          dateOfBirth: input.dateOfBirth.toISOString(),
+          parentalConsentStatus: 'pending',
+          parentalEmail: encrypt(input.parentalEmail),
+          parentalName: input.parentalName,
+          parentalConsentToken: tokenHash,
+          parentalConsentTokenExpiresAt: tokenExpires,
+          ...termsData,
+        })
+        .returning();
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered');
+      }
+      throw error;
+    }
+
+    if (!user) {
+      throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+    }
+
+    // Send email to parent with plain token (hash is stored in DB)
+    await sendEmail({
+      to: input.parentalEmail,
+      subject: `${input.name} precisa da sua autorização para usar o TáComQuem`,
+      html: buildParentalConsentRequestEmail(
+        input.name,
+        input.parentalName,
+        `${env.FRONTEND_URL}/parental-consent?token=${tokenPlain}`
+      ),
+    });
+
+    return {
+      status: 'pending_parental_consent',
+      message: 'Conta criada. Um email de confirmação foi enviado para o responsável.',
+      emailSentTo: input.parentalEmail,
+      canUseApp: false,
+      userId: user.id,
+    };
+  } else {
+    // Adult registration
+    const isBetaInvited = await checkBetaInvite(input.email);
+
+    // biome-ignore lint/suspicious/noExplicitAny: Type is inferred from Drizzle ORM returning
+    let user: any;
+    try {
+      [user] = await db
+        .insert(users)
+        .values({
+          emailEncrypted,
+          nameEncrypted,
+          emailHash,
+          passwordHash: passwordHashed,
+          accessTier: isBetaInvited ? 'BETA' : 'PUBLIC',
+          betaAddedAt: isBetaInvited ? new Date() : undefined,
+          ...termsData,
+        })
+        .returning();
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered');
+      }
+      throw error;
+    }
+
+    if (!user) {
+      throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+    }
+
+    if (isBetaInvited) {
+      await markBetaInviteAsUsed(input.email);
+    }
+
+    const token = nanoid(32);
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    await db.insert(verificationTokens).values({
+      userId: user.id,
+      token,
+      type: 'email_verification',
+      expiresAt,
+    });
+
+    const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
+    await sendEmail({
+      to: input.email,
+      subject: 'Verifique seu email - TáComQuem',
+      html: buildVerificationEmail(input.name, verificationUrl),
+    });
+
+    return {
+      status: 'success',
+      user: {
+        id: user.id,
+        name: input.name,
+        email: input.email,
+        avatarUrl: user.avatarUrl ?? null,
+        emailVerified: user.emailVerified,
+        role: user.role,
+        termsAccepted: true,
+      },
+      message: 'Conta criada com sucesso. Verifique seu email.',
+      canUseApp: true,
+    };
+  }
 }
 
 export async function verifyEmail(token: string): Promise<boolean> {
@@ -110,6 +252,10 @@ export async function verifyEmail(token: string): Promise<boolean> {
   });
 
   if (!verification) {
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
+  }
+
+  if (verification.user.deletedAt) {
     throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
   }
 
@@ -125,15 +271,17 @@ export async function verifyEmail(token: string): Promise<boolean> {
     throw new BadRequestError(ErrorCodes.AUTH_TOKEN_TYPE_INVALID, 'Invalid token type');
   }
 
-  await db
-    .update(users)
-    .set({ emailVerified: true, updatedAt: new Date() })
-    .where(eq(users.id, verification.userId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ emailVerified: true, updatedAt: new Date() })
+      .where(eq(users.id, verification.userId));
 
-  await db
-    .update(verificationTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(verificationTokens.id, verification.id));
+    await tx
+      .update(verificationTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(verificationTokens.id, verification.id));
+  });
 
   return true;
 }
@@ -158,6 +306,19 @@ export async function login(email: string, password: string): Promise<UserRespon
     throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
+  // Check parental consent if user is under 12
+  if (user.dateOfBirth && user.parentalConsentStatus === 'pending') {
+    const birthDate =
+      typeof user.dateOfBirth === 'string' ? new Date(user.dateOfBirth) : user.dateOfBirth;
+    const age = calculateAgeFromBirthDate(birthDate);
+    if (age < 12) {
+      throw new UnauthorizedError(
+        ErrorCodes.AUTH_PARENTAL_CONSENT_REQUIRED,
+        'Sua conta necessita da autorização do responsável. Por favor, entre em contato com seu pai/mãe para confirmar.'
+      );
+    }
+  }
+
   if (env.BETA_MODE_ENABLED && user.role === 'USER' && user.accessTier !== 'BETA') {
     throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
@@ -170,6 +331,7 @@ export async function login(email: string, password: string): Promise<UserRespon
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
+    termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
   };
 }
 
@@ -180,7 +342,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
     where: eq(users.emailHash, emailHash),
   });
 
-  if (!user) {
+  if (!user || user.deletedAt) {
     return;
   }
 
@@ -207,9 +369,14 @@ export async function requestPasswordReset(email: string): Promise<void> {
 export async function resetPassword(token: string, newPassword: string): Promise<boolean> {
   const verification = await db.query.verificationTokens.findFirst({
     where: eq(verificationTokens.token, token),
+    with: { user: true },
   });
 
   if (!verification) {
+    throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
+  }
+
+  if (verification.user.deletedAt) {
     throw new BadRequestError(ErrorCodes.AUTH_TOKEN_INVALID, 'Invalid token');
   }
 
@@ -227,15 +394,17 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   const passwordHashed = await hashPassword(newPassword);
 
-  await db
-    .update(users)
-    .set({ passwordHash: passwordHashed, updatedAt: new Date() })
-    .where(eq(users.id, verification.userId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ passwordHash: passwordHashed, updatedAt: new Date() })
+      .where(eq(users.id, verification.userId));
 
-  await db
-    .update(verificationTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(verificationTokens.id, verification.id));
+    await tx
+      .update(verificationTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(verificationTokens.id, verification.id));
+  });
 
   return true;
 }
@@ -266,6 +435,7 @@ export async function findOrCreateGoogleUser(
       avatarUrl: user.avatarUrl ?? null,
       emailVerified: user.emailVerified,
       role: user.role,
+      termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
     };
   }
 
@@ -274,7 +444,7 @@ export async function findOrCreateGoogleUser(
     where: eq(users.emailHash, emailHash),
   });
 
-  if (existingUser) {
+  if (existingUser && !existingUser.deletedAt) {
     if (
       env.BETA_MODE_ENABLED &&
       existingUser.role === 'USER' &&
@@ -306,6 +476,7 @@ export async function findOrCreateGoogleUser(
       avatarUrl: (avatarUrl || existingUser.avatarUrl) ?? null,
       emailVerified: true,
       role: existingUser.role,
+      termsAccepted: existingUser.termsVersion === CURRENT_TERMS_VERSION,
     };
   }
 
@@ -313,16 +484,27 @@ export async function findOrCreateGoogleUser(
     throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      emailEncrypted: encrypt(email),
-      nameEncrypted: encrypt(name),
-      emailHash,
-      avatarUrl,
-      emailVerified: true,
-    })
-    .returning();
+  // New user via OAuth: account created but terms not yet accepted.
+  // They will be prompted to accept on the frontend before using the app.
+  // biome-ignore lint/suspicious/noExplicitAny: Type is inferred from Drizzle ORM returning
+  let user: any;
+  try {
+    [user] = await db
+      .insert(users)
+      .values({
+        emailEncrypted: encrypt(email),
+        nameEncrypted: encrypt(name),
+        emailHash,
+        avatarUrl,
+        emailVerified: true,
+      })
+      .returning();
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered');
+    }
+    throw error;
+  }
 
   if (!user) {
     throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
@@ -341,6 +523,7 @@ export async function findOrCreateGoogleUser(
     avatarUrl: avatarUrl ?? null,
     emailVerified: true,
     role: user.role,
+    termsAccepted: false,
   };
 }
 
@@ -349,7 +532,7 @@ export async function setPassword(userId: string, password: string): Promise<voi
     where: eq(users.id, userId),
   });
 
-  if (!user) {
+  if (!user || user.deletedAt) {
     throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
   }
 
@@ -385,7 +568,28 @@ export async function getUserById(userId: string): Promise<UserResponse | null> 
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
+    termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
   };
+}
+
+export async function acceptTerms(userId: string, clientIp: string): Promise<void> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user || user.deletedAt) {
+    throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
+  }
+
+  await db
+    .update(users)
+    .set({
+      termsVersion: CURRENT_TERMS_VERSION,
+      termsAcceptedAt: new Date(),
+      termsAcceptedIp: clientIp,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
 }
 
 export async function deleteAccount(userId: string, password?: string): Promise<void> {
@@ -424,28 +628,30 @@ export async function deleteAccount(userId: string, password?: string): Promise<
     );
   }
 
-  await db
-    .update(users)
-    .set({
-      emailEncrypted: null,
-      emailHash: null,
-      nameEncrypted: encrypt('Usuário Deletado'),
-      avatarUrl: null,
-      passwordHash: null,
-      isActive: false,
-      deletedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        emailEncrypted: null,
+        emailHash: null,
+        nameEncrypted: encrypt('Usuário Deletado'),
+        avatarUrl: null,
+        passwordHash: null,
+        isActive: false,
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
 
-  await db.delete(oauthAccounts).where(eq(oauthAccounts.userId, userId));
-  await db.delete(verificationTokens).where(eq(verificationTokens.userId, userId));
-  await db.delete(notifications).where(eq(notifications.userId, userId));
-  await db
-    .delete(friendships)
-    .where(or(eq(friendships.userAId, userId), eq(friendships.userBId, userId)));
-  await db
-    .update(items)
-    .set({ isActive: false, updatedAt: new Date() })
-    .where(and(eq(items.ownerId, userId), eq(items.isActive, true)));
+    await tx.delete(oauthAccounts).where(eq(oauthAccounts.userId, userId));
+    await tx.delete(verificationTokens).where(eq(verificationTokens.userId, userId));
+    await tx.delete(notifications).where(eq(notifications.userId, userId));
+    await tx
+      .delete(friendships)
+      .where(or(eq(friendships.userAId, userId), eq(friendships.userBId, userId)));
+    await tx
+      .update(items)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(items.ownerId, userId), eq(items.isActive, true)));
+  });
 }

@@ -96,6 +96,8 @@ export const ErrorCodes = {
   AUTH_CREATE_FAILED: 'AUTH_CREATE_FAILED',
   AUTH_TOKEN_TYPE_INVALID: 'AUTH_TOKEN_TYPE_INVALID',
   AUTH_HAS_ACTIVE_LOANS: 'AUTH_HAS_ACTIVE_LOANS',
+  AUTH_PARENTAL_CONSENT_REQUIRED: 'AUTH_PARENTAL_CONSENT_REQUIRED',
+  AUTH_TERMS_REQUIRED: 'AUTH_TERMS_REQUIRED',
 
   ITEMS_NOT_FOUND: 'ITEMS_NOT_FOUND',
   ITEMS_CREATE_FAILED: 'ITEMS_CREATE_FAILED',
@@ -147,7 +149,8 @@ interface ProblemDetails {
   errors?: FieldError[];
 }
 
-type ErrorClass = new (...args: any[]) => AppError;
+// biome-ignore lint/suspicious/noExplicitAny: Constructor signatures vary, used only as Map key type
+export type ErrorClass = new (...args: any[]) => AppError;
 
 const HTTP_STATUS_TEXTS: Record<number, string> = {
   400: 'Bad Request',

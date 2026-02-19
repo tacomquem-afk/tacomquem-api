@@ -17,7 +17,21 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Analytics'],
-        description: 'Get dashboard statistics (requires ANALYST role or higher)',
+        description: `**Get admin dashboard statistics**
+
+Returns a high-level overview of platform activity for the admin dashboard. Includes total counts for users, items, and loans.
+
+**Required role:** \`ANALYST\` or higher (\`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Response fields:**
+| Field | Description |
+|-------|-------------|
+| \`totalUsers\` | Total registered user accounts |
+| \`activeUsers\` | Users who are not blocked |
+| \`totalItems\` | Total items created across all users |
+| \`totalLoans\` | All loans ever created |
+| \`activeLoans\` | Loans in \`confirmed\` status |
+| \`pendingLoans\` | Loans in \`pending\` status (awaiting borrower confirmation) |`,
         security: [{ BearerAuth: [] }],
         response: {
           200: adminDashboardStatsSchema,
@@ -40,7 +54,20 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Analytics'],
-        description: 'Get user statistics (requires ANALYST role or higher)',
+        description: `**Get user growth statistics**
+
+Returns user registration metrics broken down by time period.
+
+**Required role:** \`ANALYST\` or higher (\`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Response fields:**
+| Field | Description |
+|-------|-------------|
+| \`newUsersToday\` | Users registered in the last 24 hours |
+| \`newUsersThisWeek\` | Users registered in the last 7 days |
+| \`newUsersThisMonth\` | Users registered in the last 30 days |
+| \`totalUsers\` | All-time total user count |
+| \`growthRate\` | Week-over-week growth rate (percentage as decimal, e.g. \`0.12\` = 12%) |`,
         security: [{ BearerAuth: [] }],
         response: {
           200: userStatsSchema,
@@ -63,7 +90,20 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Analytics'],
-        description: 'Get loan statistics (requires ANALYST role or higher)',
+        description: `**Get loan activity statistics**
+
+Returns loan activity metrics broken down by time period.
+
+**Required role:** \`ANALYST\` or higher (\`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`)
+
+**Response fields:**
+| Field | Description |
+|-------|-------------|
+| \`loansToday\` | Loans created in the last 24 hours |
+| \`loansThisWeek\` | Loans created in the last 7 days |
+| \`loansThisMonth\` | Loans created in the last 30 days |
+| \`averageLoanDuration\` | Average number of days between loan creation and return |
+| \`returnRate\` | Ratio of returned loans to total completed loans (0–1) |`,
         security: [{ BearerAuth: [] }],
         response: {
           200: loanStatsSchema,

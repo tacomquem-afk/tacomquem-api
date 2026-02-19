@@ -15,17 +15,23 @@ import {
 
 import { env } from './config/env.js';
 import { db } from './db/index.js';
+import type { ErrorClass } from './errors/index.js';
 import { AppError, errorStatusMap, formatProblemDetails } from './errors/index.js';
+import { accessLogsPlugin } from './plugins/access-logs.js';
 import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
+import accountRoutes from './routes/account/index.js';
 import adminsRoutes from './routes/admin/admins.js';
 import analyticsRoutes from './routes/admin/analytics.js';
+import auditRoutes from './routes/admin/audit.js';
+import betaInvitesRoutes from './routes/admin/beta-invites.js';
 import betaProgramRoutes from './routes/admin/beta-program.js';
 import moderationRoutes from './routes/admin/moderation.js';
 import usersRoutes from './routes/admin/users.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import { dashboardRoutes } from './routes/dashboard/index.js';
+import dataExportRoutes from './routes/data-export/index.js';
 import itemsRoutes from './routes/items/index.js';
 import { linksRoutes } from './routes/links/index.js';
 import { loansRoutes } from './routes/loans/index.js';
@@ -87,7 +93,7 @@ export async function buildApp() {
         description: env.API_DESCRIPTION,
         version: env.API_VERSION,
         contact: {
-          name: 'TáComQuem',
+          name: 'TáComQuem Team',
         },
       },
       servers: [
@@ -107,20 +113,96 @@ export async function buildApp() {
         },
       },
       tags: [
-        { name: 'Authentication', description: 'Authentication endpoints' },
-        { name: 'OAuth', description: 'OAuth authentication providers' },
-        { name: 'Items', description: 'Items management endpoints' },
-        { name: 'Upload', description: 'Image upload endpoints' },
-        { name: 'Loans', description: 'Loan management endpoints' },
-        { name: 'Links', description: 'Public loan link endpoints' },
-        { name: 'Dashboard', description: 'User dashboard endpoints' },
-        { name: 'Notifications', description: 'User notification endpoints' },
-        { name: 'Admin - Analytics', description: 'Admin analytics endpoints' },
-        { name: 'Admin - Users', description: 'Admin user management endpoints' },
-        { name: 'Admin - Moderation', description: 'Admin content moderation endpoints' },
-        { name: 'Admin - Admins', description: 'Admin role management endpoints' },
-        { name: 'Admin - Beta Program', description: 'Beta program management endpoints' },
-        { name: 'Health', description: 'Health check endpoints' },
+        {
+          name: 'Authentication',
+          description:
+            'Email/password registration, login, email verification, password reset, token refresh, and terms acceptance. Start here for auth flows.',
+        },
+        {
+          name: 'OAuth',
+          description:
+            'Google OAuth 2.0 Authorization Code Flow. Initiates the redirect to Google and handles the callback that returns JWT tokens to the frontend.',
+        },
+        {
+          name: 'Users',
+          description:
+            'User account management: schedule/cancel account deletion, check deletion status, parental consent status, and LGPD right-of-access activity logs.',
+        },
+        {
+          name: 'Data Export',
+          description:
+            'LGPD right of data portability (Art. 18, V). Request, track, and download a full export of personal data in JSON or CSV format.',
+        },
+        {
+          name: 'Items',
+          description:
+            'Create and manage loanable items. Each item can have up to 5 images and belongs to a single owner. Items are soft-deleted to preserve loan history.',
+        },
+        {
+          name: 'Upload',
+          description:
+            'Upload item images via multipart/form-data. Images are auto-compressed to WebP. Store the returned `key` values and use them in item create/update requests.',
+        },
+        {
+          name: 'Loans',
+          description:
+            'Full loan lifecycle: create a loan with a shareable confirmation link, list active and historical loans, mark as returned, cancel, and send reminders.',
+        },
+        {
+          name: 'Links',
+          description:
+            'Public share link endpoints. View loan details before logging in and confirm a loan from the link. No authentication required for the preview endpoint.',
+        },
+        {
+          name: 'Dashboard',
+          description:
+            'Aggregated data for the home screen: stats summary, active loans, recent activity feed, friends list, and cross-entity search.',
+        },
+        {
+          name: 'Notifications',
+          description:
+            'In-app notification management. List, filter by read status, mark as read (individually or all at once), and delete notifications.',
+        },
+        {
+          name: 'Admin - Analytics',
+          description:
+            'Platform-wide statistics for the admin dashboard. Requires ANALYST role or higher. Includes user growth and loan activity metrics.',
+        },
+        {
+          name: 'Admin - Audit',
+          description:
+            'Raw HTTP access logs for support investigations. Filter by user, date range, and HTTP method. Requires SUPPORT role or higher.',
+        },
+        {
+          name: 'Admin - Users',
+          description:
+            'User lookup and moderation actions: list all users, view full user details, block and unblock accounts. Role requirements vary per endpoint.',
+        },
+        {
+          name: 'Admin - Moderation',
+          description:
+            'Content moderation: inspect and remove items, inspect and cancel loans. Actions are logged in the audit trail. Requires SUPPORT or MODERATOR role.',
+        },
+        {
+          name: 'Admin - Admins',
+          description:
+            'Admin role management: list admins, promote users, change roles, revoke access, and view the admin action audit log. Requires SUPER_ADMIN role.',
+        },
+        {
+          name: 'Admin - Beta Invites',
+          description:
+            'Manage beta program email whitelist. Add/remove/list emails that automatically get BETA access tier during registration. Requires SUPER_ADMIN role.',
+        },
+        {
+          name: 'Admin - Beta Program',
+          description:
+            'Beta program enrollment management: list beta users, grant beta access by email, and remove users from the beta program. Requires SUPER_ADMIN role.',
+        },
+        {
+          name: 'Health',
+          description:
+            'Liveness and readiness probes for load balancers and monitoring systems. No authentication required.',
+        },
       ],
     },
     transform: multipartAwareTransform,
@@ -139,6 +221,7 @@ export async function buildApp() {
 
   await app.register(jwtPlugin);
   await app.register(rbacPlugin);
+  await app.register(accessLogsPlugin);
 
   app.setErrorHandler((error, request, reply) => {
     if (hasZodFastifySchemaValidationErrors(error)) {
@@ -165,7 +248,7 @@ export async function buildApp() {
     }
 
     if (error instanceof AppError) {
-      const statusCode = errorStatusMap.get(error.constructor as any) || 500;
+      const statusCode = errorStatusMap.get(error.constructor as ErrorClass) || 500;
       const problemDetails = formatProblemDetails(error, request);
       if (statusCode >= 500) {
         request.log.error({ err: error }, error.message);
@@ -213,8 +296,10 @@ export async function buildApp() {
     '/api/health',
     {
       schema: {
-        description: 'Health check endpoint',
+        description:
+          'Returns the current server status and UTC timestamp. Use as a liveness probe — a successful response confirms the API process is running.',
         tags: ['Health'],
+        summary: 'API liveness check',
       },
     },
     async () => {
@@ -226,8 +311,10 @@ export async function buildApp() {
     '/api/health/db',
     {
       schema: {
-        description: 'Database health check endpoint',
+        description:
+          'Verifies the API can reach the PostgreSQL database. Use as a readiness probe — a `status: "ok"` response means the service is ready to handle traffic. A `status: "error"` response indicates the database is unreachable.',
         tags: ['Health'],
+        summary: 'Database readiness check',
       },
     },
     async () => {
@@ -242,6 +329,8 @@ export async function buildApp() {
 
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
+  await app.register(accountRoutes, { prefix: '/api' });
+  await app.register(dataExportRoutes, { prefix: '/api/users' });
   await app.register(itemsRoutes, { prefix: '/api/items' });
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(loansRoutes, { prefix: '/api/loans' });
@@ -250,9 +339,11 @@ export async function buildApp() {
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });
 
   await app.register(analyticsRoutes, { prefix: '/api/admin/analytics' });
+  await app.register(auditRoutes, { prefix: '/api/admin/audit' });
   await app.register(usersRoutes, { prefix: '/api/admin/users' });
   await app.register(moderationRoutes, { prefix: '/api/admin/moderation' });
   await app.register(adminsRoutes, { prefix: '/api/admin/admins' });
+  await app.register(betaInvitesRoutes, { prefix: '/api/admin/beta-invites' });
   await app.register(betaProgramRoutes, { prefix: '/api/admin/beta-program' });
 
   return app;
