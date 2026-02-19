@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
+import { db } from '../../db/index.js';
+import { users } from '../../db/schema.js';
 import {
   deleteAccountSchema,
   forgotPasswordSchema,
@@ -60,10 +63,23 @@ async function authRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const user = await createUser(request.body);
+      const result = await createUser(request.body);
+
+      if (result.status === 'pending_parental_consent') {
+        return reply.status(200).send({
+          status: result.status,
+          message: result.message,
+          emailSentTo: result.emailSentTo,
+          canUseApp: result.canUseApp,
+          userId: result.userId,
+        });
+      }
+
       return reply.status(201).send({
-        message: 'Registration successful! Please verify your email.',
-        user,
+        status: result.status,
+        message: result.message,
+        user: result.user,
+        canUseApp: result.canUseApp,
       });
     }
   );
@@ -305,6 +321,59 @@ console.log('Logged in as:', user.name);
       const { userId } = request.user;
       await setPassword(userId, request.body.password);
       return reply.send({ message: 'Password set successfully!' });
+    }
+  );
+
+  typed.get(
+    '/parental-consent/confirm',
+    {
+      schema: {
+        description: 'Confirm parental consent via email token',
+        tags: ['Authentication'],
+        querystring: z.object({
+          token: z.string(),
+        }),
+        response: {
+          200: z.object({
+            status: z.literal('success'),
+            message: z.string(),
+            userId: z.string().uuid(),
+          }),
+          404: z.object({ error: z.string() }),
+          410: z.object({ error: z.string() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { token } = request.query;
+
+      const user = await db.query.users.findFirst({
+        where: (table) => ({ parentalConsentToken: token }),
+      });
+
+      if (!user) {
+        return reply.status(404).send({ error: 'Invalid or expired token' });
+      }
+
+      if (user.parentalConsentTokenExpiresAt && user.parentalConsentTokenExpiresAt < new Date()) {
+        return reply.status(410).send({ error: 'Token has expired' });
+      }
+
+      await db
+        .update(users)
+        .set({
+          parentalConsentStatus: 'confirmed',
+          parentalConsentConfirmedAt: new Date(),
+          parentalConsentToken: null,
+          parentalConsentTokenExpiresAt: null,
+        })
+        .where((table) => table.id === user.id);
+
+      return reply.status(200).send({
+        status: 'success',
+        message: 'Parental consent confirmed. Child account is now active.',
+        userId: user.id,
+      });
     }
   );
 

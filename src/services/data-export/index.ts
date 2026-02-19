@@ -5,7 +5,7 @@ import { users, items, loans, friendships, notifications } from '../../db/schema
 
 export interface UserExportData {
   id: string;
-  emailEncrypted: string;
+  emailEncrypted: string | null;
   nameEncrypted: string;
   emailVerified: boolean;
   createdAt: Date;
@@ -126,7 +126,7 @@ export function buildJSONExport(data: ExportDataInput): JSONExport {
     },
     user: {
       id: data.user.id,
-      email: data.user.emailEncrypted,
+      email: data.user.emailEncrypted || '',
       name: data.user.nameEncrypted,
       email_verified: data.user.emailVerified,
       created_at: data.user.createdAt.toISOString(),

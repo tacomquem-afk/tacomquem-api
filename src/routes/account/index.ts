@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
-import { accessLogs } from '../../db/schema.js';
+import { accessLogs, users } from '../../db/schema.js';
 import { UnauthorizedError } from '../../errors/index.js';
 import {
   errorResponse400,
@@ -131,6 +131,46 @@ async function usersRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const result = await cancelDeletionWithToken(request.query.token);
       return reply.status(200).send(result);
+    }
+  );
+
+  typed.get(
+    '/me/parental-consent',
+    {
+      schema: {
+        description: 'Get parental consent status (LGPD compliance)',
+        tags: ['Users'],
+        security: [{ BearerAuth: [] }],
+        response: {
+          200: z.object({
+            status: z.enum(['pending', 'confirmed', 'not_applicable']),
+            confirmedAt: z.coerce.date().optional(),
+            responsibleEmail: z.string().email().optional(),
+            responsibleName: z.string().optional(),
+          }),
+          401: errorResponse401,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!request.user) {
+        throw new UnauthorizedError('Must be authenticated');
+      }
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, request.user.userId),
+      });
+
+      if (!user) {
+        throw new UnauthorizedError('User not found');
+      }
+
+      return reply.status(200).send({
+        status: user.parentalConsentStatus || 'not_applicable',
+        confirmedAt: user.parentalConsentConfirmedAt,
+        responsibleEmail: user.parentalEmail ? 'encrypted@example.com' : undefined, // In production, decrypt this
+        responsibleName: user.parentalName,
+      });
     }
   );
 

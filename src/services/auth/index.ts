@@ -23,13 +23,36 @@ import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
 import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
 import { hashPassword, verifyPassword } from '../password/index.js';
+import { calculateAgeFromBirthDate, generateParentalConsentToken, getParentalTokenExpiryDate, isChildUnder12 } from '../parental-consent/index.js';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
-export interface CreateUserInput {
+export interface RegisterAdultInput {
   name: string;
   email: string;
   password: string;
+}
+
+export interface RegisterChildInput {
+  name: string;
+  email: string;
+  password: string;
+  dateOfBirth: Date;
+  parentalEmail: string;
+  parentalName: string;
+}
+
+export type CreateUserInput = RegisterAdultInput | RegisterChildInput;
+
+export interface RegisterResponse {
+  status: 'success' | 'pending_parental_consent';
+  user?: UserResponse;
+  accessToken?: string;
+  refreshToken?: string;
+  message?: string;
+  emailSentTo?: string;
+  canUseApp?: boolean;
+  userId?: string;
 }
 
 export interface UserResponse {
@@ -41,7 +64,7 @@ export interface UserResponse {
   role: UserRole;
 }
 
-export async function createUser(input: CreateUserInput): Promise<UserResponse> {
+export async function createUser(input: CreateUserInput): Promise<RegisterResponse> {
   const emailHash = hash(input.email);
 
   const existing = await db.query.users.findFirst({
@@ -62,45 +85,101 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
   const emailEncrypted = encrypt(input.email);
   const nameEncrypted = encrypt(input.name);
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      emailEncrypted,
-      nameEncrypted,
-      emailHash,
-      passwordHash: passwordHashed,
-    })
-    .returning();
+  // Check if this is a child registration
+  const isChild = 'dateOfBirth' in input && isChildUnder12(input.dateOfBirth);
 
-  if (!user) {
-    throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+  if (isChild) {
+    // Child registration - requires parental consent
+    const token = generateParentalConsentToken();
+    const tokenExpires = getParentalTokenExpiryDate();
+
+    const [user] = await db
+      .insert(users)
+      .values({
+        emailEncrypted,
+        nameEncrypted,
+        emailHash,
+        passwordHash: passwordHashed,
+        dateOfBirth: input.dateOfBirth.toISOString(),
+        parentalConsentStatus: 'pending',
+        parentalEmail: encrypt(input.parentalEmail),
+        parentalName: input.parentalName,
+        parentalConsentToken: token,
+        parentalConsentTokenExpiresAt: tokenExpires,
+      })
+      .returning();
+
+    if (!user) {
+      throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+    }
+
+    // Send email to parent
+    await sendEmail({
+      to: input.parentalEmail,
+      subject: `${input.name} precisa da sua autorização para usar o TáComQuem`,
+      html: `
+        <h2>Olá ${input.parentalName},</h2>
+        <p>${input.name} (${input.email}) gostaria de usar o TáComQuem e precisa da sua autorização.</p>
+        <p>Clique no link abaixo para confirmar:</p>
+        <p><a href="${env.FRONTEND_URL}/parental-consent?token=${token}">Confirmar autorização</a></p>
+        <p>Este link expira em 48 horas.</p>
+      `,
+    });
+
+    return {
+      status: 'pending_parental_consent',
+      message: 'Conta criada. Um email de confirmação foi enviado para o responsável.',
+      emailSentTo: input.parentalEmail,
+      canUseApp: false,
+      userId: user.id,
+    };
+  } else {
+    // Adult registration
+    const [user] = await db
+      .insert(users)
+      .values({
+        emailEncrypted,
+        nameEncrypted,
+        emailHash,
+        passwordHash: passwordHashed,
+      })
+      .returning();
+
+    if (!user) {
+      throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+    }
+
+    const token = nanoid(32);
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+
+    await db.insert(verificationTokens).values({
+      userId: user.id,
+      token,
+      type: 'email_verification',
+      expiresAt,
+    });
+
+    const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
+    await sendEmail({
+      to: input.email,
+      subject: 'Verifique seu email - TáComQuem',
+      html: buildVerificationEmail(input.name, verificationUrl),
+    });
+
+    return {
+      status: 'success',
+      user: {
+        id: user.id,
+        name: input.name,
+        email: input.email,
+        avatarUrl: user.avatarUrl ?? null,
+        emailVerified: user.emailVerified,
+        role: user.role,
+      },
+      message: 'Conta criada com sucesso. Verifique seu email.',
+      canUseApp: true,
+    };
   }
-
-  const token = nanoid(32);
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-
-  await db.insert(verificationTokens).values({
-    userId: user.id,
-    token,
-    type: 'email_verification',
-    expiresAt,
-  });
-
-  const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${token}`;
-  await sendEmail({
-    to: input.email,
-    subject: 'Verifique seu email - TáComQuem',
-    html: buildVerificationEmail(input.name, verificationUrl),
-  });
-
-  return {
-    id: user.id,
-    name: input.name,
-    email: input.email,
-    avatarUrl: user.avatarUrl ?? null,
-    emailVerified: user.emailVerified,
-    role: user.role,
-  };
 }
 
 export async function verifyEmail(token: string): Promise<boolean> {
@@ -156,6 +235,17 @@ export async function login(email: string, password: string): Promise<UserRespon
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
     throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
+  }
+
+  // Check parental consent if user is under 12
+  if (user.dateOfBirth && user.parentalConsentStatus === 'pending') {
+    const age = calculateAgeFromBirthDate(user.dateOfBirth);
+    if (age < 12) {
+      throw new UnauthorizedError(
+        ErrorCodes.AUTH_PARENTAL_CONSENT_REQUIRED,
+        'Sua conta necessita da autorização do responsável. Por favor, entre em contato com seu pai/mãe para confirmar.'
+      );
+    }
   }
 
   if (env.BETA_MODE_ENABLED && user.role === 'USER' && user.accessTier !== 'BETA') {
