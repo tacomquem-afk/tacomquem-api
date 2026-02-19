@@ -16,11 +16,13 @@ import {
 import { env } from './config/env.js';
 import { db } from './db/index.js';
 import { AppError, errorStatusMap, formatProblemDetails } from './errors/index.js';
+import { accessLogsPlugin } from './plugins/access-logs.js';
 import jwtPlugin from './plugins/jwt.js';
 import rbacPlugin from './plugins/rbac.js';
 import accountRoutes from './routes/account/index.js';
 import adminsRoutes from './routes/admin/admins.js';
 import analyticsRoutes from './routes/admin/analytics.js';
+import auditRoutes from './routes/admin/audit.js';
 import betaProgramRoutes from './routes/admin/beta-program.js';
 import moderationRoutes from './routes/admin/moderation.js';
 import usersRoutes from './routes/admin/users.js';
@@ -118,6 +120,7 @@ export async function buildApp() {
         { name: 'Dashboard', description: 'User dashboard endpoints' },
         { name: 'Notifications', description: 'User notification endpoints' },
         { name: 'Admin - Analytics', description: 'Admin analytics endpoints' },
+        { name: 'Admin - Audit', description: 'Admin audit log endpoints' },
         { name: 'Admin - Users', description: 'Admin user management endpoints' },
         { name: 'Admin - Moderation', description: 'Admin content moderation endpoints' },
         { name: 'Admin - Admins', description: 'Admin role management endpoints' },
@@ -141,6 +144,7 @@ export async function buildApp() {
 
   await app.register(jwtPlugin);
   await app.register(rbacPlugin);
+  await app.register(accessLogsPlugin);
 
   app.setErrorHandler((error, request, reply) => {
     if (hasZodFastifySchemaValidationErrors(error)) {
@@ -253,6 +257,7 @@ export async function buildApp() {
   await app.register(notificationsRoutes, { prefix: '/api/notifications' });
 
   await app.register(analyticsRoutes, { prefix: '/api/admin/analytics' });
+  await app.register(auditRoutes, { prefix: '/api/admin/audit' });
   await app.register(usersRoutes, { prefix: '/api/admin/users' });
   await app.register(moderationRoutes, { prefix: '/api/admin/moderation' });
   await app.register(adminsRoutes, { prefix: '/api/admin/admins' });

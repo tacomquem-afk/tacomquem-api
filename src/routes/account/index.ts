@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
+import { db } from '../../db/index.js';
+import { accessLogs } from '../../db/schema.js';
 import { UnauthorizedError } from '../../errors/index.js';
 import {
   errorResponse400,
@@ -125,6 +128,85 @@ async function usersRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const result = await cancelDeletionWithToken(request.query.token);
       return reply.status(200).send(result);
+    }
+  );
+
+  typed.get(
+    '/me/activity',
+    {
+      schema: {
+        description: 'Get user activity logs (LGPD right to access)',
+        tags: ['Users'],
+        querystring: z.object({
+          from: z.string().datetime().optional(),
+          to: z.string().datetime().optional(),
+          limit: z.string().transform(Number).default('50'),
+          offset: z.string().transform(Number).default('0'),
+        }),
+        response: {
+          200: z.object({
+            total: z.number(),
+            limit: z.number(),
+            offset: z.number(),
+            logs: z.array(
+              z.object({
+                timestamp: z.coerce.date(),
+                httpMethod: z.string(),
+                path: z.string(),
+                statusCode: z.number().nullable(),
+                responseTimeMs: z.number().nullable(),
+                ipAddress: z.string().nullable(),
+              })
+            ),
+          }),
+          401: errorResponse401,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!request.user) {
+        throw new UnauthorizedError('Must be authenticated');
+      }
+
+      const { from, to, limit, offset } = request.query;
+
+      const conditions = [eq(accessLogs.userId, request.user.userId)];
+
+      if (from) {
+        conditions.push(gte(accessLogs.timestamp, new Date(from)));
+      }
+
+      if (to) {
+        conditions.push(lte(accessLogs.timestamp, new Date(to)));
+      }
+
+      const logs = await db
+        .select({
+          timestamp: accessLogs.timestamp,
+          httpMethod: accessLogs.httpMethod,
+          path: accessLogs.path,
+          statusCode: accessLogs.statusCode,
+          responseTimeMs: accessLogs.responseTimeMs,
+          ipAddress: accessLogs.ipAddress,
+        })
+        .from(accessLogs)
+        .where(conditions.length > 1 ? eq(accessLogs.userId, request.user.userId) : undefined)
+        .orderBy(desc(accessLogs.timestamp))
+        .limit(limit)
+        .offset(offset);
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: accessLogs.id })
+        .from(accessLogs)
+        .where(eq(accessLogs.userId, request.user.userId));
+
+      return reply.status(200).send({
+        total: totalResult.length,
+        limit,
+        offset,
+        logs,
+      });
     }
   );
 }
