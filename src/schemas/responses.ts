@@ -226,7 +226,7 @@ export const notificationsListResponseSchema = z.object({
 
 export const adminUserSchema = z.object({
   id: uuidSchema,
-  email: z.string().email(),
+  email: z.string(),
   name: z.string(),
   role: userRoleSchema,
   createdAt: dateSchema,
@@ -234,7 +234,7 @@ export const adminUserSchema = z.object({
 
 export const maskedUserSchema = z.object({
   id: uuidSchema,
-  email: z.string().email(),
+  email: z.string(),
   name: z.string(),
   role: userRoleSchema,
   isActive: z.boolean(),
@@ -303,7 +303,7 @@ export const adminListUsersResponseSchema = z.object({
 
 export const adminUserDetailsSchema = z.object({
   id: uuidSchema,
-  email: z.string().email(),
+  email: z.string(),
   name: z.string(),
   role: userRoleSchema,
   isActive: z.boolean(),

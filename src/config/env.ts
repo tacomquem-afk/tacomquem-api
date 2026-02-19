@@ -40,7 +40,11 @@ const envSchema = z.object({
   API_ENVIRONMENT_LABEL: z.string().default('Development'),
 
   // Beta Program
-  BETA_MODE_ENABLED: z.coerce.boolean().default(false),
+  BETA_MODE_ENABLED: z
+    .string()
+    .default('false')
+    .transform((val) => val === 'true' || val === '1')
+    .or(z.boolean().default(false)),
 });
 
 const parsed = envSchema.safeParse(Bun.env);
