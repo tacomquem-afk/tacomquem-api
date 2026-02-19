@@ -13,7 +13,7 @@ import {
 } from '../../db/schema.js';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
-import { decrypt, encrypt } from '../crypto/index.js';
+import { decrypt, encrypt, hash } from '../crypto/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
@@ -53,10 +53,14 @@ export interface MaskedUser {
 }
 
 export async function listUsers(params: ListUsersParams) {
-  const { page, limit, role, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = params;
+  const { page, limit, search, role, isActive, sortBy = 'createdAt', sortOrder = 'desc' } = params;
   const offset = (page - 1) * limit;
 
   const conditions = [];
+  if (search) {
+    const searchHash = hash(search.trim().toLowerCase());
+    conditions.push(eq(users.emailHash, searchHash));
+  }
   if (role) conditions.push(eq(users.role, role));
   if (isActive !== undefined) conditions.push(eq(users.isActive, isActive));
 

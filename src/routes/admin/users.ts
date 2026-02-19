@@ -36,7 +36,19 @@ Returns a paginated list of all registered users. User emails and names are mask
 
 **Required role:** \`ANALYST\` or higher (\`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`)
 
-**Query parameters:** Use the \`listUsersSchema\` query params for pagination, search, and filtering by status or role.
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| \`page\` | number | 1 | Page number for pagination |
+| \`limit\` | number | 50 | Items per page (max 100) |
+| \`search\` | string | - | **Exact email search** - finds user by email address. Case-insensitive. Must match full email. |
+| \`role\` | UserRole | - | Filter by user role (\`USER\`, \`ANALYST\`, \`SUPPORT\`, \`MODERATOR\`, \`SUPER_ADMIN\`) |
+| \`isActive\` | boolean | - | Filter by active status |
+| \`sortBy\` | string | \`createdAt\` | Sort field: \`createdAt\` or \`lastActivity\` |
+| \`sortOrder\` | \`asc\`/\`desc\` | \`desc\` | Sort order |
+
+**Search behavior:** The \`search\` parameter performs an **exact email match** (case-insensitive). For example, \`search=user@example.com\` returns only the user with that exact email.
 
 **Privacy note:** Fields like \`email\` and \`name\` are returned masked (e.g., \`j***e@example.com\`). Use \`GET /api/admin/users/:id\` with \`SUPPORT\` role to see fuller details.`,
         security: [{ BearerAuth: [] }],
