@@ -57,6 +57,13 @@
       "when": 1771518587757,
       "tag": "0007_tranquil_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771525884507,
+      "tag": "0008_nice_starjammers",
+      "breakpoints": true
     }
   ]
 }

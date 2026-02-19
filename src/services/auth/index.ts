@@ -1,6 +1,7 @@
 import { and, eq, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
+import { CURRENT_TERMS_VERSION } from '../../config/terms.js';
 import { db } from '../../db/index.js';
 import {
   friendships,
@@ -72,9 +73,13 @@ export interface UserResponse {
   avatarUrl: string | null;
   emailVerified: boolean;
   role: UserRole;
+  termsAccepted: boolean;
 }
 
-export async function createUser(input: CreateUserInput): Promise<RegisterResponse> {
+export async function createUser(
+  input: CreateUserInput,
+  clientIp: string
+): Promise<RegisterResponse> {
   const emailHash = hash(input.email);
 
   const existing = await db.query.users.findFirst({
@@ -94,6 +99,13 @@ export async function createUser(input: CreateUserInput): Promise<RegisterRespon
   const passwordHashed = await hashPassword(input.password);
   const emailEncrypted = encrypt(input.email);
   const nameEncrypted = encrypt(input.name);
+
+  // Terms accepted at registration time (LGPD Art. 8: explicit, informed, documented consent)
+  const termsData = {
+    termsVersion: CURRENT_TERMS_VERSION,
+    termsAcceptedAt: new Date(),
+    termsAcceptedIp: clientIp,
+  };
 
   // Check if this is a child registration
   const isChild = 'dateOfBirth' in input && isChildUnder12(input.dateOfBirth);
@@ -116,6 +128,7 @@ export async function createUser(input: CreateUserInput): Promise<RegisterRespon
         parentalName: input.parentalName,
         parentalConsentToken: token,
         parentalConsentTokenExpiresAt: tokenExpires,
+        ...termsData,
       })
       .returning();
 
@@ -150,6 +163,7 @@ export async function createUser(input: CreateUserInput): Promise<RegisterRespon
         nameEncrypted,
         emailHash,
         passwordHash: passwordHashed,
+        ...termsData,
       })
       .returning();
 
@@ -183,6 +197,7 @@ export async function createUser(input: CreateUserInput): Promise<RegisterRespon
         avatarUrl: user.avatarUrl ?? null,
         emailVerified: user.emailVerified,
         role: user.role,
+        termsAccepted: true,
       },
       message: 'Conta criada com sucesso. Verifique seu email.',
       canUseApp: true,
@@ -270,6 +285,7 @@ export async function login(email: string, password: string): Promise<UserRespon
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
+    termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
   };
 }
 
@@ -366,6 +382,7 @@ export async function findOrCreateGoogleUser(
       avatarUrl: user.avatarUrl ?? null,
       emailVerified: user.emailVerified,
       role: user.role,
+      termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
     };
   }
 
@@ -406,6 +423,7 @@ export async function findOrCreateGoogleUser(
       avatarUrl: (avatarUrl || existingUser.avatarUrl) ?? null,
       emailVerified: true,
       role: existingUser.role,
+      termsAccepted: existingUser.termsVersion === CURRENT_TERMS_VERSION,
     };
   }
 
@@ -413,6 +431,8 @@ export async function findOrCreateGoogleUser(
     throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
 
+  // New user via OAuth: account created but terms not yet accepted.
+  // They will be prompted to accept on the frontend before using the app.
   const [user] = await db
     .insert(users)
     .values({
@@ -441,6 +461,7 @@ export async function findOrCreateGoogleUser(
     avatarUrl: avatarUrl ?? null,
     emailVerified: true,
     role: user.role,
+    termsAccepted: false,
   };
 }
 
@@ -485,7 +506,28 @@ export async function getUserById(userId: string): Promise<UserResponse | null> 
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
+    termsAccepted: user.termsVersion === CURRENT_TERMS_VERSION,
   };
+}
+
+export async function acceptTerms(userId: string, clientIp: string): Promise<void> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user || user.deletedAt) {
+    throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
+  }
+
+  await db
+    .update(users)
+    .set({
+      termsVersion: CURRENT_TERMS_VERSION,
+      termsAcceptedAt: new Date(),
+      termsAcceptedIp: clientIp,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
 }
 
 export async function deleteAccount(userId: string, password?: string): Promise<void> {

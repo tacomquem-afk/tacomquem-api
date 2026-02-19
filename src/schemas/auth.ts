@@ -5,6 +5,10 @@ export const registerSchema = z
     name: z.string().min(2, 'Name must be at least 2 characters').max(100),
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
+    acceptTerms: z.literal(
+      true,
+      'Você deve aceitar os Termos de Uso e a Política de Privacidade para criar uma conta'
+    ),
     dateOfBirth: z.string().datetime().optional(),
     parentalEmail: z.string().email('Invalid email address').optional(),
     parentalName: z

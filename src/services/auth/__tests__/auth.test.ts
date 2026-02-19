@@ -74,11 +74,14 @@ describe('auth service', () => {
         .mockReturnValueOnce({ values: valuesMockUser } as any)
         .mockReturnValueOnce({ values: valuesMockToken } as any);
 
-      const result = await createUser({
-        name: 'Test User',
-        email: 'test@example.com',
-        password: 'password123',
-      });
+      const result = await createUser(
+        {
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password123',
+        },
+        '127.0.0.1'
+      );
 
       expect(result).toEqual({
         status: 'success',
@@ -89,6 +92,7 @@ describe('auth service', () => {
           avatarUrl: null,
           emailVerified: false,
           role: 'USER',
+          termsAccepted: true,
         },
         message: 'Conta criada com sucesso. Verifique seu email.',
         canUseApp: true,
@@ -104,11 +108,14 @@ describe('auth service', () => {
 
       let errorThrown = false;
       try {
-        await createUser({
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-        });
+        await createUser(
+          {
+            name: 'Test User',
+            email: 'test@example.com',
+            password: 'password123',
+          },
+          '127.0.0.1'
+        );
       } catch (e) {
         errorThrown = true;
         expect(e).toBeInstanceOf(ConflictError);
@@ -126,11 +133,14 @@ describe('auth service', () => {
 
       let errorThrown = false;
       try {
-        await createUser({
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-        });
+        await createUser(
+          {
+            name: 'Test User',
+            email: 'test@example.com',
+            password: 'password123',
+          },
+          '127.0.0.1'
+        );
       } catch (e) {
         errorThrown = true;
         expect(e).toBeInstanceOf(ConflictError);
@@ -283,6 +293,7 @@ describe('auth service', () => {
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
         role: 'USER',
+        termsAccepted: false,
       });
     });
 
@@ -570,6 +581,7 @@ describe('auth service', () => {
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
         role: 'USER',
+        termsAccepted: false,
       });
     });
 
@@ -646,6 +658,7 @@ describe('auth service', () => {
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
         role: 'USER',
+        termsAccepted: false,
       });
     });
 

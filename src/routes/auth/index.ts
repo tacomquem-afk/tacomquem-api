@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { CURRENT_TERMS_VERSION } from '../../config/terms.js';
 import { db } from '../../db/index.js';
 import { users } from '../../db/schema.js';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
@@ -18,6 +19,7 @@ import {
   authTokensResponseSchema,
   errorResponse400,
   errorResponse401,
+  errorResponse403,
   errorResponse404,
   errorResponse409,
   errorResponse410,
@@ -26,6 +28,7 @@ import {
   userResponseSchema,
 } from '../../schemas/responses.js';
 import {
+  acceptTerms,
   createUser,
   deleteAccount,
   getUserById,
@@ -72,7 +75,7 @@ async function authRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await createUser(request.body);
+      const result = await createUser(request.body, request.ip);
 
       if (result.status === 'pending_parental_consent') {
         return reply.status(200).send({
@@ -94,6 +97,7 @@ async function authRoutes(app: FastifyInstance) {
           avatarUrl: null,
           emailVerified: false,
           role: 'USER',
+          termsAccepted: true,
         },
         canUseApp: result.canUseApp ?? true,
       });
@@ -416,6 +420,68 @@ console.log('Logged in as:', user.name);
       const { userId } = request.user;
       await deleteAccount(userId, request.body.password);
       return reply.send({ message: 'Account deleted successfully.' });
+    }
+  );
+
+  typed.get(
+    '/terms',
+    {
+      schema: {
+        description:
+          'Returns the current Terms of Service and Privacy Policy version. Use this to check if the user needs to re-accept after an update (LGPD Art. 8).',
+        tags: ['Authentication'],
+        response: {
+          200: z.object({
+            version: z.string(),
+            termsUrl: z.string().url(),
+            privacyUrl: z.string().url(),
+          }),
+        },
+      },
+    },
+    async (_request, reply) => {
+      return reply.send({
+        version: CURRENT_TERMS_VERSION,
+        termsUrl: `${process.env.FRONTEND_URL}/terms`,
+        privacyUrl: `${process.env.FRONTEND_URL}/privacy`,
+      });
+    }
+  );
+
+  typed.post(
+    '/accept-terms',
+    {
+      schema: {
+        description:
+          'Accept the current Terms of Service and Privacy Policy (LGPD Art. 7/8). Required for users who signed up via OAuth and have not yet accepted, or when terms are updated.',
+        tags: ['Authentication'],
+        security: [{ BearerAuth: [] }],
+        response: {
+          200: z.object({
+            message: z.string(),
+            termsVersion: z.string(),
+            user: userResponseSchema,
+          }),
+          401: errorResponse401,
+          403: errorResponse403,
+        },
+      },
+      preHandler: [app.authenticate],
+    },
+    async (request, reply) => {
+      const { userId } = request.user;
+      await acceptTerms(userId, request.ip);
+      const user = await getUserById(userId);
+
+      if (!user) {
+        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'User not found');
+      }
+
+      return reply.send({
+        message: 'Termos de Uso e Política de Privacidade aceitos com sucesso.',
+        termsVersion: CURRENT_TERMS_VERSION,
+        user,
+      });
     }
   );
 }

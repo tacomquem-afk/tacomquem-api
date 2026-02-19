@@ -46,6 +46,7 @@ export const userResponseSchema = z.object({
   avatarUrl: z.string().nullable(),
   emailVerified: z.boolean(),
   role: userRoleSchema,
+  termsAccepted: z.boolean(),
   isActive: z.boolean().optional(),
   blockedAt: dateSchema.nullable().optional(),
   blockedReason: z.string().nullable().optional(),

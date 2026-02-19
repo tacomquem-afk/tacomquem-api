@@ -193,6 +193,7 @@ useEffect(() => {
         const params = new URLSearchParams({
           accessToken,
           refreshToken,
+          termsAccepted: String(user.termsAccepted),
         });
 
         return reply.redirect(`${env.FRONTEND_URL}/auth/callback?${params}`);

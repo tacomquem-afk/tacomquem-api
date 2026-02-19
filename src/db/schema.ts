@@ -79,6 +79,10 @@ export const users = pgTable('users', {
   parentalConsentIpAddress: varchar('parental_consent_ip_address', { length: 45 }),
   parentalConsentUserAgent: text('parental_consent_user_agent'),
 
+  termsVersion: varchar('terms_version', { length: 20 }),
+  termsAcceptedAt: timestamp('terms_accepted_at'),
+  termsAcceptedIp: varchar('terms_accepted_ip', { length: 45 }),
+
   role: roleEnum('role').default('USER').notNull(),
   accessTier: accessTierEnum('access_tier').default('PUBLIC').notNull(),
   betaAddedAt: timestamp('beta_added_at'),
