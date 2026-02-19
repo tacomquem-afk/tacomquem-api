@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -48,6 +49,13 @@ export const accessTierEnum = pgEnum('access_tier', ['PUBLIC', 'BETA', 'ARCHIVED
 
 export const betaAuditActionEnum = pgEnum('beta_audit_action', ['added', 'removed']);
 
+export const deletionStatusEnum = pgEnum('deletion_status', [
+  'active',
+  'pending',
+  'scheduled',
+  'completed',
+]);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   emailEncrypted: text('email_encrypted'),
@@ -63,6 +71,11 @@ export const users = pgTable('users', {
   blockedAt: timestamp('blocked_at'),
   blockedReason: text('blocked_reason'),
   deletedAt: timestamp('deleted_at'),
+  deletionRequestedAt: timestamp('deletion_requested_at'),
+  deletionScheduledFor: timestamp('deletion_scheduled_for'),
+  deletionStatus: deletionStatusEnum('deletion_status').default('active').notNull(),
+  deletionReason: text('deletion_reason'),
+  deletionCancelledAt: timestamp('deletion_cancelled_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -216,6 +229,58 @@ export const betaProgramAudit = pgTable('beta_program_audit', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const deletionTokens = pgTable('deletion_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  token: varchar('token', { length: 255 }).unique().notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const accessLogs = pgTable(
+  'access_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    timestamp: timestamp('timestamp').notNull(),
+    ipAddress: varchar('ip_address', { length: 45 }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    httpMethod: varchar('http_method', { length: 10 }).notNull(),
+    path: varchar('path', { length: 500 }).notNull(),
+    queryString: varchar('query_string', { length: 500 }),
+    statusCode: integer('status_code'),
+    responseTimeMs: integer('response_time_ms'),
+    userAgent: text('user_agent'),
+    referrer: varchar('referrer', { length: 500 }),
+    bodyHash: varchar('body_hash', { length: 64 }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_access_logs_user_id_timestamp').on(table.userId, table.timestamp),
+    index('idx_access_logs_timestamp').on(table.timestamp),
+    index('idx_access_logs_created_at').on(table.createdAt),
+  ]
+);
+
+export const dataExports = pgTable('data_exports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  format: varchar('format', { length: 50 }).notNull(),
+  status: varchar('status', { length: 50 }).notNull(),
+  fileUrl: varchar('file_url', { length: 255 }),
+  fileSizeBytes: integer('file_size_bytes'),
+  downloadToken: varchar('download_token', { length: 255 }).unique(),
+  downloadTokenExpiresAt: timestamp('download_token_expires_at'),
+  downloadedAt: timestamp('downloaded_at'),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),
@@ -332,5 +397,26 @@ export const betaProgramAuditRelations = relations(betaProgramAudit, ({ one }) =
     fields: [betaProgramAudit.userId],
     references: [users.id],
     relationName: 'betaUser',
+  }),
+}));
+
+export const deletionTokensRelations = relations(deletionTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [deletionTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const accessLogsRelations = relations(accessLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [accessLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const dataExportsRelations = relations(dataExports, ({ one }) => ({
+  user: one(users, {
+    fields: [dataExports.userId],
+    references: [users.id],
   }),
 }));

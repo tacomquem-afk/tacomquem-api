@@ -43,6 +43,13 @@
       "when": 1771508272178,
       "tag": "0005_puzzling_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771514360083,
+      "tag": "0006_smooth_silver_sable",
+      "breakpoints": true
     }
   ]
 }
