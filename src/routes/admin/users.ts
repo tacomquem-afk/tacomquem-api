@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
-import { blockUserSchema, listUsersSchema } from '../../schemas/admin.js';
+import { blockUserSchema, deleteUserSchema, listUsersSchema } from '../../schemas/admin.js';
 import {
   adminListUsersResponseSchema,
   adminUserDetailsSchema,
@@ -12,7 +12,13 @@ import {
   successResponseSchema,
 } from '../../schemas/responses.js';
 import { getClientIp } from '../../services/admin/helpers.js';
-import { blockUser, getUserDetails, listUsers, unblockUser } from '../../services/admin/index.js';
+import {
+  blockUser,
+  deleteUser,
+  getUserDetails,
+  listUsers,
+  unblockUser,
+} from '../../services/admin/index.js';
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
@@ -167,6 +173,47 @@ Restores access for a previously blocked user account. The action is logged in t
       await unblockUser(request.params.id, adminId, ipAddress);
 
       return { success: true, message: 'User unblocked successfully' };
+    }
+  );
+
+  typed.delete(
+    '/:id',
+    {
+      schema: {
+        tags: ['Admin - Users'],
+        description: `**Delete a user (permanent)**
+
+Permanently deletes a user account. This marks the user as deleted in the database (soft delete), setting \`deletedAt\`, \`deletionStatus\` to 'completed', and \`isActive\` to false. The action is logged in the audit trail.
+
+**Required role:** \`SUPER_ADMIN\` only
+
+**Request body:** Must include a \`reason\` explaining why the user is being deleted — this is recorded in the audit log and stored in the user record.
+
+**Effect:** The deleted user will no longer be able to log in or access the application. All user data is preserved in the database for audit purposes (soft delete). This action cannot be reversed through the API.
+
+**Error codes:**
+| Status | \`errorCode\` | Meaning |
+|--------|------------|---------|
+| \`404\` | \`ADMIN_TARGET_NOT_FOUND\` | No user found with the given ID |`,
+        security: [{ BearerAuth: [] }],
+        params: idParamSchema,
+        body: deleteUserSchema,
+        response: {
+          200: successResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+          404: errorResponse404,
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
+    },
+    async (request) => {
+      const adminId = request.user?.userId;
+      const ipAddress = getClientIp(request);
+
+      await deleteUser(request.params.id, adminId, request.body.reason, ipAddress);
+
+      return { success: true, message: 'User deleted successfully' };
     }
   );
 }

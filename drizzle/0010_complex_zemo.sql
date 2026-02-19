@@ -1,0 +1,1 @@
+ALTER TYPE "public"."admin_action" ADD VALUE 'user_deleted' BEFORE 'item_removed';

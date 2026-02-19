@@ -18,6 +18,10 @@ export const blockUserSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters'),
 });
 
+export const deleteUserSchema = z.object({
+  reason: z.string().min(10, 'Reason must be at least 10 characters'),
+});
+
 export const removeContentSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters'),
 });

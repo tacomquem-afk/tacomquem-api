@@ -9,6 +9,7 @@ import { maskEmail, maskName } from './helpers.js';
 type AdminAction =
   | 'user_blocked'
   | 'user_unblocked'
+  | 'user_deleted'
   | 'item_removed'
   | 'loan_cancelled'
   | 'admin_created'
@@ -253,6 +254,34 @@ export async function unblockUser(userId: string, adminId: string, ipAddress?: s
     action: 'user_unblocked',
     targetType: 'user',
     targetId: userId,
+    ipAddress,
+  });
+}
+
+export async function deleteUser(
+  userId: string,
+  adminId: string,
+  reason: string,
+  ipAddress?: string
+) {
+  const now = new Date();
+
+  await db
+    .update(users)
+    .set({
+      deletedAt: now,
+      deletionStatus: 'completed',
+      deletionReason: reason,
+      isActive: false,
+    })
+    .where(eq(users.id, userId));
+
+  await logAdminAction({
+    adminId,
+    action: 'user_deleted',
+    targetType: 'user',
+    targetId: userId,
+    metadata: { reason },
     ipAddress,
   });
 }

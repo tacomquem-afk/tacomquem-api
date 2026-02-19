@@ -38,6 +38,7 @@ export const roleEnum = pgEnum('user_role', [
 export const adminActionEnum = pgEnum('admin_action', [
   'user_blocked',
   'user_unblocked',
+  'user_deleted',
   'item_removed',
   'loan_cancelled',
   'admin_created',

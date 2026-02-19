@@ -168,6 +168,7 @@ CREATE INDEX idx_users_is_active ON users(is_active);
 CREATE TYPE admin_action AS ENUM (
   'user_blocked',
   'user_unblocked',
+  'user_deleted',
   'item_removed',
   'loan_cancelled',
   'admin_created',
