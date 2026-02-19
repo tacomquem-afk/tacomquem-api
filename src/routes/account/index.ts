@@ -27,6 +27,7 @@ async function usersRoutes(app: FastifyInstance) {
       schema: {
         description: 'Schedule account deletion (15-day grace period)',
         tags: ['Users'],
+        security: [{ BearerAuth: [] }],
         body: z.object({
           reason: z.string().optional(),
           password: z.string().optional(),
@@ -63,6 +64,7 @@ async function usersRoutes(app: FastifyInstance) {
       schema: {
         description: 'Check account deletion status',
         tags: ['Users'],
+        security: [{ BearerAuth: [] }],
         response: {
           200: z.object({
             status: z.enum(['active', 'pending', 'scheduled', 'completed']),
@@ -91,6 +93,7 @@ async function usersRoutes(app: FastifyInstance) {
       schema: {
         description: 'Cancel scheduled account deletion',
         tags: ['Users'],
+        security: [{ BearerAuth: [] }],
         body: z.object({}).optional(),
         response: {
           200: messageResponseSchema,
@@ -137,6 +140,7 @@ async function usersRoutes(app: FastifyInstance) {
       schema: {
         description: 'Get user activity logs (LGPD right to access)',
         tags: ['Users'],
+        security: [{ BearerAuth: [] }],
         querystring: z.object({
           from: z.string().datetime().optional(),
           to: z.string().datetime().optional(),
