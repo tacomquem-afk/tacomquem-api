@@ -4,6 +4,7 @@ import {
   BadRequestError,
   ConflictError,
   ErrorCodes,
+  ForbiddenError,
   GoneError,
   UnauthorizedError,
 } from '../../../errors/index.js';
@@ -12,11 +13,13 @@ import * as emailService from '../../email/index.js';
 import * as passwordService from '../../password/index.js';
 import {
   createUser,
+  deleteAccount,
   findOrCreateGoogleUser,
   getUserById,
   login,
   requestPasswordReset,
   resetPassword,
+  setPassword,
   verifyEmail,
 } from '../index.js';
 
@@ -87,10 +90,11 @@ describe('auth service', () => {
       });
     });
 
-    it('should throw error if email already exists', async () => {
+    it('should throw AUTH_EMAIL_TAKEN if email already exists with password', async () => {
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce({
         id: 'existing-user',
         emailHash: 'hash_test@example.com',
+        passwordHash: 'hashed_somepassword',
       } as any);
 
       let errorThrown = false;
@@ -104,6 +108,28 @@ describe('auth service', () => {
         errorThrown = true;
         expect(e).toBeInstanceOf(ConflictError);
         expect((e as ConflictError).code).toBe(ErrorCodes.AUTH_EMAIL_TAKEN);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_SOCIAL_ACCOUNT if email already exists as OAuth-only account', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce({
+        id: 'existing-user',
+        emailHash: 'hash_test@example.com',
+        passwordHash: null,
+      } as any);
+
+      let errorThrown = false;
+      try {
+        await createUser({
+          name: 'Test User',
+          email: 'test@example.com',
+          password: 'password123',
+        });
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(ConflictError);
+        expect((e as ConflictError).code).toBe(ErrorCodes.AUTH_SOCIAL_ACCOUNT);
       }
       expect(errorThrown).toBe(true);
     });
@@ -238,6 +264,7 @@ describe('auth service', () => {
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
         role: 'USER' as const,
+        accessTier: 'BETA' as const,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -454,6 +481,60 @@ describe('auth service', () => {
     });
   });
 
+  describe('setPassword', () => {
+    it('should set password for OAuth-only account', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailHash: 'hash_test@example.com',
+        passwordHash: null,
+        role: 'USER' as const,
+      };
+
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      await expect(setPassword('user-123', 'newpassword123')).resolves.toBeUndefined();
+    });
+
+    it('should throw AUTH_PASSWORD_ALREADY_SET if user already has a password', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailHash: 'hash_test@example.com',
+        passwordHash: 'hashed_existingpassword',
+        role: 'USER' as const,
+      };
+
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
+
+      let errorThrown = false;
+      try {
+        await setPassword('user-123', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_PASSWORD_ALREADY_SET);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_UNAUTHORIZED if user not found', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
+
+      let errorThrown = false;
+      try {
+        await setPassword('nonexistent-user', 'newpassword123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_UNAUTHORIZED);
+      }
+      expect(errorThrown).toBe(true);
+    });
+  });
+
   describe('findOrCreateGoogleUser', () => {
     it('should return existing user with OAuth account', async () => {
       const mockOauth = {
@@ -464,6 +545,7 @@ describe('auth service', () => {
           avatarUrl: 'https://avatar.url',
           emailVerified: true,
           role: 'USER' as const,
+          accessTier: 'BETA' as const,
         },
       };
 
@@ -495,6 +577,7 @@ describe('auth service', () => {
         avatarUrl: null,
         emailVerified: false,
         role: 'USER' as const,
+        accessTier: 'BETA' as const,
       };
 
       spyOn(db.query.oauthAccounts, 'findFirst').mockResolvedValueOnce(undefined);
@@ -519,41 +602,19 @@ describe('auth service', () => {
       expect(result.emailVerified).toBe(true);
     });
 
-    it('should create new user if not exists', async () => {
-      const mockUser = {
-        id: 'user-new',
-        emailEncrypted: 'encrypted_new@example.com',
-        nameEncrypted: 'encrypted_New User',
-        emailHash: 'hash_new@example.com',
-        avatarUrl: 'https://avatar.url',
-        emailVerified: true,
-        role: 'USER' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
+    it('should block new user creation via OAuth in beta mode', async () => {
       spyOn(db.query.oauthAccounts, 'findFirst').mockResolvedValueOnce(undefined);
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
 
-      const returningMock = mock(() => Promise.resolve([mockUser]));
-      const valuesMock = mock(() => ({ returning: returningMock }));
-      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
-
-      const result = await findOrCreateGoogleUser(
-        'google-new',
-        'new@example.com',
-        'New User',
-        'https://avatar.url'
-      );
-
-      expect(result).toEqual({
-        id: 'user-new',
-        name: 'New User',
-        email: 'new@example.com',
-        avatarUrl: 'https://avatar.url',
-        emailVerified: true,
-        role: 'USER',
-      });
+      let errorThrown = false;
+      try {
+        await findOrCreateGoogleUser('google-new', 'new@example.com', 'New User');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(ForbiddenError);
+        expect((e as ForbiddenError).code).toBe(ErrorCodes.AUTH_FORBIDDEN);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 
@@ -566,6 +627,7 @@ describe('auth service', () => {
         avatarUrl: 'https://avatar.url',
         emailVerified: true,
         role: 'USER' as const,
+        deletedAt: null,
       };
 
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
@@ -588,6 +650,144 @@ describe('auth service', () => {
       const result = await getUserById('nonexistent-user');
 
       expect(result).toBeNull();
+    });
+
+    it('should return null if user is deleted', async () => {
+      const mockUser = {
+        id: 'user-123',
+        nameEncrypted: 'encrypted_Usuário Deletado',
+        emailEncrypted: null,
+        emailHash: null,
+        avatarUrl: null,
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: new Date(),
+      };
+
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockUser as any);
+
+      const result = await getUserById('user-123');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('deleteAccount', () => {
+    const mockActiveUser = {
+      id: 'user-123',
+      emailEncrypted: 'encrypted_test@example.com',
+      nameEncrypted: 'encrypted_Test User',
+      emailHash: 'hash_test@example.com',
+      passwordHash: 'hashed_password123',
+      avatarUrl: null,
+      emailVerified: true,
+      role: 'USER' as const,
+      isActive: true,
+      deletedAt: null,
+    };
+
+    it('should delete account with valid password', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockActiveUser as any);
+      spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(undefined);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      const deleteWhereMock = mock(() => Promise.resolve());
+      spyOn(db, 'delete').mockReturnValue({ where: deleteWhereMock } as any);
+
+      await expect(deleteAccount('user-123', 'password123')).resolves.toBeUndefined();
+    });
+
+    it('should delete account without password for OAuth-only user', async () => {
+      const oauthUser = { ...mockActiveUser, passwordHash: null };
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(oauthUser as any);
+      spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce(undefined);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      const deleteWhereMock = mock(() => Promise.resolve());
+      spyOn(db, 'delete').mockReturnValue({ where: deleteWhereMock } as any);
+
+      await expect(deleteAccount('user-123')).resolves.toBeUndefined();
+    });
+
+    it('should throw AUTH_INVALID_CREDENTIALS if password required but not provided', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockActiveUser as any);
+
+      let errorThrown = false;
+      try {
+        await deleteAccount('user-123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(BadRequestError);
+        expect((e as BadRequestError).code).toBe(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_INVALID_CREDENTIALS if password is wrong', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockActiveUser as any);
+
+      let errorThrown = false;
+      try {
+        await deleteAccount('user-123', 'wrongpassword');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_INVALID_CREDENTIALS);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_HAS_ACTIVE_LOANS if user has active loans', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(mockActiveUser as any);
+      spyOn(db.query.loans, 'findFirst').mockResolvedValueOnce({
+        id: 'loan-123',
+        status: 'confirmed',
+      } as any);
+
+      let errorThrown = false;
+      try {
+        await deleteAccount('user-123', 'password123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(ConflictError);
+        expect((e as ConflictError).code).toBe(ErrorCodes.AUTH_HAS_ACTIVE_LOANS);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_UNAUTHORIZED if user not found', async () => {
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
+
+      let errorThrown = false;
+      try {
+        await deleteAccount('nonexistent-user', 'password123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_UNAUTHORIZED);
+      }
+      expect(errorThrown).toBe(true);
+    });
+
+    it('should throw AUTH_UNAUTHORIZED if user is already deleted', async () => {
+      const deletedUser = { ...mockActiveUser, deletedAt: new Date() };
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(deletedUser as any);
+
+      let errorThrown = false;
+      try {
+        await deleteAccount('user-123', 'password123');
+      } catch (e) {
+        errorThrown = true;
+        expect(e).toBeInstanceOf(UnauthorizedError);
+        expect((e as UnauthorizedError).code).toBe(ErrorCodes.AUTH_UNAUTHORIZED);
+      }
+      expect(errorThrown).toBe(true);
     });
   });
 });

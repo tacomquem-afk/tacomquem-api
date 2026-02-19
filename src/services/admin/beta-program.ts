@@ -58,7 +58,7 @@ export async function listBetaUsers(params: ListBetaUsersParams) {
   const count = countResult[0]?.count || 0;
 
   const betaUsers: BetaUser[] = allUsers.map((user) => {
-    const emailPlain = decrypt(user.emailEncrypted);
+    const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
     const namePlain = decrypt(user.nameEncrypted);
 
     return {
@@ -130,7 +130,7 @@ export async function addBetaUser(params: AddBetaUserParams): Promise<BetaUser> 
     ipAddress: ipAddress || null,
   });
 
-  const emailPlain = decrypt(updated.emailEncrypted);
+  const emailPlain = updated.emailEncrypted ? decrypt(updated.emailEncrypted) : '';
   const namePlain = decrypt(updated.nameEncrypted);
 
   return {
@@ -183,7 +183,7 @@ export async function removeBetaUser(params: RemoveBetaUserParams): Promise<Beta
     ipAddress: ipAddress || null,
   });
 
-  const emailPlain = decrypt(updated.emailEncrypted);
+  const emailPlain = updated.emailEncrypted ? decrypt(updated.emailEncrypted) : '';
   const namePlain = decrypt(updated.nameEncrypted);
 
   return {

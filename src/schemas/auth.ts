@@ -24,8 +24,18 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
+export const setPasswordSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;

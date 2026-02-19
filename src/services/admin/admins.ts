@@ -42,7 +42,7 @@ export async function listAdmins(): Promise<AdminUser[]> {
 
   return admins.map((admin) => ({
     id: admin.id,
-    email: maskEmail(decrypt(admin.emailEncrypted)),
+    email: maskEmail(admin.emailEncrypted ? decrypt(admin.emailEncrypted) : ''),
     name: maskName(decrypt(admin.nameEncrypted)),
     role: admin.role as UserRole,
     createdAt: (admin.createdAt || new Date()).toISOString(),

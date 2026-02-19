@@ -1,8 +1,16 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
-import { oauthAccounts, users, verificationTokens } from '../../db/schema.js';
+import {
+  friendships,
+  items,
+  loans,
+  notifications,
+  oauthAccounts,
+  users,
+  verificationTokens,
+} from '../../db/schema.js';
 import {
   BadRequestError,
   ConflictError,
@@ -41,6 +49,12 @@ export async function createUser(input: CreateUserInput): Promise<UserResponse> 
   });
 
   if (existing) {
+    if (!existing.passwordHash) {
+      throw new ConflictError(
+        ErrorCodes.AUTH_SOCIAL_ACCOUNT,
+        'This email is registered via social login. Please log in with your social account.'
+      );
+    }
     throw new ConflictError(ErrorCodes.AUTH_EMAIL_TAKEN, 'Email already registered');
   }
 
@@ -131,7 +145,7 @@ export async function login(email: string, password: string): Promise<UserRespon
     where: eq(users.emailHash, emailHash),
   });
 
-  if (!user) {
+  if (!user || user.deletedAt) {
     throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
@@ -144,14 +158,15 @@ export async function login(email: string, password: string): Promise<UserRespon
     throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
-  if (env.BETA_MODE_ENABLED && user.accessTier !== 'BETA') {
+  if (env.BETA_MODE_ENABLED && user.role === 'USER' && user.accessTier !== 'BETA') {
     throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
   }
 
   return {
     id: user.id,
     name: decrypt(user.nameEncrypted),
-    email: decrypt(user.emailEncrypted),
+    // biome-ignore lint/style/noNonNullAssertion: emailEncrypted is always set for non-deleted users
+    email: decrypt(user.emailEncrypted!),
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
@@ -239,14 +254,15 @@ export async function findOrCreateGoogleUser(
   if (existingOauth?.user) {
     const user = existingOauth.user;
 
-    if (env.BETA_MODE_ENABLED && user.accessTier !== 'BETA') {
+    if (env.BETA_MODE_ENABLED && user.role === 'USER' && user.accessTier !== 'BETA') {
       throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
     }
 
     return {
       id: user.id,
       name: decrypt(user.nameEncrypted),
-      email: decrypt(user.emailEncrypted),
+      // biome-ignore lint/style/noNonNullAssertion: oauthAccounts are deleted when user is deleted, so user here is always active
+      email: decrypt(user.emailEncrypted!),
       avatarUrl: user.avatarUrl ?? null,
       emailVerified: user.emailVerified,
       role: user.role,
@@ -259,7 +275,11 @@ export async function findOrCreateGoogleUser(
   });
 
   if (existingUser) {
-    if (env.BETA_MODE_ENABLED && existingUser.accessTier !== 'BETA') {
+    if (
+      env.BETA_MODE_ENABLED &&
+      existingUser.role === 'USER' &&
+      existingUser.accessTier !== 'BETA'
+    ) {
       throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
     }
 
@@ -281,7 +301,8 @@ export async function findOrCreateGoogleUser(
     return {
       id: existingUser.id,
       name: decrypt(existingUser.nameEncrypted),
-      email: decrypt(existingUser.emailEncrypted),
+      // biome-ignore lint/style/noNonNullAssertion: found by emailHash which is null for deleted users, so always active
+      email: decrypt(existingUser.emailEncrypted!),
       avatarUrl: (avatarUrl || existingUser.avatarUrl) ?? null,
       emailVerified: true,
       role: existingUser.role,
@@ -323,21 +344,108 @@ export async function findOrCreateGoogleUser(
   };
 }
 
-export async function getUserById(userId: string): Promise<UserResponse | null> {
+export async function setPassword(userId: string, password: string): Promise<void> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
 
   if (!user) {
+    throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
+  }
+
+  if (user.passwordHash) {
+    throw new BadRequestError(
+      ErrorCodes.AUTH_PASSWORD_ALREADY_SET,
+      'Password already set. Use password reset to change it.'
+    );
+  }
+
+  const passwordHashed = await hashPassword(password);
+
+  await db
+    .update(users)
+    .set({ passwordHash: passwordHashed, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function getUserById(userId: string): Promise<UserResponse | null> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user || user.deletedAt) {
     return null;
   }
 
   return {
     id: user.id,
     name: decrypt(user.nameEncrypted),
-    email: decrypt(user.emailEncrypted),
+    // biome-ignore lint/style/noNonNullAssertion: emailEncrypted is always set for non-deleted users
+    email: decrypt(user.emailEncrypted!),
     avatarUrl: user.avatarUrl ?? null,
     emailVerified: user.emailVerified,
     role: user.role,
   };
+}
+
+export async function deleteAccount(userId: string, password?: string): Promise<void> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user || user.deletedAt) {
+    throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
+  }
+
+  if (user.passwordHash) {
+    if (!password) {
+      throw new BadRequestError(
+        ErrorCodes.AUTH_INVALID_CREDENTIALS,
+        'Password is required to delete account'
+      );
+    }
+    const isValid = await verifyPassword(password, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedError(ErrorCodes.AUTH_INVALID_CREDENTIALS, 'Invalid password');
+    }
+  }
+
+  const activeLoan = await db.query.loans.findFirst({
+    where: and(
+      or(eq(loans.lenderId, userId), eq(loans.borrowerId, userId)),
+      or(eq(loans.status, 'pending'), eq(loans.status, 'confirmed'))
+    ),
+  });
+
+  if (activeLoan) {
+    throw new ConflictError(
+      ErrorCodes.AUTH_HAS_ACTIVE_LOANS,
+      'Cannot delete account with active loans. Please resolve all active loans first.'
+    );
+  }
+
+  await db
+    .update(users)
+    .set({
+      emailEncrypted: null,
+      emailHash: null,
+      nameEncrypted: encrypt('Usuário Deletado'),
+      avatarUrl: null,
+      passwordHash: null,
+      isActive: false,
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+
+  await db.delete(oauthAccounts).where(eq(oauthAccounts.userId, userId));
+  await db.delete(verificationTokens).where(eq(verificationTokens.userId, userId));
+  await db.delete(notifications).where(eq(notifications.userId, userId));
+  await db
+    .delete(friendships)
+    .where(or(eq(friendships.userAId, userId), eq(friendships.userBId, userId)));
+  await db
+    .update(items)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(items.ownerId, userId), eq(items.isActive, true)));
 }

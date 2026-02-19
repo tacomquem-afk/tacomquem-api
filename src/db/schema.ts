@@ -50,9 +50,9 @@ export const betaAuditActionEnum = pgEnum('beta_audit_action', ['added', 'remove
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  emailEncrypted: text('email_encrypted').notNull(),
+  emailEncrypted: text('email_encrypted'),
   nameEncrypted: text('name_encrypted').notNull(),
-  emailHash: varchar('email_hash', { length: 255 }).notNull().unique(),
+  emailHash: varchar('email_hash', { length: 255 }).unique(),
   passwordHash: varchar('password_hash', { length: 255 }),
   avatarUrl: text('avatar_url'),
   emailVerified: boolean('email_verified').default(false).notNull(),
@@ -62,6 +62,7 @@ export const users = pgTable('users', {
   isActive: boolean('is_active').default(true).notNull(),
   blockedAt: timestamp('blocked_at'),
   blockedReason: text('blocked_reason'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -70,7 +70,7 @@ export async function listUsers(params: ListUsersParams) {
   const count = countResult[0]?.count || 0;
 
   const maskedUsers: MaskedUser[] = allUsers.map((user) => {
-    const emailPlain = decrypt(user.emailEncrypted);
+    const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
     const namePlain = decrypt(user.nameEncrypted);
 
     return {
@@ -115,7 +115,7 @@ export async function getUserDetails(userId: string) {
 
   if (!user) return null;
 
-  const emailPlain = decrypt(user.emailEncrypted);
+  const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
   const namePlain = decrypt(user.nameEncrypted);
 
   const name = maskName(namePlain);

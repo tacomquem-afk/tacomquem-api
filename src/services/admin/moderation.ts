@@ -21,7 +21,7 @@ export async function getItemDetails(itemId: string) {
 
   if (!item) return null;
 
-  const ownerEmail = decrypt(item.owner.emailEncrypted);
+  const ownerEmail = item.owner.emailEncrypted ? decrypt(item.owner.emailEncrypted) : '';
   const ownerName = decrypt(item.owner.nameEncrypted);
 
   const activeLoans = item.loans.filter((l) => l.status === 'confirmed').length;
@@ -91,7 +91,7 @@ export async function getLoanDetails(loanId: string) {
 
   if (!loan) return null;
 
-  const lenderEmail = decrypt(loan.lender.emailEncrypted);
+  const lenderEmail = loan.lender.emailEncrypted ? decrypt(loan.lender.emailEncrypted) : '';
   const lenderName = decrypt(loan.lender.nameEncrypted);
 
   return {
@@ -109,7 +109,9 @@ export async function getLoanDetails(loanId: string) {
     borrower: loan.borrower
       ? {
           id: loan.borrower.id,
-          email: maskEmail(decrypt(loan.borrower.emailEncrypted)),
+          email: maskEmail(
+            loan.borrower.emailEncrypted ? decrypt(loan.borrower.emailEncrypted) : ''
+          ),
           name: maskName(decrypt(loan.borrower.nameEncrypted)),
         }
       : null,

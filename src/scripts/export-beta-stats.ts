@@ -11,7 +11,7 @@ export async function generateBetaCsv(): Promise<string> {
   const rows: string[] = ['email,name,betaAddedAt'];
 
   for (const u of betaUsers) {
-    const email = decrypt(u.emailEncrypted);
+    const email = u.emailEncrypted ? decrypt(u.emailEncrypted) : '';
     const name = decrypt(u.nameEncrypted);
     const addedAt = u.betaAddedAt ? u.betaAddedAt.toISOString() : '';
     // Escape quotes and commas in fields
