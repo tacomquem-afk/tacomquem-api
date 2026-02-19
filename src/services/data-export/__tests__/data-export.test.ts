@@ -1,7 +1,6 @@
-import { describe, it, expect, mock, spyOn } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import JSZip from 'jszip';
-import { buildJSONExport, buildCSVExport, exportUserData } from '../index.js';
-import { db } from '../../../db/index.js';
+import { buildCSVExport, buildJSONExport } from '../index.js';
 
 describe('Data Export - JSON', () => {
   it('should build valid JSON export structure', async () => {
@@ -78,10 +77,33 @@ describe('Data Export - JSON', () => {
   });
 
   it('should separate loans as_lender and as_borrower', async () => {
-    const userData = { id: 'user-123', emailEncrypted: 'test@example.com', nameEncrypted: 'Test', emailVerified: true, createdAt: new Date(), updatedAt: new Date() };
+    const userData = {
+      id: 'user-123',
+      emailEncrypted: 'test@example.com',
+      nameEncrypted: 'Test',
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     const loansData = [
-      { id: 'loan-1', itemId: 'item-1', lenderId: 'user-123', borrowerId: 'user-456', status: 'confirmed', confirmedAt: new Date(), returnedAt: null },
-      { id: 'loan-2', itemId: 'item-2', lenderId: 'user-789', borrowerId: 'user-123', status: 'confirmed', confirmedAt: new Date(), returnedAt: null },
+      {
+        id: 'loan-1',
+        itemId: 'item-1',
+        lenderId: 'user-123',
+        borrowerId: 'user-456',
+        status: 'confirmed',
+        confirmedAt: new Date(),
+        returnedAt: null,
+      },
+      {
+        id: 'loan-2',
+        itemId: 'item-2',
+        lenderId: 'user-789',
+        borrowerId: 'user-123',
+        status: 'confirmed',
+        confirmedAt: new Date(),
+        returnedAt: null,
+      },
     ];
 
     const result = buildJSONExport({
@@ -94,13 +116,28 @@ describe('Data Export - JSON', () => {
 
     expect(result.loans.as_lender).toHaveLength(1);
     expect(result.loans.as_borrower).toHaveLength(1);
-    expect(result.loans.as_lender[0].id).toBe('loan-1');
-    expect(result.loans.as_borrower[0].id).toBe('loan-2');
+    expect(result.loans.as_lender[0]?.id).toBe('loan-1');
+    expect(result.loans.as_borrower[0]?.id).toBe('loan-2');
   });
 
   it('should build CSV export as zip', async () => {
-    const userData = { id: 'user-123', emailEncrypted: 'test@example.com', nameEncrypted: 'John', emailVerified: true, createdAt: new Date(), updatedAt: new Date() };
-    const itemsData = [{ id: 'item-1', name: 'Book', description: 'A book', images: '["https://example.com/book.jpg"]', createdAt: new Date() }];
+    const userData = {
+      id: 'user-123',
+      emailEncrypted: 'test@example.com',
+      nameEncrypted: 'John',
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const itemsData = [
+      {
+        id: 'item-1',
+        name: 'Book',
+        description: 'A book',
+        images: '["https://example.com/book.jpg"]',
+        createdAt: new Date(),
+      },
+    ];
     const loansData: any[] = [];
     const friendshipsData: any[] = [];
     const notificationsData: any[] = [];
@@ -123,29 +160,14 @@ describe('Data Export - JSON', () => {
     expect(zip.file('friendships.csv')).toBeDefined();
 
     const userCsv = await zip.file('user.csv')?.async('string');
+    expect(userCsv).toBeDefined();
     expect(userCsv).toContain('id,email,name');
   });
 
   it('should export user data in requested format', async () => {
-    const mockUser = {
-      id: 'user-123',
-      emailEncrypted: 'test@example.com',
-      nameEncrypted: 'John Doe',
-      emailVerified: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const mockDbSelect = mock(() => ({
-      from: mock(() => ({
-        where: mock(() => ({
-          toArray: mock(async () => [mockUser]),
-        })),
-      })),
-    }));
-
     // This test will be more specific when we implement the actual logic
-    // For now, just verify the function signature works
-    expect(typeof exportUserData).toBe('function');
+    // For now, just verify the function exists
+    expect(typeof buildJSONExport).toBe('function');
+    expect(typeof buildCSVExport).toBe('function');
   });
 });

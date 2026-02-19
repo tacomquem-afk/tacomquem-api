@@ -1,25 +1,31 @@
 import { z } from 'zod';
 
-export const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  dateOfBirth: z.string().datetime().optional(),
-  parentalEmail: z.string().email('Invalid email address').optional(),
-  parentalName: z.string().min(2, 'Parent name must be at least 2 characters').max(100).optional(),
-}).refine(
-  (data) => {
-    // If dateOfBirth is provided, parentalEmail and parentalName must also be provided
-    if (data.dateOfBirth && (!data.parentalEmail || !data.parentalName)) {
-      return false;
+export const registerSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    dateOfBirth: z.string().datetime().optional(),
+    parentalEmail: z.string().email('Invalid email address').optional(),
+    parentalName: z
+      .string()
+      .min(2, 'Parent name must be at least 2 characters')
+      .max(100)
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      // If dateOfBirth is provided, parentalEmail and parentalName must also be provided
+      if (data.dateOfBirth && (!data.parentalEmail || !data.parentalName)) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Parental information is required when date of birth is provided',
+      path: ['parentalEmail'], // This will point to the parentalEmail field in the error
     }
-    return true;
-  },
-  {
-    message: 'Parental information is required when date of birth is provided',
-    path: ['parentalEmail'], // This will point to the parentalEmail field in the error
-  }
-);
+  );
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),

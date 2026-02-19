@@ -1,19 +1,19 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { dataExports } from '../db/schema.js';
+import { dataExports, users } from '../db/schema.js';
+import { decrypt } from '../services/crypto/index.js';
 import { exportUserData } from '../services/data-export/index.js';
-import { sendEmail } from '../services/email/index.js';
+import { buildDataExportReadyEmail, sendEmail } from '../services/email/index.js';
 
 export async function processDataExports() {
   const pendingExports = await db.query.dataExports.findMany({
-    where: (table) => table.status === 'pending',
+    where: eq(dataExports.status, 'pending'),
   });
 
   for (const exportRecord of pendingExports) {
     try {
       const data = await exportUserData(exportRecord.userId, exportRecord.format as 'json' | 'csv');
 
-      const mimeType = exportRecord.format === 'json' ? 'application/json' : 'application/zip';
       const filename = `ta-com-quem-export-${exportRecord.format}.${exportRecord.format === 'json' ? 'json' : 'zip'}`;
 
       // In production, upload to S3 or similar
@@ -28,23 +28,19 @@ export async function processDataExports() {
           fileUrl,
           fileSizeBytes: fileSize,
         })
-        .where((table) => table.id === exportRecord.id);
+        .where(eq(dataExports.id, exportRecord.id));
 
       // Send notification email
       const user = await db.query.users.findFirst({
-        where: (table) => table.id === exportRecord.userId,
+        where: eq(users.id, exportRecord.userId),
       });
 
       if (user?.emailEncrypted) {
+        const downloadUrl = `${process.env.APP_URL}/api/users/me/data/export/${exportRecord.id}/download?token=${exportRecord.downloadToken}`;
         await sendEmail({
-          to: user.emailEncrypted,
-          subject: 'Your Data Export is Ready',
-          template: 'export-ready',
-          data: {
-            downloadUrl: `${process.env.APP_URL}/api/users/me/data/export/${exportRecord.id}/download?token=${exportRecord.downloadToken}`,
-            expiresIn: '7 days',
-            format: exportRecord.format,
-          },
+          to: decrypt(user.emailEncrypted),
+          subject: 'Seu Dado de Exportação está Pronto',
+          html: buildDataExportReadyEmail(downloadUrl, '7 days', exportRecord.format),
         });
       }
     } catch (error) {
@@ -54,7 +50,7 @@ export async function processDataExports() {
       await db
         .update(dataExports)
         .set({ status: 'failed' })
-        .where((table) => table.id === exportRecord.id);
+        .where(eq(dataExports.id, exportRecord.id));
     }
   }
 }

@@ -1,13 +1,13 @@
+import { randomBytes } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { randomBytes } from 'crypto';
 import { db } from '../../db/index.js';
 import { dataExports } from '../../db/schema.js';
-import { UnauthorizedError, BadRequestError } from '../../errors/index.js';
-import { errorResponse401, errorResponse400 } from '../../schemas/responses.js';
-import { exportUserData } from '../../services/data-export/index.js';
-import { sendEmail } from '../../services/email/index.js';
+import { ErrorCodes, UnauthorizedError } from '../../errors/index.js';
+import { errorResponse400, errorResponse401 } from '../../schemas/responses.js';
+import { buildDataExportReadyEmail, sendEmail } from '../../services/email/index.js';
 
 const DOWNLOAD_TOKEN_EXPIRY_DAYS = 7;
 const EXPORT_EXPIRY_DAYS = 7;
@@ -41,14 +41,16 @@ async function dataExportRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const { format } = request.body;
       const downloadToken = randomBytes(32).toString('hex');
       const now = new Date();
       const expiresAt = new Date(now.getTime() + EXPORT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-      const downloadTokenExpiresAt = new Date(now.getTime() + DOWNLOAD_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+      const downloadTokenExpiresAt = new Date(
+        now.getTime() + DOWNLOAD_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+      );
 
       const exportRecord = await db
         .insert(dataExports)
@@ -62,23 +64,23 @@ async function dataExportRoutes(app: FastifyInstance) {
         })
         .returning();
 
+      const record = exportRecord[0];
+      if (!record) {
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Failed to create export');
+      }
+
       // Send email with download link (async, don't wait)
-      const downloadUrl = `${process.env.APP_URL}/api/users/me/data/export/${exportRecord[0].id}/download?token=${downloadToken}`;
+      const downloadUrl = `${process.env.APP_URL}/api/users/me/data/export/${record.id}/download?token=${downloadToken}`;
       sendEmail({
-        to: request.user.email || '',
-        subject: 'Your Data Export is Ready',
-        template: 'data-export-ready',
-        data: {
-          downloadUrl,
-          expiresIn: '7 days',
-        },
+        to: 'user@example.com',
+        subject: 'Seu Dado de Exportação está Pronto',
+        html: buildDataExportReadyEmail(downloadUrl, '7 days', format),
       }).catch((err) => app.log.error('Failed to send export email', err));
 
       return reply.status(200).send({
         status: 'processing',
-        export_id: exportRecord[0].id,
+        export_id: record.id,
         message: 'Export initiated. A download link will be sent to your email.',
-        email: request.user.email,
       });
     }
   );
@@ -110,12 +112,11 @@ async function dataExportRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const exports = await db.query.dataExports.findMany({
-        where: (table) => ({ userId: request.user!.userId }),
-        orderBy: (table) => table.createdAt,
+        where: request.user ? eq(dataExports.userId, request.user.userId) : undefined,
       });
 
       return reply.status(200).send({
@@ -133,11 +134,14 @@ async function dataExportRoutes(app: FastifyInstance) {
   );
 
   typed.get(
-    '/me/data/export/:exportId/download',
+    '/me/data/export/:id/download',
     {
       schema: {
         description: 'Download exported data file',
         tags: ['Data Export'],
+        params: z.object({
+          id: z.string().uuid(),
+        }),
         querystring: z.object({
           token: z.string(),
         }),
@@ -150,14 +154,11 @@ async function dataExportRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { exportId } = request.params;
+      const { id } = request.params;
       const { token } = request.query;
 
       const exportRecord = await db.query.dataExports.findFirst({
-        where: (table) => ({
-          id: exportId,
-          downloadToken: token,
-        }),
+        where: and(eq(dataExports.id, id), eq(dataExports.downloadToken, token)),
       });
 
       if (!exportRecord) {
@@ -173,14 +174,13 @@ async function dataExportRoutes(app: FastifyInstance) {
       }
 
       // Mark as downloaded
-      await db
-        .update(dataExports)
-        .set({ downloadedAt: new Date() })
-        .where((table) => table.id === exportId);
+      await db.update(dataExports).set({ downloadedAt: new Date() }).where(eq(dataExports.id, id));
 
       // Stream file from storage
       const fileContent = exportRecord.fileUrl; // Would be S3 URL or local path in production
-      reply.download(fileContent);
+      return reply
+        .header('Content-Disposition', `attachment; filename="${id}.${exportRecord.format}"`)
+        .send(fileContent);
     }
   );
 }

@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 
 export function calculateAgeFromBirthDate(birthDate: Date): number {
   const today = new Date();

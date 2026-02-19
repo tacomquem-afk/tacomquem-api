@@ -1,7 +1,7 @@
-import JSZip from 'jszip';
 import { and, eq } from 'drizzle-orm';
+import JSZip from 'jszip';
 import { db } from '../../db/index.js';
-import { users, items, loans, friendships, notifications } from '../../db/schema.js';
+import { friendships, items, loans, notifications, users } from '../../db/schema.js';
 
 export interface UserExportData {
   id: string;
@@ -179,7 +179,10 @@ export function buildJSONExport(data: ExportDataInput): JSONExport {
   };
 }
 
-function toCSV(headers: string[], rows: (string | number | boolean | null | undefined)[][]): string {
+function toCSV(
+  headers: string[],
+  rows: (string | number | boolean | null | undefined)[][]
+): string {
   const headerLine = headers.join(',');
   const dataLines = rows.map((row) =>
     row
@@ -220,7 +223,13 @@ export async function buildCSVExport(data: ExportDataInput): Promise<ArrayBuffer
     ['id', 'name', 'description', 'images_count', 'created_at'],
     data.items.map((item) => {
       const images = JSON.parse(item.images);
-      return [item.id, item.name, item.description || '', images.length, item.createdAt.toISOString()];
+      return [
+        item.id,
+        item.name,
+        item.description || '',
+        images.length,
+        item.createdAt.toISOString(),
+      ];
     })
   );
   zip.file('items.csv', itemsCsv);
@@ -230,7 +239,14 @@ export async function buildCSVExport(data: ExportDataInput): Promise<ArrayBuffer
     ['loan_id', 'item_id', 'borrower_id', 'status', 'confirmed_at', 'returned_at'],
     data.loans
       .filter((loan) => loan.lenderId === data.user.id)
-      .map((loan) => [loan.id, loan.itemId, loan.borrowerId || '', loan.status, loan.confirmedAt?.toISOString() || '', loan.returnedAt?.toISOString() || ''])
+      .map((loan) => [
+        loan.id,
+        loan.itemId,
+        loan.borrowerId || '',
+        loan.status,
+        loan.confirmedAt?.toISOString() || '',
+        loan.returnedAt?.toISOString() || '',
+      ])
   );
   zip.file('loans_lent.csv', loansLentCsv);
 
@@ -239,7 +255,14 @@ export async function buildCSVExport(data: ExportDataInput): Promise<ArrayBuffer
     ['loan_id', 'item_id', 'lender_id', 'status', 'confirmed_at', 'returned_at'],
     data.loans
       .filter((loan) => loan.borrowerId === data.user.id)
-      .map((loan) => [loan.id, loan.itemId, loan.lenderId, loan.status, loan.confirmedAt?.toISOString() || '', loan.returnedAt?.toISOString() || ''])
+      .map((loan) => [
+        loan.id,
+        loan.itemId,
+        loan.lenderId,
+        loan.status,
+        loan.confirmedAt?.toISOString() || '',
+        loan.returnedAt?.toISOString() || '',
+      ])
   );
   zip.file('loans_borrowed.csv', loansBorrowedCsv);
 

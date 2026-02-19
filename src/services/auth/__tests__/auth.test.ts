@@ -81,12 +81,17 @@ describe('auth service', () => {
       });
 
       expect(result).toEqual({
-        id: 'user-123',
-        name: 'Test User',
-        email: 'test@example.com',
-        avatarUrl: null,
-        emailVerified: false,
-        role: 'USER',
+        status: 'success',
+        user: {
+          id: 'user-123',
+          name: 'Test User',
+          email: 'test@example.com',
+          avatarUrl: null,
+          emailVerified: false,
+          role: 'USER',
+        },
+        message: 'Conta criada com sucesso. Verifique seu email.',
+        canUseApp: true,
       });
     });
 

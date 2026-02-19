@@ -15,6 +15,7 @@ import {
 
 import { env } from './config/env.js';
 import { db } from './db/index.js';
+import type { ErrorClass } from './errors/index.js';
 import { AppError, errorStatusMap, formatProblemDetails } from './errors/index.js';
 import { accessLogsPlugin } from './plugins/access-logs.js';
 import jwtPlugin from './plugins/jwt.js';
@@ -29,6 +30,7 @@ import usersRoutes from './routes/admin/users.js';
 import googleAuthRoutes from './routes/auth/google.js';
 import authRoutes from './routes/auth/index.js';
 import { dashboardRoutes } from './routes/dashboard/index.js';
+import dataExportRoutes from './routes/data-export/index.js';
 import itemsRoutes from './routes/items/index.js';
 import { linksRoutes } from './routes/links/index.js';
 import { loansRoutes } from './routes/loans/index.js';
@@ -113,6 +115,7 @@ export async function buildApp() {
         { name: 'Authentication', description: 'Authentication endpoints' },
         { name: 'OAuth', description: 'OAuth authentication providers' },
         { name: 'Users', description: 'User account endpoints' },
+        { name: 'Data Export', description: 'Data portability endpoints (LGPD R3)' },
         { name: 'Items', description: 'Items management endpoints' },
         { name: 'Upload', description: 'Image upload endpoints' },
         { name: 'Loans', description: 'Loan management endpoints' },
@@ -171,7 +174,7 @@ export async function buildApp() {
     }
 
     if (error instanceof AppError) {
-      const statusCode = errorStatusMap.get(error.constructor as any) || 500;
+      const statusCode = errorStatusMap.get(error.constructor as ErrorClass) || 500;
       const problemDetails = formatProblemDetails(error, request);
       if (statusCode >= 500) {
         request.log.error({ err: error }, error.message);
@@ -249,6 +252,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(googleAuthRoutes, { prefix: '/api/auth' });
   await app.register(accountRoutes, { prefix: '/api' });
+  await app.register(dataExportRoutes, { prefix: '/api/users' });
   await app.register(itemsRoutes, { prefix: '/api/items' });
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(loansRoutes, { prefix: '/api/loans' });

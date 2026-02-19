@@ -1,13 +1,10 @@
+import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
 import { accessLogs, users } from '../../db/schema.js';
-import {
-  errorResponse401,
-  errorResponse403,
-} from '../../schemas/responses.js';
+import { errorResponse401, errorResponse403 } from '../../schemas/responses.js';
 
 export default async function auditRoutes(fastify: FastifyInstance) {
   const typed = fastify.withTypeProvider<ZodTypeProvider>();
@@ -24,8 +21,8 @@ export default async function auditRoutes(fastify: FastifyInstance) {
           from: z.string().datetime().optional(),
           to: z.string().datetime().optional(),
           method: z.string().optional(),
-          limit: z.string().transform(Number).default('100'),
-          offset: z.string().transform(Number).default('0'),
+          limit: z.string().transform(Number).default(100),
+          offset: z.string().transform(Number).default(0),
         }),
         response: {
           200: z.object({

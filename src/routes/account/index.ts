@@ -1,10 +1,10 @@
+import { desc, eq, gte, lte } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
 import { accessLogs, users } from '../../db/schema.js';
-import { UnauthorizedError } from '../../errors/index.js';
+import { ErrorCodes, UnauthorizedError } from '../../errors/index.js';
 import {
   errorResponse400,
   errorResponse401,
@@ -17,6 +17,7 @@ import {
   getDeletionStatus,
   scheduleDeletion,
 } from '../../services/account-deletion/index.js';
+import { decrypt } from '../../services/crypto/index.js';
 
 async function usersRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -46,15 +47,25 @@ async function usersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated to schedule deletion');
+        throw new UnauthorizedError(
+          ErrorCodes.AUTH_UNAUTHORIZED,
+          'Must be authenticated to schedule deletion'
+        );
       }
 
-      const result = await scheduleDeletion({
+      const input: { userId: string; reason?: string } = {
         userId: request.user.userId,
-        reason: request.body.reason || undefined,
-      });
+      };
+      if (request.body.reason) {
+        input.reason = request.body.reason;
+      }
 
-      return reply.status(200).send(result);
+      const result = await scheduleDeletion(input);
+
+      return reply.status(200).send({
+        ...result,
+        status: 'success' as const,
+      });
     }
   );
 
@@ -79,7 +90,7 @@ async function usersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const status = await getDeletionStatus(request.user.userId);
@@ -104,7 +115,7 @@ async function usersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const result = await cancelDeletion(request.user.userId);
@@ -154,7 +165,7 @@ async function usersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const user = await db.query.users.findFirst({
@@ -162,14 +173,14 @@ async function usersRoutes(app: FastifyInstance) {
       });
 
       if (!user) {
-        throw new UnauthorizedError('User not found');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
       }
 
       return reply.status(200).send({
-        status: user.parentalConsentStatus || 'not_applicable',
-        confirmedAt: user.parentalConsentConfirmedAt,
-        responsibleEmail: user.parentalEmail ? 'encrypted@example.com' : undefined, // In production, decrypt this
-        responsibleName: user.parentalName,
+        status: user.parentalConsentStatus as 'pending' | 'confirmed' | 'not_applicable',
+        confirmedAt: user.parentalConsentConfirmedAt || undefined,
+        responsibleEmail: user.parentalEmail ? decrypt(user.parentalEmail) : undefined,
+        responsibleName: user.parentalName || undefined,
       });
     }
   );
@@ -184,8 +195,8 @@ async function usersRoutes(app: FastifyInstance) {
         querystring: z.object({
           from: z.string().datetime().optional(),
           to: z.string().datetime().optional(),
-          limit: z.string().transform(Number).default('50'),
-          offset: z.string().transform(Number).default('0'),
+          limit: z.string().transform(Number).default(50),
+          offset: z.string().transform(Number).default(0),
         }),
         response: {
           200: z.object({
@@ -209,7 +220,7 @@ async function usersRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       if (!request.user) {
-        throw new UnauthorizedError('Must be authenticated');
+        throw new UnauthorizedError(ErrorCodes.AUTH_UNAUTHORIZED, 'Must be authenticated');
       }
 
       const { from, to, limit, offset } = request.query;

@@ -1,10 +1,10 @@
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import { db } from '../../db/index.js';
 import { users } from '../../db/schema.js';
+import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import {
   deleteAccountSchema,
   forgotPasswordSchema,
@@ -47,9 +47,18 @@ async function authRoutes(app: FastifyInstance) {
         tags: ['Authentication'],
         body: registerSchema,
         response: {
+          200: z.object({
+            status: z.literal('pending_parental_consent'),
+            message: z.string(),
+            emailSentTo: z.string().email().optional(),
+            canUseApp: z.boolean(),
+            userId: z.string().uuid(),
+          }),
           201: z.object({
+            status: z.literal('success'),
             message: z.string(),
             user: userResponseSchema,
+            canUseApp: z.boolean(),
           }),
           409: errorResponse409,
           422: errorResponse422,
@@ -68,18 +77,25 @@ async function authRoutes(app: FastifyInstance) {
       if (result.status === 'pending_parental_consent') {
         return reply.status(200).send({
           status: result.status,
-          message: result.message,
+          message: result.message ?? 'Parental consent required',
           emailSentTo: result.emailSentTo,
-          canUseApp: result.canUseApp,
-          userId: result.userId,
+          canUseApp: result.canUseApp ?? false,
+          userId: result.userId ?? '',
         });
       }
 
       return reply.status(201).send({
         status: result.status,
-        message: result.message,
-        user: result.user,
-        canUseApp: result.canUseApp,
+        message: result.message ?? 'Account created',
+        user: result.user ?? {
+          id: '',
+          name: '',
+          email: '',
+          avatarUrl: null,
+          emailVerified: false,
+          role: 'USER',
+        },
+        canUseApp: result.canUseApp ?? true,
       });
     }
   );
@@ -348,7 +364,7 @@ console.log('Logged in as:', user.name);
       const { token } = request.query;
 
       const user = await db.query.users.findFirst({
-        where: (table) => ({ parentalConsentToken: token }),
+        where: eq(users.parentalConsentToken, token),
       });
 
       if (!user) {
@@ -367,7 +383,7 @@ console.log('Logged in as:', user.name);
           parentalConsentToken: null,
           parentalConsentTokenExpiresAt: null,
         })
-        .where((table) => table.id === user.id);
+        .where(eq(users.id, user.id));
 
       return reply.status(200).send({
         status: 'success',

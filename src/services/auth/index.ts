@@ -21,9 +21,19 @@ import {
 } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
-import { buildPasswordResetEmail, buildVerificationEmail, sendEmail } from '../email/index.js';
+import {
+  buildParentalConsentRequestEmail,
+  buildPasswordResetEmail,
+  buildVerificationEmail,
+  sendEmail,
+} from '../email/index.js';
+import {
+  calculateAgeFromBirthDate,
+  generateParentalConsentToken,
+  getParentalTokenExpiryDate,
+  isChildUnder12,
+} from '../parental-consent/index.js';
 import { hashPassword, verifyPassword } from '../password/index.js';
-import { calculateAgeFromBirthDate, generateParentalConsentToken, getParentalTokenExpiryDate, isChildUnder12 } from '../parental-consent/index.js';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -117,13 +127,11 @@ export async function createUser(input: CreateUserInput): Promise<RegisterRespon
     await sendEmail({
       to: input.parentalEmail,
       subject: `${input.name} precisa da sua autorização para usar o TáComQuem`,
-      html: `
-        <h2>Olá ${input.parentalName},</h2>
-        <p>${input.name} (${input.email}) gostaria de usar o TáComQuem e precisa da sua autorização.</p>
-        <p>Clique no link abaixo para confirmar:</p>
-        <p><a href="${env.FRONTEND_URL}/parental-consent?token=${token}">Confirmar autorização</a></p>
-        <p>Este link expira em 48 horas.</p>
-      `,
+      html: buildParentalConsentRequestEmail(
+        input.name,
+        input.parentalName,
+        `${env.FRONTEND_URL}/parental-consent?token=${token}`
+      ),
     });
 
     return {
@@ -239,7 +247,9 @@ export async function login(email: string, password: string): Promise<UserRespon
 
   // Check parental consent if user is under 12
   if (user.dateOfBirth && user.parentalConsentStatus === 'pending') {
-    const age = calculateAgeFromBirthDate(user.dateOfBirth);
+    const birthDate =
+      typeof user.dateOfBirth === 'string' ? new Date(user.dateOfBirth) : user.dateOfBirth;
+    const age = calculateAgeFromBirthDate(birthDate);
     if (age < 12) {
       throw new UnauthorizedError(
         ErrorCodes.AUTH_PARENTAL_CONSENT_REQUIRED,

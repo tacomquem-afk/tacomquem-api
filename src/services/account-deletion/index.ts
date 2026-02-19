@@ -1,4 +1,5 @@
 import { and, eq, lte, or } from 'drizzle-orm';
+import { env } from '../../config/env';
 import { db } from '../../db';
 import {
   accessLogs,
@@ -11,7 +12,6 @@ import {
 } from '../../db/schema';
 import { generateToken } from '../crypto/index';
 import { sendEmail } from '../email/index';
-import { env } from '../../config/env';
 
 const DELETION_WINDOW_DAYS = 15;
 
@@ -192,13 +192,22 @@ export async function getDeletionStatus(userId: string): Promise<DeletionStatus>
     user.deletionScheduledFor !== null &&
     new Date() < user.deletionScheduledFor;
 
-  return {
+  const result: DeletionStatus = {
     status: user.deletionStatus,
-    requestedAt: user.deletionRequestedAt || undefined,
-    scheduledFor: user.deletionScheduledFor || undefined,
-    cancelledAt: user.deletionCancelledAt || undefined,
     canCancel,
   };
+
+  if (user.deletionRequestedAt) {
+    result.requestedAt = user.deletionRequestedAt;
+  }
+  if (user.deletionScheduledFor) {
+    result.scheduledFor = user.deletionScheduledFor;
+  }
+  if (user.deletionCancelledAt) {
+    result.cancelledAt = user.deletionCancelledAt;
+  }
+
+  return result;
 }
 
 /**
@@ -207,10 +216,7 @@ export async function getDeletionStatus(userId: string): Promise<DeletionStatus>
  */
 export async function processPendingDeletions() {
   const usersToDelete = await db.query.users.findMany({
-    where: and(
-      eq(users.deletionStatus, 'pending'),
-      lte(users.deletionScheduledFor, new Date())
-    ),
+    where: and(eq(users.deletionStatus, 'pending'), lte(users.deletionScheduledFor, new Date())),
   });
 
   const results = [];
@@ -249,10 +255,7 @@ export async function processPendingDeletions() {
  */
 async function anonymizeUserData(userId: string) {
   // Soft delete items
-  await db
-    .update(items)
-    .set({ updatedAt: new Date() })
-    .where(eq(items.ownerId, userId));
+  await db.update(items).set({ updatedAt: new Date() }).where(eq(items.ownerId, userId));
 
   // Remove friendships
   await db

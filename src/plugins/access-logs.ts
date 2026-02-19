@@ -1,5 +1,5 @@
-import { createHash } from 'crypto';
-import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { db } from '../db/index.js';
 import { accessLogs } from '../db/schema.js';
 
@@ -21,7 +21,7 @@ export async function accessLogsPlugin(fastify: FastifyInstance) {
     }
 
     try {
-      const startTime = (request as any).startTime || Date.now();
+      const startTime = (request as { startTime?: number }).startTime || Date.now();
       const responseTime = Date.now() - startTime;
 
       await db.insert(accessLogs).values({
@@ -34,7 +34,7 @@ export async function accessLogsPlugin(fastify: FastifyInstance) {
         statusCode: reply.statusCode,
         responseTimeMs: responseTime,
         userAgent: request.headers['user-agent'] || null,
-        referrer: request.headers['referer'] || null,
+        referrer: request.headers.referer || null,
         bodyHash: hashBody(request.body),
       });
     } catch (error) {
@@ -44,21 +44,29 @@ export async function accessLogsPlugin(fastify: FastifyInstance) {
   });
 }
 
-function getClientIp(request: any): string | null {
+function getClientIp(request: FastifyRequest): string | null {
   // Check common headers in order of preference
+  const cfIp = request.headers['cf-connecting-ip'];
+  const cfIpStr = typeof cfIp === 'string' ? cfIp : null;
+
+  const forwardedFor = request.headers['x-forwarded-for'];
+  const firstForwarded =
+    typeof forwardedFor === 'string'
+      ? forwardedFor.split(',')[0]?.trim()
+      : forwardedFor?.[0] || null;
+
+  const realIp = request.headers['x-real-ip'];
+  const realIpStr = typeof realIp === 'string' ? realIp : null;
+
   const ip =
-    request.headers['cf-connecting-ip'] ||
-    request.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    request.headers['x-real-ip'] ||
-    request.socket?.remoteAddress ||
-    request.ip ||
-    null;
+    cfIpStr || firstForwarded || realIpStr || request.socket?.remoteAddress || request.ip || null;
 
   return ip || null;
 }
 
 function extractPath(url: string): string {
-  return url.split('?')[0];
+  const parts = url.split('?');
+  return parts[0] ?? '';
 }
 
 function extractQueryString(url: string): string | null {
@@ -66,7 +74,7 @@ function extractQueryString(url: string): string | null {
   return queryIndex !== -1 ? url.substring(queryIndex + 1) : null;
 }
 
-function hashBody(body: any): string | null {
+function hashBody(body: unknown): string | null {
   if (!body) return null;
 
   try {
