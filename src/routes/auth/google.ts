@@ -203,13 +203,13 @@ useEffect(() => {
       } catch (error) {
         console.error('Google OAuth error:', error);
 
-        if (
-          error &&
-          typeof error === 'object' &&
-          'code' in error &&
-          error.code === 'AUTH_FORBIDDEN'
-        ) {
-          return reply.redirect(`${env.FRONTEND_URL}/login?error=beta_not_available`);
+        if (error && typeof error === 'object' && 'code' in error) {
+          if (error.code === 'AUTH_BETA_WAITLISTED') {
+            return reply.redirect(`${env.FRONTEND_URL}/beta-waitlist`);
+          }
+          if (error.code === 'AUTH_FORBIDDEN') {
+            return reply.redirect(`${env.FRONTEND_URL}/login?error=beta_not_available`);
+          }
         }
 
         return reply.redirect(`${env.FRONTEND_URL}/login?error=oauth_failed`);

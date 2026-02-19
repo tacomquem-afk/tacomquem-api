@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "beta_waitlisted_at" timestamp;

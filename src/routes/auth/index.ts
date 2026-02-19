@@ -54,17 +54,27 @@ Creates a new account using email/password credentials. The \`acceptTerms: true\
 
 **Rate limit:** 5 requests per hour per IP.
 
+**Beta Mode (BETA_MODE_ENABLED=true):**
+
+When beta mode is active, **only users with a valid beta invite can log in**. The registration creates the account regardless, but login will be blocked with \`403 Forbidden\` for non-beta users.
+
+| Invite Status | Registration | Login |
+|---------------|--------------|-------|
+| In beta list | \`201\` Created | \`200\` Success |
+| Not in beta list | \`201\` Created | \`403\` Forbidden |
+
 **Response varies based on declared age:**
 
 | Status | Situation | \`canUseApp\` |
 |--------|-----------|--------------|
-| \`201\` | Adult registered successfully | \`true\` |
+| \`201\` | Adult registered successfully | \`true\` (beta users) / \`false\` (non-beta when \`BETA_MODE_ENABLED=true\`) |
 | \`200\` | User is under 12 — awaiting guardian authorization | \`false\` |
 
 **After successful registration (201):**
 - \`user.termsAccepted\` always returns \`true\` (terms were accepted at registration time)
 - A verification email is sent — the user can access the app but should verify their email
 - Call \`GET /api/auth/me\` to keep local user data in sync
+- **Beta mode:** If not invited, \`canUseApp\` will be \`false\` and login will fail
 
 **Minor accounts (200):**
 - An email is sent to the guardian with a confirmation link
@@ -88,12 +98,16 @@ const data = await response.json();
 if (data.status === 'pending_parental_consent') {
   // Minor under 12: redirect to awaiting-consent screen
   navigate('/register/awaiting-parental-consent', { email: data.emailSentTo });
+} else if (!data.canUseApp) {
+  // Beta mode: user not in beta list
+  navigate('/beta-waitlist');
 } else {
-  // Adult: store tokens and redirect to app
+  // Adult with beta access: store tokens and redirect to app
   localStorage.setItem('accessToken', data.accessToken);
   navigate('/dashboard');
 }
 \`\`\``,
+
         tags: ['Authentication'],
         body: registerSchema,
         response: {
@@ -159,6 +173,15 @@ if (data.status === 'pending_parental_consent') {
 
 Authenticates the user and returns JWT access and refresh tokens.
 
+**Beta Mode (BETA_MODE_ENABLED=true):**
+
+When beta mode is active, only users with a valid beta invite can log in. Users without beta access will receive a \`403 Forbidden\` response.
+
+| Invite Status | Login Result |
+|---------------|--------------|
+| In beta list | \`200\` Success |
+| Not in beta list | \`403\` Forbidden — "Beta access not available" |
+
 **Important — \`user.termsAccepted\` field:**
 
 This field indicates whether the user has accepted the current version of the Terms of Service. If \`false\`, the frontend must redirect the user to the terms acceptance screen before granting access to the app.
@@ -170,7 +193,19 @@ This field indicates whether the user has accepted the current version of the Te
 
 **Recommended implementation:**
 \`\`\`javascript
-const { user, accessToken, refreshToken } = await login(email, password);
+const response = await fetch('/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password }),
+});
+
+if (response.status === 403) {
+  // Beta mode: user not in beta list
+  navigate('/beta-waitlist');
+  return;
+}
+
+const { user, accessToken, refreshToken } = await response.json();
 
 localStorage.setItem('accessToken', accessToken);
 localStorage.setItem('refreshToken', refreshToken);
@@ -186,6 +221,7 @@ if (!user.termsAccepted) {
         response: {
           200: authTokensResponseSchema,
           401: errorResponse401,
+          403: errorResponse403,
           422: errorResponse422,
         },
       },

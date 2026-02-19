@@ -87,6 +87,7 @@ export const users = pgTable('users', {
   role: roleEnum('role').default('USER').notNull(),
   accessTier: accessTierEnum('access_tier').default('PUBLIC').notNull(),
   betaAddedAt: timestamp('beta_added_at'),
+  betaWaitlistedAt: timestamp('beta_waitlisted_at'),
   isActive: boolean('is_active').default(true).notNull(),
   blockedAt: timestamp('blocked_at'),
   blockedReason: text('blocked_reason'),

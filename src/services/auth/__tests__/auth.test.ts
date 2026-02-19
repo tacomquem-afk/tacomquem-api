@@ -8,6 +8,7 @@ import {
   GoneError,
   UnauthorizedError,
 } from '../../../errors/index.js';
+import * as betaInvitesService from '../../admin/beta-invites.js';
 import * as cryptoService from '../../crypto/index.js';
 import * as emailService from '../../email/index.js';
 import * as passwordService from '../../password/index.js';
@@ -44,6 +45,10 @@ beforeEach(() => {
   spyOn(emailService, 'buildPasswordResetEmail').mockImplementation(
     (name: string, url: string) => `<html>Reset ${name}: ${url}</html>`
   );
+
+  // Mock beta invite check to return true by default (user is invited)
+  spyOn(betaInvitesService, 'checkBetaInvite').mockResolvedValue(true);
+  spyOn(betaInvitesService, 'markBetaInviteAsUsed').mockResolvedValue();
 });
 
 describe('auth service', () => {
@@ -122,6 +127,47 @@ describe('auth service', () => {
         expect((e as ConflictError).code).toBe(ErrorCodes.AUTH_EMAIL_TAKEN);
       }
       expect(errorThrown).toBe(true);
+    });
+
+    it('should create user with betaWaitlistedAt when not invited during beta mode', async () => {
+      spyOn(betaInvitesService, 'checkBetaInvite').mockResolvedValueOnce(false);
+
+      const mockUser = {
+        id: 'user-456',
+        emailEncrypted: 'encrypted_waitlist@example.com',
+        nameEncrypted: 'encrypted_Waitlist User',
+        emailHash: 'hash_waitlist@example.com',
+        passwordHash: 'hashed_password123',
+        avatarUrl: null,
+        emailVerified: false,
+        role: 'USER' as const,
+        accessTier: 'PUBLIC' as const,
+        betaWaitlistedAt: new Date(),
+      };
+
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
+
+      const returningMockUser = mock(() => Promise.resolve([mockUser]));
+      const valuesMockUser = mock(() => ({ returning: returningMockUser }));
+      const returningMockToken = mock(() => Promise.resolve([{ id: 'token-456' }]));
+      const valuesMockToken = mock(() => ({ returning: returningMockToken }));
+
+      spyOn(db, 'insert')
+        .mockReturnValueOnce({ values: valuesMockUser } as any)
+        .mockReturnValueOnce({ values: valuesMockToken } as any);
+
+      const result = await createUser(
+        {
+          name: 'Waitlist User',
+          email: 'waitlist@example.com',
+          password: 'password123',
+        },
+        '127.0.0.1'
+      );
+
+      expect(result.status).toBe('success');
+      expect(result.canUseApp).toBe(false);
+      expect(result.message).toBe('Você foi adicionado à lista de espera do beta.');
     });
 
     it('should throw AUTH_SOCIAL_ACCOUNT if email already exists as OAuth-only account', async () => {
@@ -712,9 +758,31 @@ describe('auth service', () => {
       expect(result.emailVerified).toBe(true);
     });
 
-    it('should block new user creation via OAuth in beta mode', async () => {
+    it('should create account and add to waitlist for new OAuth user not in beta list', async () => {
+      const mockUser = {
+        id: 'new-user-123',
+        emailEncrypted: 'encrypted_new@example.com',
+        nameEncrypted: 'encrypted_New User',
+        emailHash: 'hash_new@example.com',
+        avatarUrl: null,
+        emailVerified: true,
+        role: 'USER' as const,
+        accessTier: 'PUBLIC' as const,
+        betaWaitlistedAt: new Date(),
+      };
+
       spyOn(db.query.oauthAccounts, 'findFirst').mockResolvedValueOnce(undefined);
       spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(undefined);
+      spyOn(betaInvitesService, 'checkBetaInvite').mockResolvedValueOnce(false);
+
+      const returningMockUser = mock(() => Promise.resolve([mockUser]));
+      const valuesMockUser = mock(() => ({ returning: returningMockUser }));
+      const returningMockOauth = mock(() => Promise.resolve([{}]));
+      const valuesMockOauth = mock(() => ({ returning: returningMockOauth }));
+
+      spyOn(db, 'insert')
+        .mockReturnValueOnce({ values: valuesMockUser } as any)
+        .mockReturnValueOnce({ values: valuesMockOauth } as any);
 
       let errorThrown = false;
       try {
@@ -722,7 +790,7 @@ describe('auth service', () => {
       } catch (e) {
         errorThrown = true;
         expect(e).toBeInstanceOf(ForbiddenError);
-        expect((e as ForbiddenError).code).toBe(ErrorCodes.AUTH_FORBIDDEN);
+        expect((e as ForbiddenError).code).toBe(ErrorCodes.AUTH_BETA_WAITLISTED);
       }
       expect(errorThrown).toBe(true);
     });

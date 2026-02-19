@@ -193,6 +193,7 @@ export async function createUser(
           passwordHash: passwordHashed,
           accessTier: isBetaInvited ? 'BETA' : 'PUBLIC',
           betaAddedAt: isBetaInvited ? new Date() : undefined,
+          betaWaitlistedAt: !isBetaInvited && env.BETA_MODE_ENABLED ? new Date() : undefined,
           ...termsData,
         })
         .returning();
@@ -228,6 +229,8 @@ export async function createUser(
       html: buildVerificationEmail(input.name, verificationUrl),
     });
 
+    const canUseApp = !env.BETA_MODE_ENABLED || isBetaInvited;
+
     return {
       status: 'success',
       user: {
@@ -239,8 +242,10 @@ export async function createUser(
         role: user.role,
         termsAccepted: true,
       },
-      message: 'Conta criada com sucesso. Verifique seu email.',
-      canUseApp: true,
+      message: canUseApp
+        ? 'Conta criada com sucesso. Verifique seu email.'
+        : 'Você foi adicionado à lista de espera do beta.',
+      canUseApp,
     };
   }
 }
@@ -480,12 +485,11 @@ export async function findOrCreateGoogleUser(
     };
   }
 
-  if (env.BETA_MODE_ENABLED) {
-    throw new ForbiddenError(ErrorCodes.AUTH_FORBIDDEN, 'Beta access not available');
-  }
+  // Check beta invite list for new OAuth users
+  const isBetaInvited = await checkBetaInvite(email);
 
-  // New user via OAuth: account created but terms not yet accepted.
-  // They will be prompted to accept on the frontend before using the app.
+  // New user via OAuth: always create the account so they land on the waitlist
+  // when beta mode is active. Terms are not yet accepted — the frontend will prompt them.
   // biome-ignore lint/suspicious/noExplicitAny: Type is inferred from Drizzle ORM returning
   let user: any;
   try {
@@ -497,6 +501,9 @@ export async function findOrCreateGoogleUser(
         emailHash,
         avatarUrl,
         emailVerified: true,
+        accessTier: isBetaInvited ? 'BETA' : 'PUBLIC',
+        betaAddedAt: isBetaInvited ? new Date() : undefined,
+        betaWaitlistedAt: !isBetaInvited && env.BETA_MODE_ENABLED ? new Date() : undefined,
       })
       .returning();
   } catch (error) {
@@ -510,11 +517,21 @@ export async function findOrCreateGoogleUser(
     throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
   }
 
+  if (isBetaInvited) {
+    await markBetaInviteAsUsed(email);
+  }
+
   await db.insert(oauthAccounts).values({
     userId: user.id,
     provider: 'google',
     providerAccountId: googleId,
   });
+
+  // Account created but not yet approved for beta — signal to the caller so it
+  // can redirect the user to the waitlist page instead of issuing tokens.
+  if (env.BETA_MODE_ENABLED && !isBetaInvited) {
+    throw new ForbiddenError(ErrorCodes.AUTH_BETA_WAITLISTED, 'Added to beta waitlist');
+  }
 
   return {
     id: user.id,
