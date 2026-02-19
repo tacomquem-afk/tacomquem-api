@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -64,6 +65,20 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }),
   avatarUrl: text('avatar_url'),
   emailVerified: boolean('email_verified').default(false).notNull(),
+
+  // Parental Consent fields
+  dateOfBirth: date('date_of_birth'),
+  parentalConsentStatus: varchar('parental_consent_status', { length: 50 })
+    .default('not_applicable')
+    .notNull(),
+  parentalEmail: text('parental_email'), // encrypted
+  parentalName: varchar('parental_name', { length: 255 }),
+  parentalConsentToken: varchar('parental_consent_token', { length: 255 }).unique(),
+  parentalConsentTokenExpiresAt: timestamp('parental_consent_token_expires_at'),
+  parentalConsentConfirmedAt: timestamp('parental_consent_confirmed_at'),
+  parentalConsentIpAddress: varchar('parental_consent_ip_address', { length: 45 }),
+  parentalConsentUserAgent: text('parental_consent_user_agent'),
+
   role: roleEnum('role').default('USER').notNull(),
   accessTier: accessTierEnum('access_tier').default('PUBLIC').notNull(),
   betaAddedAt: timestamp('beta_added_at'),

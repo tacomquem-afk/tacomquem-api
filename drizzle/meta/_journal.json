@@ -50,6 +50,13 @@
       "when": 1771514360083,
       "tag": "0006_smooth_silver_sable",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771518587757,
+      "tag": "0007_tranquil_sphinx",
+      "breakpoints": true
     }
   ]
 }
