@@ -362,25 +362,33 @@ export const adminLoanDetailsSchema = z.object({
   createdAt: dateSchema,
 });
 
-export const accessTierSchema = z.enum(['PUBLIC', 'BETA', 'ARCHIVED']);
+export const accessTierSchema = z
+  .enum(['PUBLIC', 'BETA', 'ARCHIVED'])
+  .describe('User access tier for beta program eligibility');
 
 export const betaUserSchema = z.object({
-  id: uuidSchema,
-  email: z.string().email(),
-  name: z.string(),
-  accessTier: accessTierSchema,
-  betaAddedAt: dateSchema.nullable(),
-  emailVerified: z.boolean(),
-  createdAt: dateSchema,
+  id: uuidSchema.describe('User ID'),
+  email: z.string().describe('Masked email address returned for admin views'),
+  name: z.string().describe('Masked full name returned for admin views'),
+  accessTier: accessTierSchema.describe('Current access tier for the user'),
+  betaAddedAt: dateSchema
+    .nullable()
+    .describe('Timestamp when the user was added to beta, null if not set'),
+  emailVerified: z.boolean().describe('Whether the user has verified their email'),
+  createdAt: dateSchema.describe('User account creation timestamp'),
 });
 
-export const betaUserListResponseSchema = z.object({
-  users: z.array(betaUserSchema),
-  pagination: paginationSchema,
-});
+export const betaUserListResponseSchema = z
+  .object({
+    users: z.array(betaUserSchema).describe('Paginated list of beta users'),
+    pagination: paginationSchema.describe('Pagination metadata'),
+  })
+  .describe('Paginated beta program users response');
 
-export const addBetaUserSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-  user: betaUserSchema,
-});
+export const addBetaUserSchema = z
+  .object({
+    success: z.boolean().describe('Indicates whether the operation succeeded'),
+    message: z.string().describe('Human-readable confirmation message'),
+    user: betaUserSchema.describe('Updated beta user record (masked)'),
+  })
+  .describe('Beta program mutation response');

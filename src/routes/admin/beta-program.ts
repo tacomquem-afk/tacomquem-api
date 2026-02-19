@@ -15,19 +15,28 @@ import { addBetaUser, listBetaUsers, removeBetaUser } from '../../services/admin
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const addBetaUserBodySchema = z.object({
-  email: z.string().email(),
-  reason: z.string().optional(),
+  email: z.string().email().describe('Email of the existing user to grant beta access'),
+  reason: z.string().optional().describe('Optional reason recorded in the beta program audit log'),
 });
 
 const removeBetaUserBodySchema = z.object({
-  reason: z.string().optional(),
+  reason: z.string().optional().describe('Optional reason recorded in the beta program audit log'),
 });
 
 const listBetaUsersQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-  sortBy: z.enum(['betaAddedAt', 'createdAt']).default('betaAddedAt'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  page: z.coerce.number().int().positive().default(1).describe('Page number (1-based)'),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .default(20)
+    .describe('Items per page (1-100, default 20)'),
+  sortBy: z
+    .enum(['betaAddedAt', 'createdAt'])
+    .default('betaAddedAt')
+    .describe('Sort by beta-added date or account creation date'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').describe('Sort direction'),
 });
 
 export default async function betaProgramRoutes(fastify: FastifyInstance) {
@@ -38,7 +47,10 @@ export default async function betaProgramRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Beta Program'],
-        description: 'List all beta program users (requires SUPER_ADMIN role)',
+        summary: 'List beta program users',
+        description: `Returns a paginated list of users currently enrolled in the beta program.
+      Results include masked name and email for privacy while still allowing admins to identify users.
+      Use the pagination and sorting parameters to control the listing order and size.`,
         security: [{ BearerAuth: [] }],
         querystring: listBetaUsersQuerySchema,
         response: {
@@ -59,7 +71,10 @@ export default async function betaProgramRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Beta Program'],
-        description: 'Add a user to the beta program (requires SUPER_ADMIN role)',
+        summary: 'Add user to beta program',
+        description: `Adds an existing active user to the beta program using their email address.
+      This updates the user's access tier to BETA, sets the beta-added timestamp, and writes an audit log entry.
+      The response returns the updated user with masked fields suitable for admin views.`,
         security: [{ BearerAuth: [] }],
         body: addBetaUserBodySchema,
         response: {
@@ -100,7 +115,10 @@ export default async function betaProgramRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Admin - Beta Program'],
-        description: 'Remove a user from the beta program (requires SUPER_ADMIN role)',
+        summary: 'Remove user from beta program',
+        description: `Removes a user from the beta program by user ID.
+      This resets the access tier to PUBLIC, clears the beta-added timestamp, and writes an audit log entry.
+      The response returns the updated user with masked fields suitable for admin views.`,
         security: [{ BearerAuth: [] }],
         params: idParamSchema,
         body: removeBetaUserBodySchema,
