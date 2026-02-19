@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { betaProgramAudit, users } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes, NotFoundError } from '../../errors/index.js';
@@ -22,6 +22,22 @@ export interface ListBetaUsersParams {
   page: number;
   limit: number;
   sortBy?: 'betaAddedAt' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface WaitlistedUser {
+  id: string;
+  email: string;
+  name: string;
+  accessTier: AccessTier;
+  betaWaitlistedAt: string;
+  emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface ListWaitlistedUsersParams {
+  page: number;
+  limit: number;
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -83,6 +99,54 @@ export async function listBetaUsers(params: ListBetaUsersParams) {
   };
 }
 
+export async function listWaitlistedUsers(params: ListWaitlistedUsersParams) {
+  const { page, limit, sortOrder = 'desc' } = params;
+  const offset = (page - 1) * limit;
+
+  const condition = isNotNull(users.betaWaitlistedAt);
+
+  const allUsers = await db.query.users.findMany({
+    where: condition,
+    limit,
+    offset,
+    orderBy: sortOrder === 'desc' ? [desc(users.betaWaitlistedAt)] : [asc(users.betaWaitlistedAt)],
+  });
+
+  const countResult = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(users)
+    .where(condition);
+
+  const count = countResult[0]?.count || 0;
+
+  const waitlisted: WaitlistedUser[] = allUsers.map((user) => {
+    const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
+    const namePlain = decrypt(user.nameEncrypted);
+
+    return {
+      id: user.id,
+      email: maskEmail(emailPlain),
+      name: maskName(namePlain),
+      accessTier: user.accessTier as AccessTier,
+      // betaWaitlistedAt is guaranteed non-null here by the query filter
+      // biome-ignore lint/style/noNonNullAssertion: filtered by isNotNull(betaWaitlistedAt)
+      betaWaitlistedAt: user.betaWaitlistedAt!.toISOString(),
+      emailVerified: user.emailVerified,
+      createdAt: (user.createdAt || new Date()).toISOString(),
+    };
+  });
+
+  return {
+    users: waitlisted,
+    pagination: {
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+    },
+  };
+}
+
 export async function addBetaUser(params: AddBetaUserParams): Promise<BetaUser> {
   const { email, adminId, reason, ipAddress } = params;
 
@@ -113,6 +177,7 @@ export async function addBetaUser(params: AddBetaUserParams): Promise<BetaUser> 
     .set({
       accessTier: 'BETA',
       betaAddedAt: now,
+      betaWaitlistedAt: null,
       updatedAt: now,
     })
     .where(eq(users.id, user.id))

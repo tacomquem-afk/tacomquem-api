@@ -10,6 +10,7 @@ mock.module('../../storage/index.js', () => ({
   },
 }));
 
+import { env } from '../../../config/env.js';
 import { db } from '../../../db/index.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../../errors/index.js';
 import * as cryptoModule from '../../crypto/index.js';
@@ -91,6 +92,7 @@ beforeEach(() => {
   spyOn(cryptoModule, 'decrypt').mockClear();
   spyOn(emailModule, 'sendEmail').mockClear();
   spyOn(friendshipsModule, 'createFriendshipIfNotExists').mockClear();
+  spyOn(db.query.betaInvites, 'findFirst').mockClear();
 });
 
 afterEach(() => {
@@ -852,6 +854,136 @@ describe('loans service', () => {
         expect((e as BadRequestError).code).toBe(ErrorCodes.LOANS_ALREADY_PROCESSED);
       }
       expect(errorThrown).toBe(true);
+    });
+  });
+
+  describe('createLoan with BETA_MODE_ENABLED', () => {
+    beforeEach(() => {
+      Object.assign(env, { BETA_MODE_ENABLED: true });
+    });
+
+    afterEach(() => {
+      Object.assign(env, { BETA_MODE_ENABLED: false });
+    });
+
+    it('should add borrower to beta invites when borrower email is not in the invite list', async () => {
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      spyOn(db.query.users, 'findFirst')
+        .mockResolvedValueOnce(mockLenderData as any)
+        .mockResolvedValueOnce(undefined);
+      spyOn(db.query.betaInvites, 'findFirst').mockResolvedValueOnce(undefined);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const valuesMock = mock(() => ({ returning: mock(() => Promise.resolve([mockLoanData])) }));
+      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      spyOn(emailModule, 'sendEmail').mockResolvedValueOnce(undefined as any);
+
+      const result = await createLoan('lender-123', {
+        itemId: 'item-123',
+        borrowerEmail: 'borrower@example.com',
+        expectedReturnDate: undefined,
+        lenderNotes: undefined,
+      });
+
+      expect(result.loan.id).toBe('loan-123');
+      // loans insert + loanTokens insert + betaInvites insert
+      expect(valuesMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('should skip beta invite insert when borrower email is already in the invite list', async () => {
+      const existingInvite = {
+        id: 'invite-123',
+        email: 'borrower@example.com',
+        addedBy: 'admin-123',
+      };
+
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      spyOn(db.query.users, 'findFirst')
+        .mockResolvedValueOnce(mockLenderData as any)
+        .mockResolvedValueOnce(undefined);
+      spyOn(db.query.betaInvites, 'findFirst').mockResolvedValueOnce(existingInvite as any);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const valuesMock = mock(() => ({ returning: mock(() => Promise.resolve([mockLoanData])) }));
+      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+      spyOn(emailModule, 'sendEmail').mockResolvedValueOnce(undefined as any);
+
+      await createLoan('lender-123', {
+        itemId: 'item-123',
+        borrowerEmail: 'borrower@example.com',
+        expectedReturnDate: undefined,
+        lenderNotes: undefined,
+      });
+
+      // loans insert + loanTokens insert only (no betaInvites insert)
+      expect(valuesMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should upgrade existing PUBLIC borrower to BETA so they can log in and confirm the loan', async () => {
+      const existingPublicBorrower = {
+        ...mockBorrowerData,
+        accessTier: 'PUBLIC' as const,
+        deletedAt: null,
+      };
+
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      spyOn(db.query.users, 'findFirst')
+        .mockResolvedValueOnce(mockLenderData as any)
+        .mockResolvedValueOnce(existingPublicBorrower as any);
+      spyOn(db.query.betaInvites, 'findFirst').mockResolvedValueOnce(undefined);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const valuesMock = mock(() => ({ returning: mock(() => Promise.resolve([mockLoanData])) }));
+      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+
+      const whereMock = mock(() => Promise.resolve());
+      const setMock = mock(() => ({ where: whereMock }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      spyOn(emailModule, 'sendEmail').mockResolvedValueOnce(undefined as any);
+
+      await createLoan('lender-123', {
+        itemId: 'item-123',
+        borrowerEmail: 'borrower@example.com',
+        expectedReturnDate: undefined,
+        lenderNotes: undefined,
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({ accessTier: 'BETA', betaWaitlistedAt: null })
+      );
+    });
+
+    it('should not upgrade borrower who is already BETA', async () => {
+      const existingBetaBorrower = {
+        ...mockBorrowerData,
+        accessTier: 'BETA' as const,
+        deletedAt: null,
+      };
+
+      spyOn(db.query.items, 'findFirst').mockResolvedValueOnce(mockItemData as any);
+      spyOn(db.query.users, 'findFirst')
+        .mockResolvedValueOnce(mockLenderData as any)
+        .mockResolvedValueOnce(existingBetaBorrower as any);
+      spyOn(db.query.betaInvites, 'findFirst').mockResolvedValueOnce(undefined);
+      spyOn(cryptoModule, 'decrypt').mockReturnValue('Lender Name');
+
+      const valuesMock = mock(() => ({ returning: mock(() => Promise.resolve([mockLoanData])) }));
+      spyOn(db, 'insert').mockReturnValue({ values: valuesMock } as any);
+
+      const setMock = mock(() => ({ where: mock(() => Promise.resolve()) }));
+      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+
+      spyOn(emailModule, 'sendEmail').mockResolvedValueOnce(undefined as any);
+
+      await createLoan('lender-123', {
+        itemId: 'item-123',
+        borrowerEmail: 'borrower@example.com',
+        expectedReturnDate: undefined,
+        lenderNotes: undefined,
+      });
+
+      expect(setMock).not.toHaveBeenCalled();
     });
   });
 });

@@ -4,13 +4,19 @@ import { z } from 'zod';
 import {
   addBetaUserSchema,
   betaUserListResponseSchema,
+  betaWaitlistResponseSchema,
   errorResponse400,
   errorResponse401,
   errorResponse403,
   errorResponse404,
 } from '../../schemas/responses.js';
 import { getClientIp } from '../../services/admin/helpers.js';
-import { addBetaUser, listBetaUsers, removeBetaUser } from '../../services/admin/index.js';
+import {
+  addBetaUser,
+  listBetaUsers,
+  listWaitlistedUsers,
+  removeBetaUser,
+} from '../../services/admin/index.js';
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
@@ -37,6 +43,21 @@ const listBetaUsersQuerySchema = z.object({
     .default('betaAddedAt')
     .describe('Sort by beta-added date or account creation date'),
   sortOrder: z.enum(['asc', 'desc']).default('desc').describe('Sort direction'),
+});
+
+const listWaitlistQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1).describe('Page number (1-based)'),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .default(20)
+    .describe('Items per page (1-100, default 20)'),
+  sortOrder: z
+    .enum(['asc', 'desc'])
+    .default('asc')
+    .describe('Sort direction — asc shows oldest requests first'),
 });
 
 export default async function betaProgramRoutes(fastify: FastifyInstance) {
@@ -66,6 +87,34 @@ export default async function betaProgramRoutes(fastify: FastifyInstance) {
     }
   );
 
+  typed.get(
+    '/waitlist',
+    {
+      schema: {
+        tags: ['Admin - Beta Program'],
+        summary: 'List beta waitlist (self-registered users pending approval)',
+        description: `Returns a paginated list of users who self-registered while beta mode was active
+and are awaiting admin approval. These users have \`accessTier: PUBLIC\` and cannot log in until promoted.
+
+**To approve a user:** call \`POST /api/admin/beta-program/add-user\` with their email.
+This sets \`accessTier: BETA\`, records \`betaAddedAt\`, clears \`betaWaitlistedAt\`, and writes an audit log entry.
+
+Default sort is oldest request first (\`sortOrder: asc\`) so admins work through the queue in order.`,
+        security: [{ BearerAuth: [] }],
+        querystring: listWaitlistQuerySchema,
+        response: {
+          200: betaWaitlistResponseSchema,
+          401: errorResponse401,
+          403: errorResponse403,
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.requireRole('SUPER_ADMIN')],
+    },
+    async (request) => {
+      return await listWaitlistedUsers(request.query);
+    }
+  );
+
   typed.post(
     '/add-user',
     {
@@ -73,7 +122,7 @@ export default async function betaProgramRoutes(fastify: FastifyInstance) {
         tags: ['Admin - Beta Program'],
         summary: 'Add user to beta program',
         description: `Adds an existing active user to the beta program using their email address.
-      This updates the user's access tier to BETA, sets the beta-added timestamp, and writes an audit log entry.
+      This updates the user's access tier to BETA, sets the beta-added timestamp, clears the waitlist timestamp, and writes an audit log entry.
       The response returns the updated user with masked fields suitable for admin views.`,
         security: [{ BearerAuth: [] }],
         body: addBetaUserBodySchema,

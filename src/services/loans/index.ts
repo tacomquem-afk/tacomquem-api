@@ -2,10 +2,10 @@ import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { env } from '../../config/env.js';
 import { db } from '../../db/index.js';
-import { items, loans, loanTokens, notifications, users } from '../../db/schema.js';
+import { betaInvites, items, loans, loanTokens, notifications, users } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../errors/index.js';
 import type { CreateLoanInput } from '../../schemas/loans.js';
-import { decrypt } from '../crypto/index.js';
+import { decrypt, hash } from '../crypto/index.js';
 import {
   buildLoanConfirmationRequestEmail,
   buildLoanReminderEmail,
@@ -103,6 +103,39 @@ export async function createLoan(
     subject: `${lenderName} quer registrar um empréstimo - TáComQuem`,
     html: buildLoanConfirmationRequestEmail(input.borrowerEmail, lenderName, item.name, confirmUrl),
   });
+
+  if (env.BETA_MODE_ENABLED) {
+    const normalizedBorrowerEmail = input.borrowerEmail.toLowerCase();
+
+    const existingInvite = await db.query.betaInvites.findFirst({
+      where: eq(betaInvites.email, normalizedBorrowerEmail),
+    });
+
+    if (!existingInvite) {
+      await db.insert(betaInvites).values({
+        email: normalizedBorrowerEmail,
+        addedBy: lenderId,
+        reason: 'Invited via loan confirmation',
+      });
+    }
+
+    const borrowerEmailHash = hash(input.borrowerEmail);
+    const existingBorrower = await db.query.users.findFirst({
+      where: eq(users.emailHash, borrowerEmailHash),
+    });
+
+    if (existingBorrower && !existingBorrower.deletedAt && existingBorrower.accessTier !== 'BETA') {
+      await db
+        .update(users)
+        .set({
+          accessTier: 'BETA',
+          betaAddedAt: new Date(),
+          betaWaitlistedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existingBorrower.id));
+    }
+  }
 
   return {
     loan: {

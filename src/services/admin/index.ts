@@ -371,7 +371,10 @@ export {
   type BetaUser,
   isBetaUserAllowed,
   type ListBetaUsersParams,
+  type ListWaitlistedUsersParams,
   listBetaUsers,
+  listWaitlistedUsers,
   type RemoveBetaUserParams,
   removeBetaUser,
+  type WaitlistedUser,
 } from './beta-program.js';

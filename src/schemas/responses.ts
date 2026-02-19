@@ -390,3 +390,20 @@ export const addBetaUserSchema = z
     user: betaUserSchema.describe('Updated beta user record (masked)'),
   })
   .describe('Beta program mutation response');
+
+export const betaWaitlistUserSchema = z.object({
+  id: uuidSchema.describe('User ID'),
+  email: z.string().describe('Masked email address returned for admin views'),
+  name: z.string().describe('Masked full name returned for admin views'),
+  accessTier: accessTierSchema.describe('Current access tier (always PUBLIC for waitlisted users)'),
+  betaWaitlistedAt: dateSchema.describe('Timestamp when the user requested beta access'),
+  emailVerified: z.boolean().describe('Whether the user has verified their email'),
+  createdAt: dateSchema.describe('User account creation timestamp'),
+});
+
+export const betaWaitlistResponseSchema = z
+  .object({
+    users: z.array(betaWaitlistUserSchema).describe('Paginated list of users in the beta waitlist'),
+    pagination: paginationSchema.describe('Pagination metadata'),
+  })
+  .describe('Paginated beta waitlist response');
