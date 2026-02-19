@@ -162,8 +162,43 @@ async function authRoutes(app: FastifyInstance) {
     '/refresh',
     {
       schema: {
-        description: 'Refresh access token using refresh token',
+        description: `**Refresh Access Token**
+
+Generates a new access token using the current user's session.
+
+**Important for Frontend Developers:**
+
+Use this endpoint when:
+- The access token is about to expire (recommended: check 5 minutes before expiry)
+- You receive a 401 Unauthorized response from another endpoint
+
+**Token Expiration:**
+- Access Token: 7 days
+- Refresh Token: 30 days
+
+**Implementation Example:**
+\`\`\`javascript
+// Auto-refresh token before expiry
+const isTokenExpiringSoon = (token) => {
+  const payload = JSON.parse(atob(token.split('.')[1]));
+  const expirationTime = payload.exp * 1000;
+  const threshold = 5 * 60 * 1000; // 5 minutes
+  return Date.now() > (expirationTime - threshold);
+};
+
+// Refresh the token
+const response = await fetch('/api/auth/refresh', {
+  method: 'POST',
+  headers: {
+    'Authorization': \`Bearer \${accessToken}\`
+  }
+});
+
+const { accessToken } = await response.json();
+localStorage.setItem('accessToken', accessToken);
+\`\`\``,
         tags: ['Authentication'],
+        summary: 'Refresh access token',
         security: [{ BearerAuth: [] }],
         response: {
           200: z.object({ accessToken: z.string() }),
@@ -183,8 +218,47 @@ async function authRoutes(app: FastifyInstance) {
     '/me',
     {
       schema: {
-        description: 'Get current authenticated user',
+        description: `**Get Current Authenticated User**
+
+Returns the profile information of the currently authenticated user.
+
+**Important for Frontend Developers:**
+
+Call this endpoint after:
+- Successful login (email/password or OAuth)
+- Token refresh to get updated user data
+
+**Response includes:**
+- \`id\`: User UUID
+- \`name\`: User's full name
+- \`email\`: User's email address
+- \`avatarUrl\`: Profile picture URL (or null)
+- \`emailVerified\`: Boolean indicating if email is verified
+- \`role\`: User role (USER, ANALYST, SUPPORT, MODERATOR, SUPER_ADMIN)
+
+**Implementation Example:**
+\`\`\`javascript
+// Fetch user data after login
+const response = await fetch('/api/auth/me', {
+  headers: {
+    'Authorization': \`Bearer \${accessToken}\`
+  }
+});
+
+if (!response.ok) {
+  if (response.status === 401) {
+    // Token expired, try to refresh
+    await refreshAccessToken();
+    // Retry the request
+  }
+  throw new Error('Failed to fetch user');
+}
+
+const { user } = await response.json();
+console.log('Logged in as:', user.name);
+\`\`\``,
         tags: ['Authentication'],
+        summary: 'Get current user',
         security: [{ BearerAuth: [] }],
         response: {
           200: z.object({ user: userResponseSchema }),

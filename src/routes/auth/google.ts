@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { findOrCreateGoogleUser } from '../../services/auth/index.js';
 
@@ -21,9 +22,37 @@ async function googleAuthRoutes(app: FastifyInstance) {
     '/google',
     {
       schema: {
-        description: 'Initiate Google OAuth flow',
+        description: `Initiate Google OAuth 2.0 Authorization Code Flow.
+
+**Important for Frontend Developers:**
+
+1. This endpoint redirects the user to Google's OAuth consent page
+2. After user authorization, Google redirects back to the callback endpoint
+3. The callback endpoint will redirect to your frontend with JWT tokens
+
+**Frontend Implementation:**
+\`\`\`javascript
+// Redirect user to Google OAuth
+window.location.href = '/api/auth/google';
+\`\`\`
+
+**Flow:**
+1. User clicks "Login with Google" button
+2. Frontend redirects to this endpoint
+3. User is redirected to Google to authorize
+4. Google redirects back to \`/api/auth/google/callback\`
+5. Backend processes the callback and redirects to \`FRONTEND_URL/auth/callback\` with tokens
+
+**Environment Variables Required:**
+- \`GOOGLE_CLIENT_ID\`: Google OAuth client ID
+- \`GOOGLE_REDIRECT_URI\`: Callback URL registered with Google
+- \`FRONTEND_URL\`: Your frontend URL for final redirect`,
         tags: ['Authentication', 'OAuth'],
-        hide: true,
+        summary: 'Initiate Google OAuth login',
+        externalDocs: {
+          description: 'View Google OAuth 2.0 Documentation',
+          url: 'https://developers.google.com/identity/protocols/oauth2',
+        },
       },
     },
     async (_request, reply) => {
@@ -47,16 +76,67 @@ async function googleAuthRoutes(app: FastifyInstance) {
     '/google/callback',
     {
       schema: {
-        description: 'Google OAuth callback endpoint',
+        description: `**Google OAuth Callback Endpoint (Internal)**
+
+This endpoint receives the callback from Google OAuth after user authorization.
+The backend exchanges the authorization code for tokens, fetches user info,
+creates/updates the user, and redirects to the frontend with JWT tokens.
+
+**Important:** This endpoint is called by Google, not directly by the frontend.
+
+**Query Parameters:**
+- \`code\`: Authorization code from Google (on success)
+- \`error\`: Error code from Google (on user denial or error)
+
+**Frontend Redirect Behavior:**
+
+On success, redirects to: \`FRONTEND_URL/auth/callback?accessToken=xxx&refreshToken=xxx\`
+On error, redirects to: \`FRONTEND_URL/login?error=ERROR_CODE\`
+
+**Error Codes:**
+| Code | Description |
+|------|-------------|
+| \`oauth_denied\` | User denied authorization |
+| \`no_code\` | No authorization code received |
+| \`oauth_failed\` | Generic OAuth failure |
+| \`beta_not_available\` | Beta mode enabled, user not in beta program |
+
+**Frontend Implementation:**
+Your frontend should handle the callback at \`/auth/callback\`:
+
+\`\`\`javascript
+// pages/AuthCallback.tsx
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const accessToken = params.get('accessToken');
+  const refreshToken = params.get('refreshToken');
+
+  if (accessToken && refreshToken) {
+    // Save tokens to localStorage
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+
+    // Fetch user data and redirect to dashboard
+    fetchUserData().then(() => navigate('/dashboard'));
+  } else {
+    // Handle error redirect
+    navigate('/login?error=missing_tokens');
+  }
+}, []);
+\`\`\``,
         tags: ['Authentication', 'OAuth'],
-        hide: true,
-        querystring: {
-          type: 'object',
-          properties: {
-            code: { type: 'string', description: 'OAuth authorization code' },
-            error: { type: 'string', description: 'OAuth error' },
-          },
+        summary: 'Google OAuth callback (internal)',
+        externalDocs: {
+          description: 'View Google OAuth 2.0 Documentation',
+          url: 'https://developers.google.com/identity/protocols/oauth2',
         },
+        querystring: z.object({
+          code: z.string().optional().describe('OAuth authorization code from Google'),
+          error: z
+            .enum(['access_denied', 'temporarily_unavailable', 'invalid_request'])
+            .optional()
+            .describe('Error code if user denied or error occurred'),
+        }),
       },
     },
     async (request, reply) => {
@@ -118,6 +198,16 @@ async function googleAuthRoutes(app: FastifyInstance) {
         return reply.redirect(`${env.FRONTEND_URL}/auth/callback?${params}`);
       } catch (error) {
         console.error('Google OAuth error:', error);
+
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code === 'AUTH_FORBIDDEN'
+        ) {
+          return reply.redirect(`${env.FRONTEND_URL}/login?error=beta_not_available`);
+        }
+
         return reply.redirect(`${env.FRONTEND_URL}/login?error=oauth_failed`);
       }
     }

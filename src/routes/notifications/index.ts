@@ -46,13 +46,9 @@ Use the \`read\` filter to show only unread (\`false\`) or already-read (\`true\
 The \`unreadCount\` field always reflects the total number of unread notifications regardless
 of the current filter — use it to display the notification badge count in the UI.`,
         security: [{ BearerAuth: [] }],
-        querystring: notificationsQuerySchema.describe(
-          'Notification filter and pagination options'
-        ),
+        querystring: notificationsQuerySchema,
         response: {
-          200: notificationsListResponseSchema.describe(
-            'Paginated list of notifications with unread count'
-          ),
+          200: notificationsListResponseSchema,
           401: errorResponse401,
           422: errorResponse422,
         },
@@ -80,19 +76,15 @@ of the current filter — use it to display the notification badge count in the 
 This operation is idempotent - calling it on an already-read notification will succeed
 without changes. Users can only mark their own notifications as read.`,
         security: [{ BearerAuth: [] }],
-        params: z
-          .object({
-            id: z.string().uuid().describe('Notification ID'),
-          })
-          .describe('Notification identifier'),
+        params: z.object({
+          id: z.string().uuid().describe('Notification ID'),
+        }),
         response: {
-          200: z
-            .object({
-              id: z.string().uuid(),
-              read: z.boolean(),
-              updatedAt: z.string().datetime(),
-            })
-            .describe('Notification marked as read'),
+          200: z.object({
+            id: z.string().uuid(),
+            read: z.boolean(),
+            updatedAt: z.string().datetime(),
+          }),
           403: errorResponse403,
           404: errorResponse404,
           401: errorResponse401,
@@ -145,11 +137,9 @@ Useful for "Mark all as read" functionality in notification centers. Returns the
 of notifications that were actually marked as read.`,
         security: [{ BearerAuth: [] }],
         response: {
-          200: z
-            .object({
-              markedCount: z.number().describe('Number of notifications marked as read'),
-            })
-            .describe('All notifications marked as read'),
+          200: z.object({
+            markedCount: z.number().describe('Number of notifications marked as read'),
+          }),
           401: errorResponse401,
         },
       },
@@ -171,18 +161,14 @@ of notifications that were actually marked as read.`,
         description: `Permanently deletes a notification for the authenticated user.
 Users can only delete their own notifications. This operation cannot be undone.`,
         security: [{ BearerAuth: [] }],
-        params: z
-          .object({
-            id: z.string().uuid().describe('Notification ID'),
-          })
-          .describe('Notification identifier'),
+        params: z.object({
+          id: z.string().uuid().describe('Notification ID'),
+        }),
         response: {
-          200: z
-            .object({
-              id: z.string().uuid(),
-              deleted: z.boolean(),
-            })
-            .describe('Notification deleted successfully'),
+          200: z.object({
+            id: z.string().uuid(),
+            deleted: z.boolean(),
+          }),
           403: errorResponse403,
           404: errorResponse404,
           401: errorResponse401,
