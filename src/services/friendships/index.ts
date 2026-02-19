@@ -96,7 +96,8 @@ export async function getFriendsByUser(userId: string): Promise<FriendWithMetric
     friendsMap.set(friend.id, {
       id: friend.id,
       name: decrypt(friend.nameEncrypted),
-      email: decrypt(friend.emailEncrypted),
+      // biome-ignore lint/style/noNonNullAssertion: friendships are cascade-deleted when user is deleted
+      email: decrypt(friend.emailEncrypted!),
       avatarUrl: friend.avatarUrl,
       lentCount: 0,
       borrowedCount: 0,

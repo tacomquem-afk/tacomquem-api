@@ -1,130 +1,132 @@
-import { eq } from 'drizzle-orm';
+import { and, count, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../../db/index.js';
-import { items } from '../../db/schema.js';
+import { items, loans, users } from '../../db/schema.js';
 
 export interface DashboardStats {
-  summary: {
-    totalUsers: number;
-    activeUsers: number;
-    totalItems: number;
-    activeLoans: number;
-    totalLoans: number;
-  };
-  trends: {
-    newUsersLastWeek: number;
-    newLoansLastWeek: number;
-    returnRateLast30Days: number;
-  };
+  totalUsers: number;
+  activeUsers: number;
+  totalItems: number;
+  totalLoans: number;
+  activeLoans: number;
+  pendingLoans: number;
 }
 
 export interface UserStats {
-  byRole: Record<string, number>;
-  activeUsers: number;
-  blockedUsers: number;
-  emailVerifiedCount: number;
+  newUsersToday: number;
+  newUsersThisWeek: number;
+  newUsersThisMonth: number;
+  totalUsers: number;
+  growthRate: number;
 }
 
 export interface LoanStats {
-  byStatus: Record<string, number>;
+  loansToday: number;
+  loansThisWeek: number;
+  loansThisMonth: number;
   averageLoanDuration: number;
-  onTimeReturnRate: number;
+  returnRate: number;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-  const allUsers = await db.query.users.findMany();
-  const allItems = await db.query.items.findMany({
-    where: eq(items.isActive, true),
-  });
-  const allLoans = await db.query.loans.findMany();
-
-  const activeLoans = allLoans.filter(
-    (loan) => (loan.status === 'confirmed' || loan.status === 'pending') && !loan.returnedAt
-  );
-
-  const newUsersLastWeek = allUsers.filter(
-    (user) => user.createdAt && user.createdAt >= oneWeekAgo
-  ).length;
-
-  const newLoansLastWeek = allLoans.filter(
-    (loan) => loan.createdAt && loan.createdAt >= oneWeekAgo
-  ).length;
-
-  const loansLast30Days = allLoans.filter(
-    (loan) => loan.createdAt && loan.createdAt >= thirtyDaysAgo
-  );
-  const returnedLoans = loansLast30Days.filter((loan) => loan.returnedAt);
-  const returnRate = loansLast30Days.length > 0 ? returnedLoans.length / loansLast30Days.length : 0;
+  const [
+    totalUsersResult,
+    activeUsersResult,
+    totalItemsResult,
+    totalLoansResult,
+    activeLoansResult,
+    pendingLoansResult,
+  ] = await Promise.all([
+    db.select({ count: count() }).from(users),
+    db.select({ count: count() }).from(users).where(eq(users.isActive, true)),
+    db.select({ count: count() }).from(items).where(eq(items.isActive, true)),
+    db.select({ count: count() }).from(loans),
+    db.select({ count: count() }).from(loans).where(eq(loans.status, 'confirmed')),
+    db.select({ count: count() }).from(loans).where(eq(loans.status, 'pending')),
+  ]);
 
   return {
-    summary: {
-      totalUsers: allUsers.length,
-      activeUsers: allUsers.filter((u) => u.isActive).length,
-      totalItems: allItems.length,
-      activeLoans: activeLoans.length,
-      totalLoans: allLoans.length,
-    },
-    trends: {
-      newUsersLastWeek,
-      newLoansLastWeek,
-      returnRateLast30Days: Math.round(returnRate * 100) / 100,
-    },
+    totalUsers: totalUsersResult[0]?.count || 0,
+    activeUsers: activeUsersResult[0]?.count || 0,
+    totalItems: totalItemsResult[0]?.count || 0,
+    totalLoans: totalLoansResult[0]?.count || 0,
+    activeLoans: activeLoansResult[0]?.count || 0,
+    pendingLoans: pendingLoansResult[0]?.count || 0,
   };
 }
 
 export async function getUsersStats(): Promise<UserStats> {
-  const allUsers = await db.query.users.findMany();
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const byRole: Record<string, number> = {};
-  let activeUsers = 0;
-  let blockedUsers = 0;
-  let emailVerifiedCount = 0;
+  const [totalResult, todayResult, weekResult, monthResult, lastMonthResult] = await Promise.all([
+    db.select({ count: count() }).from(users),
+    db.select({ count: count() }).from(users).where(gte(users.createdAt, startOfToday)),
+    db.select({ count: count() }).from(users).where(gte(users.createdAt, startOfWeek)),
+    db.select({ count: count() }).from(users).where(gte(users.createdAt, startOfMonth)),
+    db
+      .select({ count: count() })
+      .from(users)
+      .where(
+        and(gte(users.createdAt, startOfLastMonth), sql`${users.createdAt} < ${startOfMonth}`)
+      ),
+  ]);
 
-  for (const user of allUsers) {
-    byRole[user.role] = (byRole[user.role] || 0) + 1;
-    if (user.isActive) activeUsers++;
-    if (user.blockedAt) blockedUsers++;
-    if (user.emailVerified) emailVerifiedCount++;
-  }
+  const totalUsers = totalResult[0]?.count || 0;
+  const newUsersThisMonth = monthResult[0]?.count || 0;
+  const newUsersLastMonth = lastMonthResult[0]?.count || 0;
+
+  const growthRate =
+    newUsersLastMonth > 0
+      ? Math.round(((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 * 100) / 100
+      : newUsersThisMonth > 0
+        ? 100
+        : 0;
 
   return {
-    byRole,
-    activeUsers,
-    blockedUsers,
-    emailVerifiedCount,
+    newUsersToday: todayResult[0]?.count || 0,
+    newUsersThisWeek: weekResult[0]?.count || 0,
+    newUsersThisMonth,
+    totalUsers,
+    growthRate,
   };
 }
 
 export async function getLoansStats(): Promise<LoanStats> {
-  const allLoans = await db.query.loans.findMany();
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const byStatus: Record<string, number> = {};
-  let totalDuration = 0;
-  let loansWithDuration = 0;
+  const [todayResult, weekResult, monthResult, durationResult, returnedResult, totalResult] =
+    await Promise.all([
+      db.select({ count: count() }).from(loans).where(gte(loans.createdAt, startOfToday)),
+      db.select({ count: count() }).from(loans).where(gte(loans.createdAt, startOfWeek)),
+      db.select({ count: count() }).from(loans).where(gte(loans.createdAt, startOfMonth)),
+      db
+        .select({
+          avgDays: sql<number>`coalesce(cast(avg(extract(epoch from (${loans.returnedAt} - ${loans.createdAt})) / 86400) as int), 0)`,
+        })
+        .from(loans)
+        .where(sql`${loans.returnedAt} is not null`),
+      db.select({ count: count() }).from(loans).where(eq(loans.status, 'returned')),
+      db.select({ count: count() }).from(loans),
+    ]);
 
-  for (const loan of allLoans) {
-    byStatus[loan.status] = (byStatus[loan.status] || 0) + 1;
-
-    if (loan.returnedAt && loan.createdAt) {
-      const duration = loan.returnedAt.getTime() - loan.createdAt.getTime();
-      totalDuration += duration;
-      loansWithDuration++;
-    }
-  }
-
-  const averageLoanDuration =
-    loansWithDuration > 0
-      ? Math.round(totalDuration / loansWithDuration / (1000 * 60 * 60 * 24))
-      : 0;
-
-  const onTimeReturnRate = 0.85;
+  const totalLoans = totalResult[0]?.count || 0;
+  const returnedLoans = returnedResult[0]?.count || 0;
+  const returnRate =
+    totalLoans > 0 ? Math.round((returnedLoans / totalLoans) * 100 * 100) / 100 : 0;
 
   return {
-    byStatus,
-    averageLoanDuration,
-    onTimeReturnRate,
+    loansToday: todayResult[0]?.count || 0,
+    loansThisWeek: weekResult[0]?.count || 0,
+    loansThisMonth: monthResult[0]?.count || 0,
+    averageLoanDuration: durationResult[0]?.avgDays || 0,
+    returnRate,
   };
 }

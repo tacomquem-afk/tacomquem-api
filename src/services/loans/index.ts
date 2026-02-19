@@ -333,7 +333,8 @@ export async function sendReminder(loanId: string, lenderId: string): Promise<bo
 
   const lenderName = decrypt(loan.lender.nameEncrypted);
   const borrowerName = decrypt(loan.borrower.nameEncrypted);
-  const borrowerEmail = decrypt(loan.borrower.emailEncrypted);
+  // biome-ignore lint/style/noNonNullAssertion: borrower cannot delete account while a loan is active
+  const borrowerEmail = decrypt(loan.borrower.emailEncrypted!);
 
   await sendEmail({
     to: borrowerEmail,

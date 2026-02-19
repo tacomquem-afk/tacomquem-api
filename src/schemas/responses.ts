@@ -269,31 +269,28 @@ export const auditLogResponseSchema = z.object({
 });
 
 export const adminDashboardStatsSchema = z.object({
-  summary: z.object({
-    totalUsers: z.number(),
-    activeUsers: z.number(),
-    totalItems: z.number(),
-    activeLoans: z.number(),
-    totalLoans: z.number(),
-  }),
-  trends: z.object({
-    newUsersLastWeek: z.number(),
-    newLoansLastWeek: z.number(),
-    returnRateLast30Days: z.number(),
-  }),
+  totalUsers: z.number(),
+  activeUsers: z.number(),
+  totalItems: z.number(),
+  totalLoans: z.number(),
+  activeLoans: z.number(),
+  pendingLoans: z.number(),
 });
 
 export const userStatsSchema = z.object({
-  byRole: z.record(z.string(), z.number()),
-  activeUsers: z.number(),
-  blockedUsers: z.number(),
-  emailVerifiedCount: z.number(),
+  newUsersToday: z.number(),
+  newUsersThisWeek: z.number(),
+  newUsersThisMonth: z.number(),
+  totalUsers: z.number(),
+  growthRate: z.number(),
 });
 
 export const loanStatsSchema = z.object({
-  byStatus: z.record(z.string(), z.number()),
+  loansToday: z.number(),
+  loansThisWeek: z.number(),
+  loansThisMonth: z.number(),
   averageLoanDuration: z.number(),
-  onTimeReturnRate: z.number(),
+  returnRate: z.number(),
 });
 
 export const adminListUsersResponseSchema = z.object({

@@ -3,10 +3,12 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import {
+  deleteAccountSchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  setPasswordSchema,
   verifyEmailSchema,
 } from '../../schemas/auth.js';
 import {
@@ -22,10 +24,12 @@ import {
 } from '../../schemas/responses.js';
 import {
   createUser,
+  deleteAccount,
   getUserById,
   login,
   requestPasswordReset,
   resetPassword,
+  setPassword,
   verifyEmail,
 } from '../../services/auth/index.js';
 
@@ -277,6 +281,56 @@ console.log('Logged in as:', user.name);
       }
 
       return reply.send({ user });
+    }
+  );
+
+  typed.post(
+    '/password',
+    {
+      schema: {
+        description: 'Set a password for accounts created via social login',
+        tags: ['Authentication'],
+        security: [{ BearerAuth: [] }],
+        body: setPasswordSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          422: errorResponse422,
+        },
+      },
+      preHandler: [app.authenticate],
+    },
+    async (request, reply) => {
+      const { userId } = request.user;
+      await setPassword(userId, request.body.password);
+      return reply.send({ message: 'Password set successfully!' });
+    }
+  );
+
+  typed.delete(
+    '/me',
+    {
+      schema: {
+        description:
+          'Delete own account. All personal data is anonymized for LGPD compliance. Deletion is blocked if there are active loans.',
+        tags: ['Authentication'],
+        security: [{ BearerAuth: [] }],
+        body: deleteAccountSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponse400,
+          401: errorResponse401,
+          409: errorResponse409,
+          422: errorResponse422,
+        },
+      },
+      preHandler: [app.authenticate],
+    },
+    async (request, reply) => {
+      const { userId } = request.user;
+      await deleteAccount(userId, request.body.password);
+      return reply.send({ message: 'Account deleted successfully.' });
     }
   );
 }
