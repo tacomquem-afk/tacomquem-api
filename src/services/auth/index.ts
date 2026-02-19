@@ -21,6 +21,7 @@ import {
   UnauthorizedError,
 } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
+import { checkBetaInvite, markBetaInviteAsUsed } from '../admin/beta-invites.js';
 import { decrypt, encrypt, hash } from '../crypto/index.js';
 import {
   buildParentalConsentRequestEmail,
@@ -156,6 +157,8 @@ export async function createUser(
     };
   } else {
     // Adult registration
+    const isBetaInvited = await checkBetaInvite(input.email);
+
     const [user] = await db
       .insert(users)
       .values({
@@ -163,12 +166,18 @@ export async function createUser(
         nameEncrypted,
         emailHash,
         passwordHash: passwordHashed,
+        accessTier: isBetaInvited ? 'BETA' : 'PUBLIC',
+        betaAddedAt: isBetaInvited ? new Date() : undefined,
         ...termsData,
       })
       .returning();
 
     if (!user) {
       throw new BadRequestError(ErrorCodes.AUTH_CREATE_FAILED, 'Failed to create user');
+    }
+
+    if (isBetaInvited) {
+      await markBetaInviteAsUsed(input.email);
     }
 
     const token = nanoid(32);

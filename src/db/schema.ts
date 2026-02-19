@@ -300,6 +300,18 @@ export const dataExports = pgTable('data_exports', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const betaInvites = pgTable('beta_invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  addedBy: uuid('added_by')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  reason: text('reason'),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
   oauthAccounts: many(oauthAccounts),
   items: many(items),
@@ -313,6 +325,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   adminActions: many(adminAuditLog),
   betaAuditEntriesAsAdmin: many(betaProgramAudit, { relationName: 'betaAdmin' }),
   betaAuditEntriesAsUser: many(betaProgramAudit, { relationName: 'betaUser' }),
+  betaInvitesCreated: many(betaInvites, { relationName: 'admin' }),
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
@@ -437,5 +450,13 @@ export const dataExportsRelations = relations(dataExports, ({ one }) => ({
   user: one(users, {
     fields: [dataExports.userId],
     references: [users.id],
+  }),
+}));
+
+export const betaInvitesRelations = relations(betaInvites, ({ one }) => ({
+  admin: one(users, {
+    fields: [betaInvites.addedBy],
+    references: [users.id],
+    relationName: 'admin',
   }),
 }));

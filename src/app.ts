@@ -24,6 +24,7 @@ import accountRoutes from './routes/account/index.js';
 import adminsRoutes from './routes/admin/admins.js';
 import analyticsRoutes from './routes/admin/analytics.js';
 import auditRoutes from './routes/admin/audit.js';
+import betaInvitesRoutes from './routes/admin/beta-invites.js';
 import betaProgramRoutes from './routes/admin/beta-program.js';
 import moderationRoutes from './routes/admin/moderation.js';
 import usersRoutes from './routes/admin/users.js';
@@ -188,6 +189,11 @@ export async function buildApp() {
             'Admin role management: list admins, promote users, change roles, revoke access, and view the admin action audit log. Requires SUPER_ADMIN role.',
         },
         {
+          name: 'Admin - Beta Invites',
+          description:
+            'Manage beta program email whitelist. Add/remove/list emails that automatically get BETA access tier during registration. Requires SUPER_ADMIN role.',
+        },
+        {
           name: 'Admin - Beta Program',
           description:
             'Beta program enrollment management: list beta users, grant beta access by email, and remove users from the beta program. Requires SUPER_ADMIN role.',
@@ -337,6 +343,7 @@ export async function buildApp() {
   await app.register(usersRoutes, { prefix: '/api/admin/users' });
   await app.register(moderationRoutes, { prefix: '/api/admin/moderation' });
   await app.register(adminsRoutes, { prefix: '/api/admin/admins' });
+  await app.register(betaInvitesRoutes, { prefix: '/api/admin/beta-invites' });
   await app.register(betaProgramRoutes, { prefix: '/api/admin/beta-program' });
 
   return app;
