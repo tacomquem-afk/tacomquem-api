@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { env } from '../../config/env.js';
 import { CURRENT_TERMS_VERSION } from '../../config/terms.js';
 import { db } from '../../db/index.js';
 import { users } from '../../db/schema.js';
@@ -38,6 +39,7 @@ import {
   setPassword,
   verifyEmail,
 } from '../../services/auth/index.js';
+import { hash } from '../../services/crypto/index.js';
 
 async function authRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -414,7 +416,7 @@ if (response.status === 401) {
       const user = await getUserById(userId);
 
       if (!user) {
-        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'User not found');
+        throw new NotFoundError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
       }
 
       return reply.send({ user });
@@ -465,6 +467,8 @@ Called by a parent or legal guardian to authorize a minor's account (under 12 ye
 
 Once confirmed, the child's account becomes active and the minor can log in normally.
 
+**Rate limit:** 10 requests per hour per IP.
+
 **Token behavior:**
 - Expires in 48 hours from the time of registration
 - Single-use — becomes invalid after confirmation
@@ -488,12 +492,19 @@ Once confirmed, the child's account becomes active and the minor can log in norm
           410: z.object({ error: z.string() }),
         },
       },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 hour',
+        },
+      },
     },
     async (request, reply) => {
       const { token } = request.query;
+      const tokenHash = hash(token);
 
       const user = await db.query.users.findFirst({
-        where: eq(users.parentalConsentToken, token),
+        where: eq(users.parentalConsentToken, tokenHash),
       });
 
       if (!user) {
@@ -600,8 +611,8 @@ const { version, termsUrl, privacyUrl } = await fetch('/api/auth/terms').then(r 
     async (_request, reply) => {
       return reply.send({
         version: CURRENT_TERMS_VERSION,
-        termsUrl: `${process.env.FRONTEND_URL}/terms`,
-        privacyUrl: `${process.env.FRONTEND_URL}/privacy`,
+        termsUrl: `${env.FRONTEND_URL}/terms`,
+        privacyUrl: `${env.FRONTEND_URL}/privacy`,
       });
     }
   );
@@ -673,7 +684,7 @@ navigate('/dashboard');
       const user = await getUserById(userId);
 
       if (!user) {
-        throw new NotFoundError(ErrorCodes.ITEMS_NOT_FOUND, 'User not found');
+        throw new NotFoundError(ErrorCodes.AUTH_UNAUTHORIZED, 'User not found');
       }
 
       return reply.send({

@@ -171,7 +171,15 @@ describe('auth service', () => {
 
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateTx = mock(() => ({ set: setMock }));
+
+      spyOn(db, 'transaction').mockImplementation(async (callback) => {
+        const tx = {
+          update: updateTx,
+        } as any;
+        await callback(tx);
+        return undefined as any;
+      });
 
       const result = await verifyEmail('valid-token');
 
@@ -193,6 +201,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token already used', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -200,6 +218,7 @@ describe('auth service', () => {
         type: 'email_verification',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
         usedAt: new Date(),
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -218,6 +237,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token expired', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -225,6 +254,7 @@ describe('auth service', () => {
         type: 'email_verification',
         expiresAt: new Date(Date.now() - 1000),
         usedAt: null,
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -243,6 +273,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token type is invalid', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -250,6 +290,7 @@ describe('auth service', () => {
         type: 'password_reset',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
         usedAt: null,
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -385,6 +426,16 @@ describe('auth service', () => {
 
   describe('resetPassword', () => {
     it('should reset password with valid token', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -392,6 +443,7 @@ describe('auth service', () => {
         type: 'password_reset',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
         usedAt: null,
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -400,7 +452,15 @@ describe('auth service', () => {
 
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
+      const updateTx = mock(() => ({ set: setMock }));
+
+      spyOn(db, 'transaction').mockImplementation(async (callback) => {
+        const tx = {
+          update: updateTx,
+        } as any;
+        await callback(tx);
+        return undefined as any;
+      });
 
       const result = await resetPassword('valid-token', 'newpassword123');
 
@@ -422,6 +482,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token already used', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -429,6 +499,7 @@ describe('auth service', () => {
         type: 'password_reset',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
         usedAt: new Date(),
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -447,6 +518,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token expired', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -454,6 +535,7 @@ describe('auth service', () => {
         type: 'password_reset',
         expiresAt: new Date(Date.now() - 1000),
         usedAt: null,
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -472,6 +554,16 @@ describe('auth service', () => {
     });
 
     it('should throw error if token type is invalid', async () => {
+      const mockUser = {
+        id: 'user-123',
+        emailEncrypted: 'encrypted_test@example.com',
+        nameEncrypted: 'encrypted_Test User',
+        emailHash: 'hash_test@example.com',
+        emailVerified: false,
+        role: 'USER' as const,
+        deletedAt: null,
+      };
+
       const mockVerification = {
         id: 'token-123',
         userId: 'user-123',
@@ -479,6 +571,7 @@ describe('auth service', () => {
         type: 'email_verification',
         expiresAt: new Date(Date.now() + 1000 * 60 * 60),
         usedAt: null,
+        user: mockUser,
       };
 
       spyOn(db.query.verificationTokens, 'findFirst').mockResolvedValueOnce(
@@ -710,10 +803,18 @@ describe('auth service', () => {
 
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
-
+      const updateTx = mock(() => ({ set: setMock }));
       const deleteWhereMock = mock(() => Promise.resolve());
-      spyOn(db, 'delete').mockReturnValue({ where: deleteWhereMock } as any);
+      const deleteTx = mock(() => ({ where: deleteWhereMock }));
+
+      spyOn(db, 'transaction').mockImplementation(async (callback) => {
+        const tx = {
+          update: updateTx,
+          delete: deleteTx,
+        } as any;
+        await callback(tx);
+        return undefined as any;
+      });
 
       await expect(deleteAccount('user-123', 'password123')).resolves.toBeUndefined();
     });
@@ -725,10 +826,18 @@ describe('auth service', () => {
 
       const whereMock = mock(() => Promise.resolve());
       const setMock = mock(() => ({ where: whereMock }));
-      spyOn(db, 'update').mockReturnValue({ set: setMock } as any);
-
+      const updateTx = mock(() => ({ set: setMock }));
       const deleteWhereMock = mock(() => Promise.resolve());
-      spyOn(db, 'delete').mockReturnValue({ where: deleteWhereMock } as any);
+      const deleteTx = mock(() => ({ where: deleteWhereMock }));
+
+      spyOn(db, 'transaction').mockImplementation(async (callback) => {
+        const tx = {
+          update: updateTx,
+          delete: deleteTx,
+        } as any;
+        await callback(tx);
+        return undefined as any;
+      });
 
       await expect(deleteAccount('user-123')).resolves.toBeUndefined();
     });
