@@ -1,4 +1,7 @@
 import JSZip from 'jszip';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../../db/index.js';
+import { users, items, loans, friendships, notifications } from '../../db/schema.js';
 
 export interface UserExportData {
   id: string;
@@ -254,4 +257,55 @@ export async function buildCSVExport(data: ExportDataInput): Promise<ArrayBuffer
   zip.file('friendships.csv', friendshipsCsv);
 
   return zip.generateAsync({ type: 'arraybuffer' });
+}
+
+export async function exportUserData(userId: string, format: 'json' | 'csv') {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  const userItems = await db.query.items.findMany({
+    where: eq(items.ownerId, userId),
+  });
+
+  const userLoans = await db.query.loans.findMany({
+    where: and(
+      eq(loans.lenderId, userId)
+      // Note: also need to include loans where borrowerId = userId
+    ),
+  });
+
+  // Need to get both lent and borrowed loans
+  const allLoans = [
+    ...userLoans,
+    ...(await db.query.loans.findMany({
+      where: eq(loans.borrowerId, userId),
+    })),
+  ];
+
+  const userFriendships = await db.query.friendships.findMany({
+    where: eq(friendships.userAId, userId),
+  });
+
+  const userNotifications = await db.query.notifications.findMany({
+    where: eq(notifications.userId, userId),
+  });
+
+  const exportData: ExportDataInput = {
+    user,
+    items: userItems,
+    loans: allLoans,
+    friendships: userFriendships,
+    notifications: userNotifications,
+  };
+
+  if (format === 'json') {
+    return buildJSONExport(exportData);
+  } else {
+    return buildCSVExport(exportData);
+  }
 }

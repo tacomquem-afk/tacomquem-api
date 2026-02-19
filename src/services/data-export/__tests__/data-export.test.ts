@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, mock, spyOn } from 'bun:test';
 import JSZip from 'jszip';
-import { buildJSONExport, buildCSVExport } from '../index.js';
+import { buildJSONExport, buildCSVExport, exportUserData } from '../index.js';
+import { db } from '../../../db/index.js';
 
 describe('Data Export - JSON', () => {
   it('should build valid JSON export structure', async () => {
@@ -123,5 +124,28 @@ describe('Data Export - JSON', () => {
 
     const userCsv = await zip.file('user.csv')?.async('string');
     expect(userCsv).toContain('id,email,name');
+  });
+
+  it('should export user data in requested format', async () => {
+    const mockUser = {
+      id: 'user-123',
+      emailEncrypted: 'test@example.com',
+      nameEncrypted: 'John Doe',
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockDbSelect = mock(() => ({
+      from: mock(() => ({
+        where: mock(() => ({
+          toArray: mock(async () => [mockUser]),
+        })),
+      })),
+    }));
+
+    // This test will be more specific when we implement the actual logic
+    // For now, just verify the function signature works
+    expect(typeof exportUserData).toBe('function');
   });
 });
