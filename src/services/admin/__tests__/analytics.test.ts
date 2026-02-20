@@ -28,14 +28,18 @@ describe('Analytics Service', () => {
     it('should return flat dashboard statistics with pending loans', async () => {
       mocks.push(
         spyOn(db, 'select')
-          .mockReturnValueOnce(Promise.resolve([{ count: 100 }]) as any)
+          .mockReturnValueOnce({
+            from: () => Promise.resolve([{ count: 100 }]),
+          } as any)
           .mockReturnValueOnce({
             from: () => ({ where: () => Promise.resolve([{ count: 85 }]) }),
           } as any)
           .mockReturnValueOnce({
             from: () => ({ where: () => Promise.resolve([{ count: 50 }]) }),
           } as any)
-          .mockReturnValueOnce(Promise.resolve([{ count: 200 }]) as any)
+          .mockReturnValueOnce({
+            from: () => Promise.resolve([{ count: 200 }]),
+          } as any)
           .mockReturnValueOnce({
             from: () => ({ where: () => Promise.resolve([{ count: 30 }]) }),
           } as any)
@@ -57,12 +61,24 @@ describe('Analytics Service', () => {
     it('should return zeros when no data exists', async () => {
       mocks.push(
         spyOn(db, 'select')
-          .mockReturnValueOnce({ from: () => ({ where: () => [{ count: 0 }] }) } as any)
-          .mockReturnValueOnce({ from: () => ({ where: () => [{ count: 0 }] }) } as any)
-          .mockReturnValueOnce({ from: () => ({ where: () => [{ count: 0 }] }) } as any)
-          .mockReturnValueOnce({ from: () => [{ count: 0 }] } as any)
-          .mockReturnValueOnce({ from: () => ({ where: () => [{ count: 0 }] }) } as any)
-          .mockReturnValueOnce({ from: () => ({ where: () => [{ count: 0 }] }) } as any)
+          .mockReturnValueOnce({
+            from: () => Promise.resolve([{ count: 0 }]),
+          } as any)
+          .mockReturnValueOnce({
+            from: () => ({ where: () => Promise.resolve([{ count: 0 }]) }),
+          } as any)
+          .mockReturnValueOnce({
+            from: () => ({ where: () => Promise.resolve([{ count: 0 }]) }),
+          } as any)
+          .mockReturnValueOnce({
+            from: () => Promise.resolve([{ count: 0 }]),
+          } as any)
+          .mockReturnValueOnce({
+            from: () => ({ where: () => Promise.resolve([{ count: 0 }]) }),
+          } as any)
+          .mockReturnValueOnce({
+            from: () => ({ where: () => Promise.resolve([{ count: 0 }]) }),
+          } as any)
       );
 
       const stats = await getDashboardStats();

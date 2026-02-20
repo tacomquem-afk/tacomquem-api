@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
+import { db } from '../../../db/index.js';
 import jwtPlugin from '../../../plugins/jwt.js';
 import rbacPlugin from '../../../plugins/rbac.js';
 import * as analyticsModule from '../../../services/admin/analytics.js';
@@ -23,6 +24,16 @@ describe('Analytics Routes', () => {
       }
     }
     mocks.length = 0;
+
+    // Mock database user lookup for BETA_MODE checks
+    mocks.push(
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce({
+        id: 'admin-user',
+        role: 'ANALYST',
+        deletedAt: null,
+        accessTier: 'BETA',
+      } as any)
+    );
 
     app = Fastify();
     app.setValidatorCompiler(validatorCompiler);
@@ -107,14 +118,12 @@ describe('Analytics Routes', () => {
   it('GET /dashboard should return dashboard stats', async () => {
     mocks.push(
       spyOn(analyticsModule, 'getDashboardStats').mockResolvedValueOnce({
-        summary: {
-          totalUsers: 100,
-          activeUsers: 80,
-          totalItems: 50,
-          activeLoans: 10,
-          totalLoans: 200,
-        },
-        trends: { newUsersLastWeek: 5, newLoansLastWeek: 15, returnRateLast30Days: 0.85 },
+        totalUsers: 100,
+        activeUsers: 80,
+        totalItems: 50,
+        activeLoans: 10,
+        totalLoans: 200,
+        pendingLoans: 5,
       } as any)
     );
 
@@ -150,6 +159,16 @@ describe('Analytics Routes', () => {
 
   it('should reject USER role', async () => {
     const userToken = (app as any).signAccessToken('regular-user', 'USER');
+
+    // Mock another call to db.query.users.findFirst for the USER token
+    mocks.push(
+      spyOn(db.query.users, 'findFirst').mockResolvedValueOnce({
+        id: 'regular-user',
+        role: 'USER',
+        deletedAt: null,
+        accessTier: 'BETA',
+      } as any)
+    );
 
     const response = await app.inject({
       method: 'GET',

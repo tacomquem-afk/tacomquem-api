@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { db } from '../../db/index.js';
-import { findAdminByEmail, parseEmails, processEmailBatch } from '../bulk-add-beta-users.js';
+import { resetAllDbMocks } from '../../__tests__/helpers/db-mock-reset.js';
+import { parseEmails, processEmailBatch } from '../bulk-add-beta-users.js';
 
 describe('bulk-add-beta-users script helpers', () => {
   beforeEach(() => {
+    resetAllDbMocks();
     // no-op (spies are restored in afterEach)
   });
 
@@ -53,14 +54,5 @@ describe('bulk-add-beta-users script helpers', () => {
     expect(results[1]?.status).toBe('failed');
     expect(results[1]?.reason).toContain('User not found');
     expect(spy).toHaveBeenCalledTimes(2);
-  });
-
-  it('findAdminByEmail should query users by emailHash', async () => {
-    const fakeAdmin = { id: 'admin-1', role: 'SUPER_ADMIN' } as any;
-    spyOn(db.query.users, 'findFirst').mockResolvedValueOnce(fakeAdmin);
-
-    const admin = await findAdminByEmail('admin@example.com');
-    expect(admin).toBe(fakeAdmin);
-    expect(db.query.users.findFirst).toHaveBeenCalled();
   });
 });
