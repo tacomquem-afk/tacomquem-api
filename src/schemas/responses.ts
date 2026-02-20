@@ -393,7 +393,10 @@ export const addBetaUserSchema = z
 
 export const betaWaitlistUserSchema = z.object({
   id: uuidSchema.describe('User ID'),
-  email: z.string().describe('Masked email address returned for admin views'),
+  email: z
+    .string()
+    .email()
+    .describe('Full unmasked email address (required to add user to beta program)'),
   name: z.string().describe('Masked full name returned for admin views'),
   accessTier: accessTierSchema.describe('Current access tier (always PUBLIC for waitlisted users)'),
   betaWaitlistedAt: dateSchema.describe('Timestamp when the user requested beta access'),

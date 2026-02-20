@@ -125,7 +125,7 @@ export async function listWaitlistedUsers(params: ListWaitlistedUsersParams) {
 
     return {
       id: user.id,
-      email: maskEmail(emailPlain),
+      email: emailPlain,
       name: maskName(namePlain),
       accessTier: user.accessTier as AccessTier,
       // betaWaitlistedAt is guaranteed non-null here by the query filter
