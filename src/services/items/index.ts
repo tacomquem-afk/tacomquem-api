@@ -3,7 +3,7 @@ import { db } from '../../db/index.js';
 import { items, loans, uploads } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { CreateItemInput, UpdateItemInput } from '../../schemas/items.js';
-import { decrypt } from '../crypto/index.js';
+import { decryptSafe } from '../crypto/index.js';
 import { deleteUploadsFromR2, resolveImageKeys } from '../storage/index.js';
 
 export interface ItemResponse {
@@ -29,7 +29,7 @@ async function toItemResponse(
 ): Promise<ItemResponse> {
   let borrowedTo: string | null = null;
   if (activeLoan?.borrower) {
-    borrowedTo = decrypt(activeLoan.borrower.nameEncrypted);
+    borrowedTo = decryptSafe(activeLoan.borrower.nameEncrypted);
   }
 
   return {

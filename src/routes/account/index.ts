@@ -17,7 +17,7 @@ import {
   getDeletionStatus,
   scheduleDeletion,
 } from '../../services/account-deletion/index.js';
-import { decrypt } from '../../services/crypto/index.js';
+import { decryptSafe } from '../../services/crypto/index.js';
 
 async function usersRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -239,7 +239,7 @@ Returns the parental consent information for the authenticated user's account. R
       return reply.status(200).send({
         status: user.parentalConsentStatus as 'pending' | 'confirmed' | 'not_applicable',
         confirmedAt: user.parentalConsentConfirmedAt || undefined,
-        responsibleEmail: user.parentalEmail ? decrypt(user.parentalEmail) : undefined,
+        responsibleEmail: user.parentalEmail ? decryptSafe(user.parentalEmail) : undefined,
         responsibleName: user.parentalName || undefined,
       });
     }

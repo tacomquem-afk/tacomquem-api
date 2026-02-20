@@ -3,7 +3,7 @@ import { db } from '../../db/index.js';
 import { adminAuditLog, users } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
-import { decrypt } from '../crypto/index.js';
+import { decryptSafe } from '../crypto/index.js';
 import { maskEmail, maskName } from './helpers.js';
 import { logAdminAction } from './index.js';
 
@@ -42,8 +42,8 @@ export async function listAdmins(): Promise<AdminUser[]> {
 
   return admins.map((admin) => ({
     id: admin.id,
-    email: maskEmail(admin.emailEncrypted ? decrypt(admin.emailEncrypted) : ''),
-    name: maskName(decrypt(admin.nameEncrypted)),
+    email: maskEmail(decryptSafe(admin.emailEncrypted)),
+    name: maskName(decryptSafe(admin.nameEncrypted)),
     role: admin.role as UserRole,
     createdAt: (admin.createdAt || new Date()).toISOString(),
   }));
@@ -129,7 +129,7 @@ export async function getAuditLog(params: AuditLogParams) {
     id: log.id,
     admin: {
       id: log.admin.id,
-      name: maskName(decrypt(log.admin.nameEncrypted)),
+      name: maskName(decryptSafe(log.admin.nameEncrypted)),
       role: log.admin.role as UserRole,
     },
     action: log.action,

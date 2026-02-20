@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { dataExports, users } from '../db/schema.js';
-import { decrypt } from '../services/crypto/index.js';
+import { decryptSafe } from '../services/crypto/index.js';
 import { exportUserData } from '../services/data-export/index.js';
 import { buildDataExportReadyEmail, sendEmail } from '../services/email/index.js';
 
@@ -38,7 +38,7 @@ export async function processDataExports() {
       if (user?.emailEncrypted) {
         const downloadUrl = `${process.env.APP_URL}/api/users/me/data/export/${exportRecord.id}/download?token=${exportRecord.downloadToken}`;
         await sendEmail({
-          to: decrypt(user.emailEncrypted),
+          to: decryptSafe(user.emailEncrypted),
           subject: 'Seu Dado de Exportação está Pronto',
           html: buildDataExportReadyEmail(downloadUrl, '7 days', exportRecord.format),
         });

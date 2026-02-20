@@ -2,7 +2,7 @@ import { and, eq, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { friendships, loans } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes } from '../../errors/index.js';
-import { decrypt } from '../crypto/index.js';
+import { decryptSafe } from '../crypto/index.js';
 
 interface FriendshipExecutor {
   insert: typeof db.insert;
@@ -95,9 +95,8 @@ export async function getFriendsByUser(userId: string): Promise<FriendWithMetric
 
     friendsMap.set(friend.id, {
       id: friend.id,
-      name: decrypt(friend.nameEncrypted),
-      // biome-ignore lint/style/noNonNullAssertion: friendships are cascade-deleted when user is deleted
-      email: decrypt(friend.emailEncrypted!),
+      name: decryptSafe(friend.nameEncrypted),
+      email: decryptSafe(friend.emailEncrypted),
       avatarUrl: friend.avatarUrl,
       lentCount: 0,
       borrowedCount: 0,

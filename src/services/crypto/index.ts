@@ -43,6 +43,25 @@ export function decrypt(encryptedText: string): string {
   return decrypted;
 }
 
+/**
+ * Safely decrypt text, returning empty string instead of throwing on invalid format.
+ * Logs errors for monitoring while preventing application crashes.
+ * Used for user PII data that must always be handled gracefully.
+ */
+export function decryptSafe(encryptedText?: string | null): string {
+  if (!encryptedText) return '';
+  try {
+    return decrypt(encryptedText);
+  } catch (error) {
+    console.error('[crypto] Decryption failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      dataLength: encryptedText.length,
+      hasColons: encryptedText.includes(':'),
+    });
+    return '';
+  }
+}
+
 export function hash(text: string): string {
   return createHash('sha256').update(text.toLowerCase()).digest('hex');
 }

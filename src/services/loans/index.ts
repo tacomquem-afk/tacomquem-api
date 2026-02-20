@@ -5,7 +5,7 @@ import { db } from '../../db/index.js';
 import { betaInvites, items, loans, loanTokens, notifications, users } from '../../db/schema.js';
 import { BadRequestError, ErrorCodes, GoneError, NotFoundError } from '../../errors/index.js';
 import type { CreateLoanInput } from '../../schemas/loans.js';
-import { decrypt, hash } from '../crypto/index.js';
+import { decryptSafe, hash } from '../crypto/index.js';
 import {
   buildLoanConfirmationRequestEmail,
   buildLoanReminderEmail,
@@ -70,7 +70,7 @@ export async function createLoan(
     throw new NotFoundError(ErrorCodes.LOANS_USER_NOT_FOUND, 'User not found');
   }
 
-  const lenderName = decrypt(lender.nameEncrypted);
+  const lenderName = decryptSafe(lender.nameEncrypted);
 
   const loanResult = await db
     .insert(loans)
@@ -218,12 +218,12 @@ export async function getLoansByUser(
       },
       lender: {
         id: loan.lender.id,
-        name: decrypt(loan.lender.nameEncrypted),
+        name: decryptSafe(loan.lender.nameEncrypted),
       },
       borrower: loan.borrower
         ? {
             id: loan.borrower.id,
-            name: decrypt(loan.borrower.nameEncrypted),
+            name: decryptSafe(loan.borrower.nameEncrypted),
           }
         : null,
       borrowerEmail: loan.borrowerEmail,
@@ -261,12 +261,12 @@ export async function getLoanById(loanId: string, userId: string): Promise<LoanR
     },
     lender: {
       id: loan.lender.id,
-      name: decrypt(loan.lender.nameEncrypted),
+      name: decryptSafe(loan.lender.nameEncrypted),
     },
     borrower: loan.borrower
       ? {
           id: loan.borrower.id,
-          name: decrypt(loan.borrower.nameEncrypted),
+          name: decryptSafe(loan.borrower.nameEncrypted),
         }
       : null,
     borrowerEmail: loan.borrowerEmail,
@@ -311,7 +311,7 @@ export async function markLoanAsReturned(
       loanId: loan.id,
       type: 'loan_returned',
       title: 'Item devolvido',
-      message: `Você devolveu "${loan.item.name}" para ${decrypt(loan.lender.nameEncrypted)}.`,
+      message: `Você devolveu "${loan.item.name}" para ${decryptSafe(loan.lender.nameEncrypted)}.`,
       sentAt: new Date(),
     });
   }
@@ -364,10 +364,9 @@ export async function sendReminder(loanId: string, lenderId: string): Promise<bo
     throw new BadRequestError(ErrorCodes.LOANS_NO_RECEIVER, 'Loan has no confirmed receiver');
   }
 
-  const lenderName = decrypt(loan.lender.nameEncrypted);
-  const borrowerName = decrypt(loan.borrower.nameEncrypted);
-  // biome-ignore lint/style/noNonNullAssertion: borrower cannot delete account while a loan is active
-  const borrowerEmail = decrypt(loan.borrower.emailEncrypted!);
+  const lenderName = decryptSafe(loan.lender.nameEncrypted);
+  const borrowerName = decryptSafe(loan.borrower.nameEncrypted);
+  const borrowerEmail = decryptSafe(loan.borrower.emailEncrypted);
 
   await sendEmail({
     to: borrowerEmail,
@@ -454,12 +453,12 @@ export async function getLoansHistory(
       },
       lender: {
         id: loan.lender.id,
-        name: decrypt(loan.lender.nameEncrypted),
+        name: decryptSafe(loan.lender.nameEncrypted),
       },
       borrower: loan.borrower
         ? {
             id: loan.borrower.id,
-            name: decrypt(loan.borrower.nameEncrypted),
+            name: decryptSafe(loan.borrower.nameEncrypted),
           }
         : null,
       borrowerEmail: loan.borrowerEmail,
@@ -504,7 +503,7 @@ export async function getPublicLoanInfo(token: string): Promise<PublicLoanInfo |
   return {
     itemName: loanToken.loan.item.name,
     itemImages: await resolveImageKeys(loanToken.loan.item.images),
-    lenderName: decrypt(loanToken.loan.lender.nameEncrypted),
+    lenderName: decryptSafe(loanToken.loan.lender.nameEncrypted),
     itemDescription: loanToken.loan.item.description ?? null,
     expectedReturnDate: loanToken.loan.expectedReturnDate?.toISOString() ?? null,
     lenderNotes: loanToken.loan.lenderNotes ?? null,
@@ -565,8 +564,8 @@ export async function confirmLoan(token: string, borrowerId: string): Promise<Lo
       });
 
       if (borrower) {
-        const borrowerName = decrypt(borrower.nameEncrypted);
-        const lenderName = decrypt(loanToken.loan.lender.nameEncrypted);
+        const borrowerName = decryptSafe(borrower.nameEncrypted);
+        const lenderName = decryptSafe(loanToken.loan.lender.nameEncrypted);
 
         await tx.insert(notifications).values({
           userId: loanToken.loan.lenderId,

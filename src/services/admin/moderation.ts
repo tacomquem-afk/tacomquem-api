@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans } from '../../db/schema.js';
-import { decrypt } from '../crypto/index.js';
+import { decryptSafe } from '../crypto/index.js';
 import { deleteUploadsFromR2, resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 import { logAdminAction } from './index.js';
@@ -21,8 +21,8 @@ export async function getItemDetails(itemId: string) {
 
   if (!item) return null;
 
-  const ownerEmail = item.owner.emailEncrypted ? decrypt(item.owner.emailEncrypted) : '';
-  const ownerName = decrypt(item.owner.nameEncrypted);
+  const ownerEmail = decryptSafe(item.owner.emailEncrypted);
+  const ownerName = decryptSafe(item.owner.nameEncrypted);
 
   const activeLoans = item.loans.filter((l) => l.status === 'confirmed').length;
 
@@ -59,7 +59,12 @@ export async function removeItem(
     let imageKeys: string[] = [];
     try {
       imageKeys = JSON.parse(item.images);
-    } catch {}
+    } catch (error) {
+      console.error('[moderation] Failed to parse item images JSON', {
+        itemId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
 
     if (imageKeys.length > 0) {
       const { failed } = await deleteUploadsFromR2(imageKeys);
@@ -91,8 +96,8 @@ export async function getLoanDetails(loanId: string) {
 
   if (!loan) return null;
 
-  const lenderEmail = loan.lender.emailEncrypted ? decrypt(loan.lender.emailEncrypted) : '';
-  const lenderName = decrypt(loan.lender.nameEncrypted);
+  const lenderEmail = decryptSafe(loan.lender.emailEncrypted);
+  const lenderName = decryptSafe(loan.lender.nameEncrypted);
 
   return {
     id: loan.id,
@@ -109,10 +114,8 @@ export async function getLoanDetails(loanId: string) {
     borrower: loan.borrower
       ? {
           id: loan.borrower.id,
-          email: maskEmail(
-            loan.borrower.emailEncrypted ? decrypt(loan.borrower.emailEncrypted) : ''
-          ),
-          name: maskName(decrypt(loan.borrower.nameEncrypted)),
+          email: maskEmail(decryptSafe(loan.borrower.emailEncrypted)),
+          name: maskName(decryptSafe(loan.borrower.nameEncrypted)),
         }
       : null,
     borrowerEmail: loan.borrowerEmail,

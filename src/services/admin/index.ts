@@ -13,7 +13,7 @@ import {
 } from '../../db/schema.js';
 import { ErrorCodes, NotFoundError } from '../../errors/index.js';
 import type { UserRole } from '../../plugins/rbac.js';
-import { decrypt, encrypt, hash } from '../crypto/index.js';
+import { decryptSafe, encrypt, hash } from '../crypto/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 import { maskEmail, maskName } from './helpers.js';
 
@@ -86,8 +86,8 @@ export async function listUsers(params: ListUsersParams) {
   const count = countResult[0]?.count || 0;
 
   const maskedUsers: MaskedUser[] = allUsers.map((user) => {
-    const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
-    const namePlain = decrypt(user.nameEncrypted);
+    const emailPlain = decryptSafe(user.emailEncrypted);
+    const namePlain = decryptSafe(user.nameEncrypted);
 
     return {
       id: user.id,
@@ -131,8 +131,8 @@ export async function getUserDetails(userId: string) {
 
   if (!user) return null;
 
-  const emailPlain = user.emailEncrypted ? decrypt(user.emailEncrypted) : '';
-  const namePlain = decrypt(user.nameEncrypted);
+  const emailPlain = decryptSafe(user.emailEncrypted);
+  const namePlain = decryptSafe(user.nameEncrypted);
 
   const name = maskName(namePlain);
 
@@ -160,7 +160,7 @@ export async function getUserDetails(userId: string) {
         borrower: loan.borrower
           ? {
               id: loan.borrower.id,
-              name: maskName(decrypt(loan.borrower.nameEncrypted)),
+              name: maskName(decryptSafe(loan.borrower.nameEncrypted)),
             }
           : null,
         borrowerEmail: loan.borrowerEmail,
@@ -183,7 +183,7 @@ export async function getUserDetails(userId: string) {
         },
         lender: {
           id: loan.lender.id,
-          name: maskName(decrypt(loan.lender.nameEncrypted)),
+          name: maskName(decryptSafe(loan.lender.nameEncrypted)),
         },
         borrower: {
           id: user.id,
@@ -215,7 +215,7 @@ export async function getUserDetails(userId: string) {
           currentLoanId: activeLoan?.status === 'confirmed' ? activeLoan.id : null,
           borrowedTo:
             activeLoan?.status === 'confirmed' && activeLoan.borrower
-              ? maskName(decrypt(activeLoan.borrower.nameEncrypted))
+              ? maskName(decryptSafe(activeLoan.borrower.nameEncrypted))
               : null,
           createdAt: (item.createdAt || new Date()).toISOString(),
           updatedAt: (item.updatedAt || new Date()).toISOString(),

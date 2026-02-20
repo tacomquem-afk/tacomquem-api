@@ -1,7 +1,7 @@
 import { and, count, desc, eq, ilike, or } from 'drizzle-orm';
 import { db } from '../../db/index.js';
 import { items, loans, notifications } from '../../db/schema.js';
-import { decrypt } from '../crypto/index.js';
+import { decryptSafe } from '../crypto/index.js';
 import { getFriendsByUser } from '../friendships/index.js';
 import { resolveImageKeys } from '../storage/index.js';
 
@@ -99,9 +99,9 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
           const isLender = l.lenderId === userId;
           const otherParty = isLender
             ? l.borrower
-              ? decrypt(l.borrower.nameEncrypted)
+              ? decryptSafe(l.borrower.nameEncrypted)
               : (l.borrowerEmail ?? 'Pendente')
-            : decrypt(l.lender.nameEncrypted);
+            : decryptSafe(l.lender.nameEncrypted);
 
           return {
             id: l.id,
